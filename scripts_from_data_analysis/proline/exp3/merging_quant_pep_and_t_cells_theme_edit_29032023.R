@@ -7,13 +7,23 @@ library(ggplot2)
 library(tidyr)
 ###############################################
 
-source("D:/dev/Desktop_copy/PHD/data_analysis/scripts/ggplot_functions.R")
+source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/ggplot/ggplot_functions.R")
+# 
+# file_path_exp3 <- "D:/dev/Desktop_copy/PHD/wet_lab_experiments/DDA_data_analysis/experiment_3/Proline_data_analysis/quant_pep_06022023/"
+# file_name_exp3 <- "PAL _Tcell_Exp3_( 5 conc 3reps)_NoFAIMS_DDA_with_cont_230206.xlsx"
+# selected_spcies = "_MOUSE"
+# sheet_name <- "Quantified peptide ions"
+# 
 
-file_path_exp3 <- "D:/dev/Desktop_copy/PHD/wet_lab_experiments/DDA_data_analysis/experiment_3/Proline_data_analysis/quant_pep_06022023/"
-file_name_exp3 <- "PAL _Tcell_Exp3_( 5 conc 3reps)_NoFAIMS_DDA_with_cont_230206.xlsx"
-selected_spcies = "_MOUSE"
-sheet_name <- "Quantified peptide ions"
 
+file_path_exp3_tims <- "D:/dev/Pinar/PHD/wet_lab_experiments/DDA_data_analysis/experiment_3/Proline_timsdata/"
+file_name_exp3_tims <- "PAL TimsTOF_data_conversion_all_exp_06062023 E3 corrected_2023-06-28_1522.xlsx"
+# Common constant objects
+sample_size <- 5
+#sheet_name <- "Quantified peptide ions"
+sheet_name <- "Best PSM from protein sets"
+file_path<- file_path_exp3_tims 
+file_name <- file_name_exp3_tims
 
 final_proline_pep_quant_analysis_bio <- function(file_path,
                                              file_name,
@@ -23,15 +33,22 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
                                              sheet_theo_name,
                                              selected_spcies,
                                              sample_size){
-  quant_peptides <- read.xlsx(paste0(file_path_exp3,file_name_exp3), sheet = sheet_name)
+  quant_peptides <- read.xlsx(paste0(file_path,file_name), sheet = sheet_name)
   
-  quant_peptides_with_all <- quant_peptides %>% 
+  abundances_for_impute <- quant_peptides %>% 
+    select(starts_with("abundance_"),spectrum_title) %>%
+    rename_with(~exp_design,matches("abundance"))
+  
+  quant_peptides_cor_abun <- quant_peptides %>% 
+    rename_with(~exp_design,matches("^abundance"))
+  
+  quant_peptides_with_all <- quant_peptides_cor_abun %>% 
     filter(grepl("_MOUSE",accession)) %>% 
     filter(grepl("Phospho",modifications)) 
   
-  quant_peptides_ECOLI <- quant_peptides %>% 
+  quant_peptides_ECOLI <- quant_peptides_cor_abun %>% 
     filter(grepl("ECOLI",accession)) %>% 
-    select(sequence,ptm_protein_positions, starts_with("abundance"))
+    select(sequence,ptm_protein_positions, starts_with(exp_design))
     
   
   phospho_ptm_pos <- lapply(quant_peptides_with_all$ptm_protein_positions, function(each_ptm_protein_positions) {
@@ -58,31 +75,31 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   quant_peptides_with_all$pep_with_pos <- paste(quant_peptides_with_all$sequence, phospho_ptm_pos_df, sep = "_")
 
   # Nothing is changed
-  filtered_abundances<-quant_peptides_with_all[rowSums(!is.na(select(quant_peptides_with_all,starts_with("abundance_"))))>0,]
+  filtered_abundances<-quant_peptides_with_all[rowSums(!is.na(select(quant_peptides_with_all,starts_with(exp_design))))>0,]
   
   df_id_pep <- filtered_abundances %>% 
-    select(sequence,ptm_protein_positions, pep_with_pos, starts_with("abundance")) %>%
+    select(sequence,ptm_protein_positions, pep_with_pos, starts_with(exp_design)) %>%
     tibble() %>%
-    rename(A1_R1= 4, # Using column index to rename the colnames
-           A1_R2= 5,
-           A1_R3= 6,
-           A2_R1= 7,
-           A2_R2= 8,
-           A2_R3= 9,
-           A3_R1= 10,
-           A3_R2= 11,
-           A3_R3= 12,
-           A4_R1= 13,
-           A4_R2= 14,
-           A4_R3= 15,
-           A5_R1= 16,
-           A5_R2= 17,
-           A5_R3= 18) %>%
-    pivot_longer(cols = starts_with("A"), 
+    # rename(A1_R1= 4, # Using column index to rename the colnames
+    #        A1_R2= 5,
+    #        A1_R3= 6,
+    #        A2_R1= 7,
+    #        A2_R2= 8,
+    #        A2_R3= 9,
+    #        A3_R1= 10,
+    #        A3_R2= 11,
+    #        A3_R3= 12,
+    #        A4_R1= 13,
+    #        A4_R2= 14,
+    #        A4_R3= 15,
+    #        A5_R1= 16,
+    #        A5_R2= 17,
+    #        A5_R3= 18) %>%
+    pivot_longer(cols = starts_with("E2"), 
                  values_to = "intensity",
                  names_to = "sample_ids",
                  values_drop_na = T) %>%
-    separate(sample_ids, into = c("Sample_id", "Rep_id"), sep = "_")# %>% 
+    separate(sample_ids, into = c("Exp_id","Sample_id", "Rep_id"), sep = "_")# %>% 
     #group_by(Sample_id) %>%
     #count()
   
@@ -101,6 +118,11 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
                          y_lab = "Number of identified peptides")
   
   barplt_df_ecoli <- quant_peptides_ECOLI %>% 
+    pivot_longer(cols = starts_with("E2"), 
+                 values_to = "intensity",
+                 names_to = "sample_ids",
+                 values_drop_na = T) %>%
+    separate(sample_ids, into = c("Exp_id","Sample_id", "Rep_id"), sep = "_") %>%
     mutate(sample_rep_id_seq = paste(sequence, Sample_id,Rep_id, sep = "_")) %>%
     filter(duplicated(sample_rep_id_seq)==FALSE)
   
@@ -114,8 +136,6 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
                          fill_lab =  "Sample id",
                          y_lab = "Number of identified peptides")
 
-  abundances_only_for_impute <- filtered_abundances %>% select(starts_with("abundance_"))
-  
   
   ## DENSITY PLOT OF BEFORE IMPUTATION 
   
@@ -125,30 +145,26 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   for (k in 1:sample_size){
     # If separate version of row means is not needed, it can be commented later.
     # Separate row Means can be collected in temp object to merge in "log_10_filtered_abundances_rowMeans"
-    assign(paste0("abundances_A",k),as.data.frame(rowMeans(abundances_only_for_impute  %>%
-                                                             select(contains(paste0("A",k))) %>%
-                                                             select(starts_with("abundance_")))))
+    assign(paste0("abundances_A",k),as.data.frame(rowMeans(quant_peptides_with_all  %>%
+                                                             select(contains(paste0("A",k)))))) #%>%
+                                                             #select(starts_with("abundance_")))))
     abundances_rowMeans<- bind_cols(abundances_rowMeans,get(paste0("abundances_A",k)))
     
     
     assign(paste0("ecoli_abundances_A",k),as.data.frame(rowMeans(quant_peptides_ECOLI  %>%
-                                                             select(contains(paste0("A",k))) %>%
-                                                             select(starts_with("abundance_")))))  
+                                                             select(contains(paste0("A",k))))))# %>%
+                                                             #select(starts_with("abundance_")))))  
     
     abundances_ecoli_rowMeans<- bind_cols(abundances_ecoli_rowMeans,get(paste0("ecoli_abundances_A",k)))
     
   }
   
-  
+
   quant_peptides_ECOLI_density_plot <- quant_peptides_ECOLI %>%
-    select(!starts_with("abundance")) %>%
+    select(!starts_with("E")) %>%
     bind_cols(abundances_ecoli_rowMeans) %>%
     tibble() %>%
-    rename(mean_abundances_A1= 3, # Using column index to rename the colnames
-           mean_abundances_A2= 4,
-           mean_abundances_A3= 5,
-           mean_abundances_A4= 6,
-           mean_abundances_A5= 7) %>%
+    rename_with(~ paste0("mean_abun",1:5), matches("^row")) %>%
     pivot_longer(cols = starts_with("mean"), 
                  values_to = "intensity",
                  names_to = "sample_ids",
@@ -166,9 +182,12 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   colnames(abundances_rowMeans) <- paste0("mean_abundances_A",1:sample_size)
   
   #### MEAN ABUNDANCE RATIO WITH  DENSITY PLOT ####
-  figure_with_mean_abundance <- abundances_rowMeans %>% 
-    tibble() %>% mutate(pep_with_pos = filtered_abundances$pep_with_pos) %>%
-    mutate(species="MOUSE") %>%
+  figure_with_mean_abundance <- quant_peptides_with_all %>%
+    select(!starts_with("E")) %>%
+    bind_cols(abundances_rowMeans) %>% 
+    rename_with(~ paste0("mean_abun",1:5), matches("^row")) %>%
+    tibble() %>% #mutate(pep_with_pos = sequence) %>% ###  At this stage, no need for phospho-position
+    mutate(species="MOUSE") %>%                         # We only count number of sequence here.   
     pivot_longer(cols = starts_with("mean"), 
                  names_to = "sample_ids",
                  values_to = "intensity",
@@ -190,6 +209,12 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
              fill_lab = "species")
 
   # Calculate 1 percent quantile of each sample
+  
+  
+  abundances_only_for_impute <- filtered_abundances %>% select(starts_with("abundance_"))
+  
+  impute_values <- apply(abundances_for_impute, 2 , quantile , probs = 0.01 , na.rm = TRUE )
+  
   impute_values <- apply(abundances_only_for_impute, 2 , quantile , probs = 0.01 , na.rm = TRUE )
   
   # Impute missing values
