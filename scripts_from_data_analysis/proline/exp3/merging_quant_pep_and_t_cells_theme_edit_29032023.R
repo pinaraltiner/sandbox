@@ -24,7 +24,23 @@ sample_size <- 5
 sheet_name <- "Best PSM from protein sets"
 file_path<- file_path_exp3_tims 
 file_name <- file_name_exp3_tims
+selected_spcies <-  "_MOUSE"
+test_type <- c("t.test","wilcoxon","limma") ## one selection at a time
 
+exp_design <- c("E3_A1_R1","E3_A1_R2",
+                "E3_A1_R3",
+                "E3_A2_R1",
+                "E3_A2_R2",
+                "E3_A2_R3",
+                "E3_A3_R1",
+                "E3_A3_R2",
+                "E3_A3_R3",
+                "E3_A4_R1",
+                "E3_A4_R2",
+                "E3_A4_R3",
+                "E3_A5_R1",
+                "E3_A5_R2",
+                "E3_A5_R3")
 final_proline_pep_quant_analysis_bio <- function(file_path,
                                              file_name,
                                              sheet_name,
@@ -36,7 +52,7 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   quant_peptides <- read.xlsx(paste0(file_path,file_name), sheet = sheet_name)
   
   abundances_for_impute <- quant_peptides %>% 
-    select(starts_with("abundance_"),spectrum_title) %>%
+    select(starts_with("abundance_")) %>% ## spectrum_title remove it because it was not make it as rownames (has duplicates)
     rename_with(~exp_design,matches("abundance"))
   
   quant_peptides_cor_abun <- quant_peptides %>% 
@@ -48,10 +64,10 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   
   quant_peptides_ECOLI <- quant_peptides_cor_abun %>% 
     filter(grepl("ECOLI",accession)) %>% 
-    select(sequence,ptm_protein_positions, starts_with(exp_design))
+    select(sequence,modifications, starts_with(exp_design))
     
   
-  phospho_ptm_pos <- lapply(quant_peptides_with_all$ptm_protein_positions, function(each_ptm_protein_positions) {
+  phospho_ptm_pos <- lapply(quant_peptides_with_all$modifications, function(each_ptm_protein_positions) {
     
     ptm_list <- as.list(strsplit(each_ptm_protein_positions,"; ", fixed=TRUE)[[1]]) # Split ptm_protein_position depending on ";"
     
@@ -76,9 +92,10 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
 
   # Nothing is changed
   filtered_abundances<-quant_peptides_with_all[rowSums(!is.na(select(quant_peptides_with_all,starts_with(exp_design))))>0,]
+  filtered_abundances_ecoli <-quant_peptides_ECOLI[rowSums(!is.na(select(quant_peptides_ECOLI,starts_with(exp_design))))>0,]
   
   df_id_pep <- filtered_abundances %>% 
-    select(sequence,ptm_protein_positions, pep_with_pos, starts_with(exp_design)) %>%
+    select(sequence,modifications, pep_with_pos, starts_with(exp_design)) %>%
     tibble() %>%
     # rename(A1_R1= 4, # Using column index to rename the colnames
     #        A1_R2= 5,
@@ -95,7 +112,7 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
     #        A5_R1= 16,
     #        A5_R2= 17,
     #        A5_R3= 18) %>%
-    pivot_longer(cols = starts_with("E2"), 
+    pivot_longer(cols = starts_with("E3"), 
                  values_to = "intensity",
                  names_to = "sample_ids",
                  values_drop_na = T) %>%
@@ -115,10 +132,11 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
                          caption_lab = "NA values are removed.",
                          x_lab = "Sample id",
                          fill_lab =  "Sample id",
-                         y_lab = "Number of identified peptides")
+                         y_lab = "Number of identified peptides",
+                         subtitle_txt = "")
   
-  barplt_df_ecoli <- quant_peptides_ECOLI %>% 
-    pivot_longer(cols = starts_with("E2"), 
+  barplt_df_ecoli <- filtered_abundances_ecoli %>% 
+    pivot_longer(cols = starts_with("E3"), 
                  values_to = "intensity",
                  names_to = "sample_ids",
                  values_drop_na = T) %>%
@@ -134,7 +152,8 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
                          caption_lab = "NA values are removed.",
                          x_lab = "Sample id",
                          fill_lab =  "Sample id",
-                         y_lab = "Number of identified peptides")
+                         y_lab = "Number of identified peptides",
+                         subtitle_txt = "")
 
   
   ## DENSITY PLOT OF BEFORE IMPUTATION 
@@ -145,13 +164,13 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   for (k in 1:sample_size){
     # If separate version of row means is not needed, it can be commented later.
     # Separate row Means can be collected in temp object to merge in "log_10_filtered_abundances_rowMeans"
-    assign(paste0("abundances_A",k),as.data.frame(rowMeans(quant_peptides_with_all  %>%
+    assign(paste0("abundances_A",k),as.data.frame(rowMeans(filtered_abundances  %>%
                                                              select(contains(paste0("A",k)))))) #%>%
                                                              #select(starts_with("abundance_")))))
     abundances_rowMeans<- bind_cols(abundances_rowMeans,get(paste0("abundances_A",k)))
     
     
-    assign(paste0("ecoli_abundances_A",k),as.data.frame(rowMeans(quant_peptides_ECOLI  %>%
+    assign(paste0("ecoli_abundances_A",k),as.data.frame(rowMeans(filtered_abundances_ecoli  %>%
                                                              select(contains(paste0("A",k))))))# %>%
                                                              #select(starts_with("abundance_")))))  
     
@@ -160,7 +179,7 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   }
   
 
-  quant_peptides_ECOLI_density_plot <- quant_peptides_ECOLI %>%
+  quant_peptides_ECOLI_density_plot <- filtered_abundances_ecoli %>%
     select(!starts_with("E")) %>%
     bind_cols(abundances_ecoli_rowMeans) %>%
     tibble() %>%
@@ -177,15 +196,14 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
     select(contains(c("sample_ids","intensity","species"))) 
   
   
-  
-  
-  colnames(abundances_rowMeans) <- paste0("mean_abundances_A",1:sample_size)
+  colnames(abundances_rowMeans) <- paste0("mean_abun",1:sample_size)
   
   #### MEAN ABUNDANCE RATIO WITH  DENSITY PLOT ####
-  figure_with_mean_abundance <- quant_peptides_with_all %>%
+      ### BEFORE IMPUTATION ###
+  quant_phospho_density_plot <- filtered_abundances %>%
     select(!starts_with("E")) %>%
     bind_cols(abundances_rowMeans) %>% 
-    rename_with(~ paste0("mean_abun",1:5), matches("^row")) %>%
+    #rename_with(~ paste0("mean_abun",1:5), matches("^row")) %>%
     tibble() %>% #mutate(pep_with_pos = sequence) %>% ###  At this stage, no need for phospho-position
     mutate(species="MOUSE") %>%                         # We only count number of sequence here.   
     pivot_longer(cols = starts_with("mean"), 
@@ -193,7 +211,7 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
                  values_to = "intensity",
                  values_drop_na = T)
   
-  density_df <-figure_with_mean_abundance %>%
+  density_df <-quant_phospho_density_plot %>%
     select(c(sample_ids,intensity,species)) %>%
     bind_rows(ecoli_density_plot)
   
@@ -206,36 +224,30 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
              facet_df = "sample_ids",
              x_lab = "log10(intensities)",
              color_lab= "",
-             fill_lab = "species")
+             fill_lab = "species",
+             subtitle_txt = "")
 
   # Calculate 1 percent quantile of each sample
   
-  
-  abundances_only_for_impute <- filtered_abundances %>% select(starts_with("abundance_"))
-  
   impute_values <- apply(abundances_for_impute, 2 , quantile , probs = 0.01 , na.rm = TRUE )
-  
-  impute_values <- apply(abundances_only_for_impute, 2 , quantile , probs = 0.01 , na.rm = TRUE )
-  
+  abundances_for_impute_mouse <- filtered_abundances %>% select(exp_design)
   # Impute missing values
   for (j in 1:length(impute_values)){
     # Number NA
-    num_NA <- length(abundances_only_for_impute[,j][is.na(abundances_only_for_impute[,j])])
+    num_NA <- length(abundances_for_impute_mouse[,j][is.na(abundances_for_impute_mouse[,j])])
     
-    abundances_only_for_impute[,j][is.na(abundances_only_for_impute[,j])] <- impute_values[j]
+    abundances_for_impute_mouse[,j][is.na(abundances_for_impute_mouse[,j])] <- impute_values[j]
     
     # After imputation number of imputed values
-    num_imp <-length(abundances_only_for_impute[,j][(abundances_only_for_impute[,j]==impute_values[j])])
+    num_imp <-length(abundances_for_impute_mouse[,j][(abundances_for_impute_mouse[,j]==impute_values[j])])
     
     # This is verification of imputation is done successfully
     # Because we expect to see that number of imputed values should be the same amount as number of NA
-    # However there is also possibility that data has already had the same value just by chance.
-    
     print(setequal(num_NA,num_imp))
     #print(num_NA)
     #print(num_imp)
-    #print(impute_values[j])
   }
+  
   
   
   # Take log10 
@@ -249,16 +261,23 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   # Ask sample_size additional parameter
   
   filtered_abundances_rowMeans <- NULL
+  filtered_abundances_log10 <- NULL
+  
   for (k in 1:sample_size){
     # If separate version of row means is not needed, it can be commented later.
     # Separate row Means can be collected in temp object to merge in "log_10_filtered_abundances_rowMeans"
-    assign(paste0("aft_imp_abundances_A",k),as.data.frame(rowMeans(abundances_only_for_impute  %>% select(contains(paste0("A",k))) %>%
-                                                             select(starts_with("abundance_")))))
+    assign(paste0("aft_imp_abundances_A",k),as.data.frame(rowMeans(abundances_for_impute_mouse  %>% select(contains(paste0("A",k))))))
     filtered_abundances_rowMeans<- bind_cols(filtered_abundances_rowMeans,get(paste0("aft_imp_abundances_A",k)))
+    
+    assign(paste0("log10_abundances_A",k),as.data.frame(log10(abundances_for_impute_mouse  %>% select(contains(paste0("A",k)))))) 
+    filtered_abundances_log10 <- bind_cols(filtered_abundances_log10, get(paste0("log10_abundances_A",k)))
     
   }
   
   colnames(filtered_abundances_rowMeans) <- paste0("mean_abundances_aft_imp_A",1:sample_size)
+  
+  filtered_abundances_log10 <- filtered_abundances_log10 %>%
+    rename_with(~ paste0("log10_", .x), everything())
   
   # Calculate Fold Change by keeping A1 constant (mean(S1)/mean(S2), etc.)
   cols <- ncol(filtered_abundances_rowMeans)
@@ -271,19 +290,19 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   #  sapply(cols, function(xi) (filtered_abundances_rowMeans[, xj]/(filtered_abundances_rowMeans[, xj])))))
   #colnames(mat) <-  outer(names(filtered_abundances_rowMeans), names(filtered_abundances_rowMeans), paste0)
   
-  final_imputed_normalized_data <- cbind(filtered_abundances,filtered_abundances_rowMeans)
+  final_imputed_data <- cbind(filtered_abundances,filtered_abundances_rowMeans,filtered_abundances_log10)
   
-  #write.table(final_imputed_normalized_data, file = "final_imputed_normalized_data_PAL _T_cell_Exp3_( 5 conc 3reps)_NoFAIMS_DDA_with_cont_230206_2023-02-07_0947.txt",sep = "\t",row.names = F)
+  #write.table(final_imputed_data, file = "final_imputed_normalized_data_PAL _T_cell_Exp3_( 5 conc 3reps)_NoFAIMS_DDA_with_cont_230206_2023-02-07_0947.txt",sep = "\t",row.names = F)
   
-  df_mean_ab_after_impt <- final_imputed_normalized_data %>% 
+  df_mean_ab_after_impt <- final_imputed_data %>% 
     select(starts_with("mean_")| contains("common_col_for_merging")) %>%
     tibble() %>% 
     pivot_longer(cols = starts_with("mean"),
                  names_to = "Mean_abundance",
                  values_to = "values")
     
-  df_FC_ratio_after_impt <- final_imputed_normalized_data %>% 
-    select(starts_with("exp_")| contains("common_col_for_merging")) %>%
+  df_FC_ratio_after_impt <- final_imputed_data %>% 
+    select(starts_with("exp_")| contains("pep_with_pos")) %>%
     tibble() %>% 
     pivot_longer(cols = starts_with("exp_"),
                  names_to = "exp_FC",
@@ -297,7 +316,8 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
                    facet_df = "Mean_abundance",
                    x_lab = "log10(values)",
                    color_lab= "",
-                   fill_lab = "Sample Names")
+                   fill_lab = "Sample Names",
+                   subtitle_txt = "")
   
   p5 <- gg_raincloud(data_set = df_mean_ab_after_impt,
                      x_df = df_mean_ab_after_impt$Mean_abundance,
@@ -307,7 +327,8 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
                      x_lab = "Sample Names",
                      y_lab = " Density of log10(Mean Abundance)",
                      fill_lab = "Sample Names",
-                     caption_lab = "")
+                     caption_lab = "",
+                     subtitle_txt = "")
   
   
   
@@ -331,7 +352,8 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
                             header="Experimental Quantity Ratio of T-cell Phospho Peptides",
                             x_lab="Sample Names",
                             y_lab="Abundance Ratios",
-                            fill_lab = "Sample Names")
+                            fill_lab = "Sample Names",
+                            subtitle_txt = "")
   
   
   ### HALF-BOX-PLOT & HALF-SCATTER-PLOT: Experimental Quantity Ratio of Synthetic Peptides  
@@ -344,7 +366,8 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
                                  header="Experimental Quantity Ratio of T-cell Phospho Peptides",
                                  x_lab="Sample Names",
                                  y_lab="Abundance Ratios",
-                                 fill_lab = "Sample Names")
+                                 fill_lab = "Sample Names",
+                                 subtitle_txt = "")
   
   ### VIOLIN-PLOT: Experimental Quantity Ratio of Synthetic Peptides   
   
@@ -357,7 +380,8 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
                             x_lab="Sample Names",
                             y_lab="Abundance Ratios",
                             fill_lab = "Sample Names",
-                            trim=TRUE)
+                            trim=TRUE,
+                            subtitle_txt = "")
   
   sapply(1:8,function(x) ggsave(filename = paste0("p",x,".tiff"),
                                 width = 50, height = 40, 
@@ -409,5 +433,122 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   # 
   # 
   # 
+  
+  ttest_func <- function(x, y) {
+    # if (sum(!is.na(x)) < 2 | sum(!is.na(y)) < 2) {
+    #   return(NA)
+    # }else{
+    #   
+    # }
+    t.test(x, y,alternative = c("two.sided"))$p.value
+  }
+  
+  wilcox_func <- function(x, y) {
+    # if (sum(!is.na(x)) < 2 | sum(!is.na(y)) < 2) {
+    #   return(NA)
+    # }else{
+    #   
+    # }
+    wilcox.test(as.numeric(x), as.numeric(y),alternative = c("two.sided"))$p.value
+  }
+  ## TODO: ADD LIMMA
+  stat_analysis <- final_imputed_data %>%
+    select(pep_with_pos,spectrum_title,accession, starts_with("log10_"))
+  
+  rownames(stat_analysis) <- paste0(stat_analysis$pep_with_pos,"@",stat_analysis$spectrum_title,"@",stat_analysis$accession,"@",(1:nrow(stat_analysis)))
+  
+
+  all_pvalues <- NULL
+  
+  for (i in 2:sample_size){
+    p_values_tmp <- NULL
+    
+    for(j in 1:dim(stat_analysis)[1]){
+      
+      if(test_type=="t.test"){
+        p_values_tmp[j] <- ttest_func(select(stat_analysis,contains("A1"))[j,],     ### FOR DIFFERENT KIND OF EXP SETUP, 
+                                      select(stat_analysis,contains(paste0("A",i)))[j,])  ## It should be defined as an input.
+      
+      }else if(test_type=="wilcoxon"){
+        p_values_tmp[j] <- wilcox_func(select(stat_analysis,contains("A1"))[j,],     ### FOR DIFFERENT KIND OF EXP SETUP, 
+                                      select(stat_analysis,contains(paste0("A",i)))[j,])  ## It should be defined as an input.
+      }
+      
+      
+    }
+    p_values_tmp <- as.data.frame(p_values_tmp)
+    colnames(p_values_tmp) <- paste0("A1_","vs_","A",i)
+    all_pvalues <- bind_cols(all_pvalues,p_values_tmp)
+    rm(p_values_tmp)
+  }
+  
+  
+  ## DESIGN SETUP FOR LIMMA (TODO: supply this matrix as an imput makes it faster)
+  ## MANUALLY DESIGN GENERATION this is unnecessary to have that but still I'll keep it
+  # for (i in 0:num_reps){
+  #   design[(1:num_reps+(num_reps*i)),paste0("A",(i+2))] <- 1
+  # }
+  # 
+  # design[is.na(design)] <- 0
+  # num_reps <- 3
+  # sample_size <- length(exp_design) / num_reps
+  # num_comparison <- sample_size -1 
+  # 
+  # design <- matrix(nrow = num_comparison*num_reps, ncol = sample_size)
+  # colnames(design) <- paste0("A",1:sample_size)
+  # design[,"A1"] <- 1
+  # 
+  
+  ## DESIGN SETUP FOR LIMMA (TODO: supply this matrix as an imput makes it faster)
+  # Create the design matrix
+  num_reps <- 3
+  sample_size <- length(exp_design) / num_reps
+  sample_names <- paste0("A",1:sample_size)
+  comparisons <- NULL
+  for (i in 1:sample_size){
+    tmp <- paste0(sample_names[1], "_vs_",sample_names[i])
+    comparisons[i] <- tmp
+    rm(tmp)
+  }
+  
+  if(test_type=="limma"){
+    library(limma)
+    
+    design_matrix <- model.matrix(~ 0 + factor(rep(sample_names, each = 3)))
+    colnames(design_matrix) <-comparisons
+    data_limma <- limma::eBayes(limma::lmFit(stat_analysis[,3:18], design_matrix))
+    
+    ###  adjust.method argument in the topTable function does not directly control 
+    # the target false discovery rate (FDR) threshold.
+    
+    all_pvalues <- topTable(data_limma,number = Inf, adjust.method = "BH",p.value = 1)
+    # For A1 vs. all comparison
+    
+    for (j in 2:length(comparisons)){
+      assign(paste0("results_",comparisons[j]),
+             topTable(data_limma, coef = comparisons[j],
+                      number = Inf, adjust.method = "BH",p.value = 1))
+      
+    }
+    # Filter the results based on the FDR threshold
+    # desired_fdr_threshold <- 0.05
+    # significant_results_A1_vs_A2 <- subset(results_A1_vs_A2, adj.P.Val <= desired_fdr_threshold)
+  
+  }
+  
+  necessary_cols <- as.data.frame(rownames(all_pvalues))
+  
+  stat_df <- necessary_cols %>%
+    rename(mult_col = 1) %>%
+    separate(mult_col, c("pep_with_pos", "spectrum_title","accession","id"),sep = "@") %>%
+    select(-accession) %>%
+    bind_cols(all_pvalues) %>% tibble() ## tibble() will delete rownames! 
+                                        ## Be careful that merging correct rownames to pvalues
+  
+  
+  
+  
+  
+
 }
 
