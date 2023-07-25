@@ -14,7 +14,8 @@ gg_density <- function(data_set,
                                  facet_df,
                                  x_lab,
                                  fill_lab,
-                                 color_lab){
+                                 color_lab,
+                       subtitle_txt){
   data_set$facet <- data_set[[facet_df]]
   ggplot(data_set,aes(x=log10(x_df), fill=fill_df )) +
     stat_density(position = "stack",alpha=0.7, aes(color=color_df),size=1)+
@@ -27,12 +28,17 @@ gg_density <- function(data_set,
           axis.title.x = element_text(size = 25),
           axis.title.y = element_text(size = 25),
           plot.title = element_text(size=30),
+          plot.subtitle = element_text(size = 20),
           legend.title=element_text(size=25),
           axis.text=element_text(size=25),
-          axis.title=element_text(size=25)) +
+          axis.title=element_text(size=25),
+          strip.text.x = element_text(
+            size = 15
+          )
+          ) +
     ggtitle(header) +
     facet_wrap(~facet, nrow = 2,scales = "free_x") +
-    labs(x=x_lab,fill = fill_lab, color= color_lab)
+    labs(x=x_lab,fill = fill_lab, color= color_lab,subtitle = subtitle_txt)
   
 } 
 
@@ -48,7 +54,8 @@ gg_density <- function(data_set,
 #                                  color_df,
 #                                  header,
 #                                  facet_df,
-#                                  header){
+#                                  header,
+#subtitle_txt){
 #   data_set$facet <- data_set[[facet_df]]
 #   ggplot(data_set, aes(x =log10(x_df) , y = log10(y_df), color=color_df)) +
 #   geom_point()+
@@ -61,7 +68,7 @@ gg_density <- function(data_set,
 #         legend.title=element_text(size=15),
 #         axis.text=element_text(size=15),
 #         axis.title=element_text(size=15)
-#   ) 
+#   ) +labs(subtitle = subtitle_txt)
 
 ### BOX-PLOT: Experimental Quantity Ratio of Synthetic Peptides  
 
@@ -72,7 +79,8 @@ gg_boxplt_exp_ratio <- function(data_set,
                                  header,
                                  x_lab,
                                  y_lab,
-                                 fill_lab){
+                                 fill_lab,
+                                subtitle_txt){
   ggplot(data_set,aes(x =x_df , y =log2(y_df),fill = fill_df)) +
     geom_boxplot() +
     scale_y_continuous(breaks = seq(from =round(min(log2(y_df))), to=(round(max(log2(y_df)))+2),by=1)) +
@@ -81,12 +89,13 @@ gg_boxplt_exp_ratio <- function(data_set,
           axis.title.x = element_text(size = 25),
           axis.title.y = element_text(size = 25),
           plot.title = element_text(size=30),
+          plot.subtitle = element_text(size = 20),
           legend.title=element_text(size=25),
           axis.text=element_text(size=25),
           axis.title=element_text(size=25)
     ) +   stat_boxplot(geom = "errorbar") + 
     ggtitle(header) +
-    labs(x=x_lab,y=y_lab,fill = fill_lab) +
+    labs(x=x_lab,y=y_lab,fill = fill_lab,subtitle = subtitle_txt) +
     scale_fill_brewer(palette="Set1")
   
 }
@@ -102,7 +111,8 @@ gg_half_boxplt_exp_ratio <- function(data_set,
                                 header,
                                 x_lab,
                                 y_lab,
-                                fill_lab
+                                fill_lab,
+                                subtitle_txt
                                 ){
   ggplot(data_set,aes(x =x_df , y =log2(y_df),fill = fill_df)) +
     geom_half_boxplot(outlier.shape = NA) +
@@ -113,11 +123,12 @@ gg_half_boxplt_exp_ratio <- function(data_set,
           axis.title.x = element_text(size = 25),
           axis.title.y = element_text(size = 25),
           plot.title = element_text(size=30),
+          plot.subtitle = element_text(size = 20),
           legend.title=element_text(size=25),
           axis.text=element_text(size=25),
           axis.title=element_text(size=25)
     ) + scale_fill_brewer(palette="Set1") +
-    labs(x=x_lab,y=y_lab,fill=fill_lab) +
+    labs(x=x_lab,y=y_lab,fill=fill_lab,subtitle = subtitle_txt) +
     ggtitle(header)
 }
 
@@ -132,7 +143,8 @@ gg_violin_exp_ratio <- function(data_set,
                                      x_lab,
                                      y_lab,
                                      fill_lab,
-                                     trim){
+                                     trim,
+                                subtitle_txt){
   
   ggplot(data_set,aes(x =x_df , y =log2(y_df),fill = fill_df)) +
     geom_violin(trim = trim) +
@@ -142,11 +154,12 @@ gg_violin_exp_ratio <- function(data_set,
           axis.title.x = element_text(size = 25),
           axis.title.y = element_text(size = 25),
           plot.title = element_text(size=30),
+          plot.subtitle = element_text(size = 20),
           legend.title=element_text(size=25),
           axis.text=element_text(size=25),
           axis.title=element_text(size=25)
     ) + scale_fill_brewer(palette="Set1") +
-    labs(x=x_lab,y=y_lab, fill= fill_lab) +
+    labs(x=x_lab,y=y_lab, fill= fill_lab,subtitle = subtitle_txt) +
     ggtitle(header)
 }
 
@@ -160,8 +173,8 @@ gg_barplt_id_pep_count <- function(data_set,
                                 x_lab,
                                 y_lab,
                                 fill_lab,
-                                caption_lab # "NA values are removed.",
-                                ){
+                                caption_lab, # "NA values are removed.",
+                                subtitle_txt){
 
 
 ggplot(data_set, aes(x=x_df, fill=fill_df)) + geom_bar(position = "dodge") +
@@ -171,13 +184,15 @@ ggplot(data_set, aes(x=x_df, fill=fill_df)) + geom_bar(position = "dodge") +
         axis.title.x = element_text(size = 25),
         axis.title.y = element_text(size = 25),
         plot.title = element_text(size=30),
+        plot.subtitle = element_text(size = 20),
+        plot.caption = element_text(size = 20),
         legend.title=element_text(size=25),
         axis.text=element_text(size=25),
         axis.title=element_text(size=25)) +
   ggtitle(header) + 
   scale_y_continuous(breaks = seq(from=0, to=ymax,by=500)) +
   geom_text(aes(label=after_stat(count)),stat = "count", position=position_dodge(width=0.9), vjust=-0.25) +
-  labs(x=x_lab,y=y_lab, fill= fill_lab, caption = caption_lab)
+  labs(x=x_lab,y=y_lab, fill= fill_lab, caption = caption_lab,subtitle = subtitle_txt)
 }
   
 
@@ -192,7 +207,8 @@ gg_raincloud <- function(data_set,
                          x_lab,
                          y_lab,
                          fill_lab,
-                         caption_lab){
+                         caption_lab,
+                         subtitle_txt){
   ggplot(data_set, aes(x= factor(x_df),
                                          y = log10(y_df),
                                          fill=factor(fill_df))) +
@@ -211,11 +227,13 @@ gg_raincloud <- function(data_set,
     theme(legend.text = element_text(size=25), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
           axis.title.x = element_text(size = 25),axis.title.y = element_text(size = 25),
           plot.title = element_text(size=30),
+          plot.subtitle = element_text(size = 20),
+          plot.caption = element_text(size = 20),
           legend.title=element_text(size=25),
           axis.text=element_text(size=25),
           axis.title=element_text(size=25)) + 
     ggtitle(header) + 
-    labs(x=x_lab,y=y_lab, fill= fill_lab, caption = caption_lab) +
+    labs(x=x_lab,y=y_lab, fill= fill_lab, caption = caption_lab,subtitle = subtitle_txt) +
     scale_fill_brewer(palette="Set1")
 }
   
