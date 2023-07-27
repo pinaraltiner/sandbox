@@ -16,14 +16,16 @@ source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis
 # 
 
 
+### BE INVOLVED ECOLI IN THE STATISTICAL PART
+
 file_path_exp3_tims <- "D:/dev/Pinar/PHD/wet_lab_experiments/DDA_data_analysis/experiment_3/Proline_timsdata/"
 file_name_exp3_tims <- "PAL TimsTOF_data_conversion_all_exp_06062023 E3 corrected_2023-06-28_1522.xlsx"
 # Common constant objects
 sample_size <- 5
 #sheet_name <- "Quantified peptide ions"
 sheet_name <- "Best PSM from protein sets"
-file_path<- file_path_exp3_tims 
-file_name <- file_name_exp3_tims
+file_path<- file_path_exp3_faims
+file_name <- file_name_exp3_faims
 selected_spcies <-  "_MOUSE"
 test_type <- c("t.test","wilcoxon","limma") ## one selection at a time
 
@@ -52,6 +54,10 @@ for (i in 1:sample_size){
   rm(tmp)
 }
 
+acquisiton_type <- c("DDA Exploris with FAIMS","DDA Exploris no FAIMS","DDA TIMS-TOF")
+exp_id <- 1:3
+software_name <- c("Proline", "MaxQuant", "PD")
+
 final_proline_pep_quant_analysis_bio <- function(file_path,
                                              file_name,
                                              sheet_name,
@@ -59,7 +65,10 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
                                              theo_file_name,
                                              sheet_theo_name,
                                              selected_spcies,
-                                             sample_size){
+                                             sample_size,
+                                             acquisiton_type,
+                                             exp_id,
+                                             software_name){
   quant_peptides <- read.xlsx(paste0(file_path,file_name), sheet = sheet_name)
   
   abundances_for_impute <- quant_peptides %>% 
@@ -75,7 +84,7 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   
   quant_peptides_ECOLI <- quant_peptides_cor_abun %>% 
     filter(grepl("ECOLI",accession)) %>% 
-    select(sequence,modifications, starts_with(exp_design))
+    select(sequence,modifications,accession,spectrum_title,starts_with(exp_design))
     
   
   phospho_ptm_pos <- lapply(quant_peptides_with_all$modifications, function(each_ptm_protein_positions) {
@@ -241,16 +250,23 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   # Calculate 1 percent quantile of each sample
   
   impute_values <- apply(abundances_for_impute, 2 , quantile , probs = 0.01 , na.rm = TRUE )
-  abundances_for_impute_mouse <- filtered_abundances %>% select(exp_design)
+  
+  #abundances_for_impute_ecoli <- filtered_abundances_ecoli %>% select(exp_design)
+  
+  abundances_for_impute_all <- filtered_abundances %>%
+    bind_rows(filtered_abundances_ecoli) %>% select(exp_design)
+
   # Impute missing values
   for (j in 1:length(impute_values)){
     # Number NA
-    num_NA <- length(abundances_for_impute_mouse[,j][is.na(abundances_for_impute_mouse[,j])])
+    num_NA <- length(abundances_for_impute_all[,j][is.na(abundances_for_impute_all[,j])])
     
-    abundances_for_impute_mouse[,j][is.na(abundances_for_impute_mouse[,j])] <- impute_values[j]
+    #abundances_for_impute_mouse[,j][is.na(abundances_for_impute_mouse[,j])] <- impute_values[j]
+    #abundances_for_impute_ecoli[,j][is.na(abundances_for_impute_ecoli[,j])] <- impute_values[j]
     
+    abundances_for_impute_all[,j][is.na(abundances_for_impute_all)[,j]] <- impute_values[j]
     # After imputation number of imputed values
-    num_imp <-length(abundances_for_impute_mouse[,j][(abundances_for_impute_mouse[,j]==impute_values[j])])
+    num_imp <-length(abundances_for_impute_all[,j][(abundances_for_impute_all[,j]==impute_values[j])])
     
     # This is verification of imputation is done successfully
     # Because we expect to see that number of imputed values should be the same amount as number of NA
@@ -259,7 +275,10 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
     #print(num_imp)
   }
   
-  
+  abundances_all_aft_imputation <- filtered_abundances %>%
+    bind_rows(filtered_abundances_ecoli) %>% 
+    select(sequence, accession, spectrum_title) %>%
+    bind_cols(abundances_for_impute_all)
   
   # Take log10 
   #log_10_abundances_only_for_impute <- log10(abundances_only_for_impute)
@@ -271,17 +290,33 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   # Take mean of triplicates of each sample 
   # Ask sample_size additional parameter
   
+  
+
+  
   filtered_abundances_rowMeans <- NULL
   filtered_abundances_log10 <- NULL
   filtered_abundances_log10_rowMeans <- NULL
   
+  
   for (k in 1:sample_size){
     # If separate version of row means is not needed, it can be commented later.
     # Separate row Means can be collected in temp object to merge in "log_10_filtered_abundances_rowMeans"
-    assign(paste0("aft_imp_abundances_A",k),as.data.frame(rowMeans(abundances_for_impute_mouse  %>% select(contains(paste0("A",k))))))
+    
+    #### COMMENTED CODES ARE CORRESPOND TO IMPUTATION FOR ONLY MOUSE ####
+    
+    # assign(paste0("aft_imp_abundances_A",k),as.data.frame(rowMeans(abundances_for_impute_mouse  %>% select(contains(paste0("A",k))))))
+    # filtered_abundances_rowMeans<- bind_cols(filtered_abundances_rowMeans,get(paste0("aft_imp_abundances_A",k)))
+    # 
+    # assign(paste0("log10_abundances_A",k),as.data.frame(log10(abundances_for_impute_mouse  %>% select(contains(paste0("A",k)))))) 
+    # filtered_abundances_log10 <- bind_cols(filtered_abundances_log10, get(paste0("log10_abundances_A",k)))
+    # 
+    # assign(paste0("rowMean_log10_abundances_A",k),as.data.frame(rowMeans(get(paste0("log10_abundances_A",k)) %>% select(contains(paste0("A",k))))))
+    # filtered_abundances_log10_rowMeans<- bind_cols(filtered_abundances_log10_rowMeans,get(paste0("rowMean_log10_abundances_A",k)))
+    
+    assign(paste0("aft_imp_abundances_A",k),as.data.frame(rowMeans(abundances_all_aft_imputation  %>% select(contains(paste0("A",k))))))
     filtered_abundances_rowMeans<- bind_cols(filtered_abundances_rowMeans,get(paste0("aft_imp_abundances_A",k)))
     
-    assign(paste0("log10_abundances_A",k),as.data.frame(log10(abundances_for_impute_mouse  %>% select(contains(paste0("A",k)))))) 
+    assign(paste0("log10_abundances_A",k),as.data.frame(log10(abundances_all_aft_imputation  %>% select(contains(paste0("A",k))))))
     filtered_abundances_log10 <- bind_cols(filtered_abundances_log10, get(paste0("log10_abundances_A",k)))
     
     assign(paste0("rowMean_log10_abundances_A",k),as.data.frame(rowMeans(get(paste0("log10_abundances_A",k)) %>% select(contains(paste0("A",k))))))
@@ -305,19 +340,21 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   #  sapply(cols, function(xi) (filtered_abundances_rowMeans[, xj]/(filtered_abundances_rowMeans[, xj])))))
   #colnames(mat) <-  outer(names(filtered_abundances_rowMeans), names(filtered_abundances_rowMeans), paste0)
   
-  final_imputed_data <- cbind(filtered_abundances,filtered_abundances_rowMeans,filtered_abundances_log10,filtered_abundances_log10_rowMeans)
+  final_imputed_data <- cbind(abundances_all_aft_imputation, filtered_abundances_rowMeans,filtered_abundances_log10,filtered_abundances_log10_rowMeans) #filtered_abundances
   
   #write.table(final_imputed_data, file = "final_imputed_normalized_data_PAL _T_cell_Exp3_( 5 conc 3reps)_NoFAIMS_DDA_with_cont_230206_2023-02-07_0947.txt",sep = "\t",row.names = F)
   
   df_mean_ab_after_impt <- final_imputed_data %>% 
-    select(contains("aft_imp") | contains("pep_with_pos")) %>%
+    select(contains("aft_imp") | contains("accession")) %>%
     tibble() %>% 
+    separate(accession, into = c("uniprot_id", "species"), remove = F) %>%
     pivot_longer(cols = contains("aft_imp"),
                  names_to = "Mean_abundance",
                  values_to = "values")
     
   df_FC_ratio_after_impt <- final_imputed_data %>% 
-    select(starts_with("exp_")| contains("pep_with_pos")) %>%
+    select(starts_with("exp_")| contains("accession")) %>%
+    separate(accession, into = c("uniprot_id", "species"), remove = F) %>%
     tibble() %>% 
     pivot_longer(cols = starts_with("exp_"),
                  names_to = "exp_FC",
@@ -326,7 +363,7 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   p4 <- gg_density(data_set = df_mean_ab_after_impt, 
                    x_df = df_mean_ab_after_impt$values,
                    fill_df = df_mean_ab_after_impt$Mean_abundance,
-                   color_df = NULL,
+                   color_df = df_mean_ab_after_impt$species,
                    header="Distribution of mean abundance of every sample after imputation",
                    facet_df = "Mean_abundance",
                    x_lab = "log10(values)",
@@ -347,23 +384,24 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   
   
   
-  # p4 <- gg_density(data_set = df_FC_ratio_after_impt, 
-  #                  x_df = df_FC_ratio_after_impt$values,
-  #                  fill_df = df_FC_ratio_after_impt$exp_FC,
-  #                  color_df = NULL,
-  #                  header="Distribution of Fold change Ratio of every sample after imputation",
-  #                  facet_df = "exp_FC",
-  #                  x_lab = "log10(values)",
-  #                  color_lab= "",
-  #                  fill_lab = "Sample Names")
+  p6 <- gg_density(data_set = df_FC_ratio_after_impt,
+                   x_df = df_FC_ratio_after_impt$values,
+                   fill_df = df_FC_ratio_after_impt$exp_FC,
+                   color_df = df_FC_ratio_after_impt$species,
+                   header="Distribution of Fold change Ratio of every sample after imputation",
+                   facet_df = "exp_FC",
+                   x_lab = "log10(values)",
+                   color_lab= "",
+                   fill_lab = "Sample Names",
+                   subtitle_txt = "")
   # 
 
   ### BOX-PLOT: Experimental Quantity Ratio of Phospho Peptides  
   
-  p6 <- gg_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
+  p7 <- gg_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
                             x_df = df_FC_ratio_after_impt$exp_FC,
                             y_df = df_FC_ratio_after_impt$values,
-                            fill_df = df_FC_ratio_after_impt$exp_FC,
+                            fill_df = df_FC_ratio_after_impt$species,
                             header="Experimental Quantity Ratio of T-cell Phospho Peptides",
                             x_lab="Sample Names",
                             y_lab="Abundance Ratios",
@@ -374,11 +412,11 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   ### HALF-BOX-PLOT & HALF-SCATTER-PLOT: Experimental Quantity Ratio of Synthetic Peptides  
   library(gghalves)
   
-  p7 <- gg_half_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
+  p8 <- gg_half_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
                                  x_df = df_FC_ratio_after_impt$exp_FC,
                                  y_df = df_FC_ratio_after_impt$values,
-                                 fill_df = df_FC_ratio_after_impt$exp_FC,
-                                 header="Experimental Quantity Ratio of T-cell Phospho Peptides",
+                                 fill_df = df_FC_ratio_after_impt$species,
+                                 header="Experimental Quantity Ratio of T-cell Phospho Peptides with Background",
                                  x_lab="Sample Names",
                                  y_lab="Abundance Ratios",
                                  fill_lab = "Sample Names",
@@ -387,24 +425,16 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   ### VIOLIN-PLOT: Experimental Quantity Ratio of Synthetic Peptides   
   
   ### TODO: fix y scaling without trimming 
-  p8 <- gg_violin_exp_ratio(data_set = df_FC_ratio_after_impt, 
+  p9 <- gg_violin_exp_ratio(data_set = df_FC_ratio_after_impt, 
                             x_df = df_FC_ratio_after_impt$exp_FC,
                             y_df = df_FC_ratio_after_impt$values,
-                            fill_df = df_FC_ratio_after_impt$exp_FC,
-                            header="Experimental Quantity Ratio of T-cell Phospho Peptides",
+                            fill_df = df_FC_ratio_after_impt$species,
+                            header="Experimental Quantity Ratio of T-cell Phospho Peptides with Background",
                             x_lab="Sample Names",
                             y_lab="Abundance Ratios",
                             fill_lab = "Sample Names",
                             trim=TRUE,
                             subtitle_txt = "")
-  
-  sapply(1:8,function(x) ggsave(filename = paste0("p",x,".tiff"),
-                                width = 50, height = 40, 
-                                path = file_path,
-                                units = "cm",
-                                get(paste0("p",x)),
-                                device = "tiff", #".svg"
-  ))
   
   
   
@@ -468,9 +498,9 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   }
   ## TODO: ADD LIMMA
   stat_analysis <- final_imputed_data %>%
-    select(pep_with_pos,spectrum_title,accession, starts_with("log10_") | starts_with("mean_log10_") | starts_with("exp_FC"))
+    select(sequence,spectrum_title,accession, starts_with("log10_") | starts_with("mean_log10_") | starts_with("exp_FC"))
   
-  rownames(stat_analysis) <- paste0(stat_analysis$pep_with_pos,"@",stat_analysis$spectrum_title,"@",stat_analysis$accession,"@",(1:nrow(stat_analysis)))
+  rownames(stat_analysis) <- paste0(stat_analysis$sequence,"@",stat_analysis$spectrum_title,"@",stat_analysis$accession,"@",(1:nrow(stat_analysis)))
   if(test_type== "t.test" | test_type== "wilcoxon"){
     all_pvalues <- NULL
     
@@ -480,12 +510,12 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
       for(j in 1:dim(stat_analysis)[1]){
         
         if(test_type=="t.test"){
-          p_values_tmp[j] <- ttest_func(select(stat_analysis,contains("A1"))[j,],     ### FOR DIFFERENT KIND OF EXP SETUP, 
-                                        select(stat_analysis,contains(paste0("A",i)))[j,])  ## It should be defined as an input.
+          p_values_tmp[j] <- ttest_func(select(stat_analysis,contains("A1_") & contains("log10_"))[j,],     ### FOR DIFFERENT KIND OF EXP SETUP, 
+                                        select(stat_analysis,contains(paste0("A",i,"_")) & contains("log10_"))[j,] ) ## It should be defined as an input.
           
         }else if(test_type=="wilcoxon"){
-          p_values_tmp[j] <- wilcox_func(select(stat_analysis,contains("A1"))[j,],     ### FOR DIFFERENT KIND OF EXP SETUP, 
-                                         select(stat_analysis,contains(paste0("A",i)))[j,])  ## It should be defined as an input.
+          p_values_tmp[j] <- wilcox.test(select(stat_analysis,contains("A1_") & contains("log10_"))[j,],     ### FOR DIFFERENT KIND OF EXP SETUP, 
+                                        select(stat_analysis,contains(paste0("A",i,"_")) & contains("log10_"))[j,])     ## It should be defined as an input.
         }
         
         
@@ -497,12 +527,12 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
       
     }
     all_pvalues_common_col <- stat_analysis %>% 
-      select(pep_with_pos, spectrum_title, accession) %>%
+      select(sequence, spectrum_title, accession) %>%
       bind_cols(all_pvalues) %>% 
       pivot_longer(cols = starts_with("pvalues_"), values_to = "pvalues", names_to ="p_ratios") %>%
       separate(p_ratios, into = c("tmp","ratio"),sep = "_") %>%
       select(!tmp) %>%
-      mutate(common_col = paste(pep_with_pos,spectrum_title,accession,ratio,1:((sample_size-1)*nrow(stat_analysis)),sep="@"))
+      mutate(common_col = paste(sequence,spectrum_title,accession,ratio,1:((sample_size-1)*nrow(stat_analysis)),sep="@"))
     
     ### MERGING I: All used columns are merged and used to combine pvalues and ratios
           ## Before changing the shape of data 
@@ -510,13 +540,14 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
           ## We are 100% sured that all pvalues are associated with its ratio.
       ## Shape of volcano plot looks quite weird esspecially in the A1vsA5.
     merge_stat_df <- stat_analysis %>%
-      select(pep_with_pos, spectrum_title, accession, starts_with("exp_FC")) %>%
+      select(sequence, spectrum_title, accession, starts_with("exp_FC")) %>%
       bind_cols(all_pvalues) %>%
       pivot_longer(cols = starts_with("exp_FC"), values_to = "fold_change_values", names_to ="fold_change_ratios") %>%
       separate(fold_change_ratios, into = c("tmp","tmp1","ratio"),sep = "_") %>%
       select(!c(tmp,tmp1)) %>%
-      mutate(common_col = paste(pep_with_pos,spectrum_title,accession,ratio,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) %>%
-      left_join(all_pvalues_common_col, by="common_col")
+      mutate(common_col = paste(sequence,spectrum_title,accession,ratio,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) %>%
+      left_join(all_pvalues_common_col, by="common_col") %>%
+      separate(accession.x, into = c("uniprot_id","species"),sep = "_")
     
     ### MERGING II: Previous version of combining pvalues and ratios
         ## No errors were appeared when I double pivot_longer()
@@ -524,10 +555,11 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
         ## We cannot know which pvalues correspond to which ratio (MAYBE WE DON'T NEED IT)
     ## Shape of volcano plot looks better when I used this way.
       merge_stat_df1 <- stat_analysis %>%
-        select(pep_with_pos, spectrum_title, accession, starts_with("exp_FC")) %>%
+        select(sequence, spectrum_title, accession, starts_with("exp_FC")) %>%
         bind_cols(all_pvalues) %>%
         pivot_longer(cols = starts_with("exp_FC"), values_to = "fold_change_values", names_to ="fold_change_ratios") %>%
-        pivot_longer(cols = starts_with("pvalues_"), values_to = "pvalues", names_to ="p_ratios")
+        pivot_longer(cols = starts_with("pvalues_"), values_to = "pvalues", names_to ="p_ratios") %>%
+        separate(accession, into = c("uniprot_id","species"),sep = "_")
       
       
   }else if(test_type=="limma"){
@@ -630,7 +662,11 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
       merge_stat_df_final <- merge_stat_df %>%  #
         rename_with(.col =1 , ~"mult_col") %>%
         rename_with(.col=9, ~ "ratios") %>%
-        separate(mult_col, into = c("pep_with_pos", "spectrum_title","accession","id"),sep = "@")
+        separate(mult_col, into = c("sequence", "spectrum_title","accession","id"),sep = "@") %>%
+        separate(accession, into = c("uniprot_id","species"),sep = "_")
+      
+      
+      
       #select(accession, spectrum_title, contains("P.value") | contains("logFC")) %>%
       #pivot_longer(cols = contains("P.value"), values_to = "pvalues", names_to ="p_ratios") %>%
       #pivot_longer(cols = contains("logFC"), values_to = "fold_change_values", names_to ="fold_change_ratios")
@@ -674,32 +710,12 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
     actual_ratio <- data.frame(Ratio_col=unique(merge_stat_df_pivot$fold_change_ratios),-1*(log2(c(2,10,20,100))))
     
     
-    ggplot(merge_stat_df_final ,aes(x = merge_stat_df_final$logFC, y = -log10(merge_stat_df_final$P.Value), color=merge_stat_df_final$ratios)) +
-      geom_point( size = 2.5) +
-      facet_wrap(~ratios) +
-    #geom_line(aes(color = new_col_coloring), size = 1) +  # Add color aesthetic to geom_line()
-    # scale_color_manual(values = c("ISO-REF" = "#000000", "unexpected" = "#999999",
-    #                               "Others_multi_A1-A2_Ratio" = "#CC79A7",
-    #                               "Others_mono_A1-A2_Ratio" = "#CC79A7",
-    #                               "Others_multi_A1-A3_Ratio" = "#E69F00",
-    #                               "Others_mono_A1-A3_Ratio" = "#E69F00",
-    #                               "Others_multi_A1-A4_Ratio" = "#56B4E9",
-    #                               "Others_mono_A1-A4_Ratio" = "#56B4E9",
-    #                               "Others_multi_A1-A5_Ratio" = "#009E73",
-    #                               "Others_mono_A1-A5_Ratio" = "#009E73"),
-    #                    labels = c('Non-variant', 'Variant non-isomeric A1 vs A2',
-    #                               'Variant non-isomeric A1 vs A3',
-    #                               'Variant non-isomeric A1 vs A4',
-    #                               'Variant non-isomeric A1 vs A5',
-    #                               'Variant isomeric A1 vs A2',
-    #                               'Variant isomeric A1 vs A3',
-    #                               'Variant isomeric A1 vs A4',
-    #                               'Variant isomeric A1 vs A5',
-    #                               'Unexpected')) +
-    #scale_shape_manual(values = c(16, 15, 12, 17),
-                       #labels = comparisons) +
-      scale_y_continuous(limits = c(0, 8), breaks = seq(0, 8, by = 0.8)) +
-      scale_x_continuous(limits = c(-3,3),breaks = seq(-3, 3, by = 0.8)) +
+    p10 <- ggplot(merge_stat_df ,aes(x =log2(fold_change_values), y = -log10(merge_stat_df$pvalues), color=species)) +
+      geom_point(size = 1) + #, aes(shape=merge_stat_df_final$species)
+      facet_wrap(~ratio.x) +
+      #scale_y_continuous(limits = c(0, 8), breaks = seq(0, 8, by = 0.8)) +
+      #scale_x_continuous(limits = c(-3,3),breaks = seq(-3, 3, by = 0.8)) +
+      scale_color_brewer(palette = "Set1") +
       #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
       theme_bw() +
       theme(legend.text = element_text(size = 15),
@@ -710,12 +726,50 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
             axis.text.x = element_text(size = 15),
             axis.title = element_text(size = 15),
             axis.text.y = element_text(size = 15)) +
+      labs(title = paste0("Experiment - ", exp_id[3], acquisiton_type[2], " data processed by ", software_name[1]), subtitle = "T-test was used")
       #expand_limits(x = 0, y = 0) +
       #geom_vline(data = actual_ratio, aes(xintercept = actual_ratio$X.1....log2.c.2..10..20..100..., size = 1, show.legend = FALSE)) + #color=c("#CC79A7","#E69F00","#56B4E9","#009E73")
       #geom_hline(data = log10_p_thresholds, aes(yintercept = log10_p_thresholds$X.log10.p_thresholds.),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"), size = 1, linetype = 2, show.legend = FALSE)+ 
-      labs(title = "Experiment 3 - DDA TIMS-TOF processed by Proline", color = "Classes", shape="Type") 
+      #
+      
+      
+      
+      
+      # gg_volcano(data_set = merge_stat_df,
+      #                 x_df = log2(merge_stat_df$fold_change_values),
+      #                 y_df = -log10(merge_stat_df$pvalues),
+      #                 color_df = merge_stat_df_final$species,
+      #                 facet_df = "ratio.x",
+      #                 header ="", #paste0("Experiment ", exp_id[3], acquisiton_type[2], " data processed by ", software_name[1]),
+      #                 color_lab = "Classes",
+      #                 subtitle_txt = "with adjusted p values")
+    
+    p11 <- gg_volcano(data_set = merge_stat_df_final,
+                      x_df = merge_stat_df_final$logFC,
+                      y_df = -log10(merge_stat_df_final$P.Value),
+                      color_df = merge_stat_df_final$species,
+                      facet_df = "ratios",
+                      header = paste0("Experiment - ", exp_id[3], acquisiton_type[2], " data processed by ", software_name[1]), ## Specifications of the header will be asked as an input.
+                      color_lab = "Classes",
+                      subtitle_txt = "limma was used")    
+    
+    # ggplot(data=merge_stat_df1,aes(x=log2(merge_stat_df1$fold_change_values),y=-log10(merge_stat_df1$pvalues),color=species)) +
+    #   geom_point() + facet_wrap(~fold_change_ratios)
+    # 
+    
+     
     
     
+    
+    sapply(10:11,function(x) ggsave(filename = paste0("p",x,".tiff"),
+                                  width = 50, height = 40, 
+                                  path = paste0(file_path,"/outputs_with_new_script/"),
+                                  units = "cm",
+                                  get(paste0("p",x)),
+                                  device = "tiff", #".svg"
+    ))
+    
+   
   }
 
   
