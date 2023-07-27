@@ -235,6 +235,41 @@ gg_raincloud <- function(data_set,
     ggtitle(header) + 
     labs(x=x_lab,y=y_lab, fill= fill_lab, caption = caption_lab,subtitle = subtitle_txt) +
     scale_fill_brewer(palette="Set1")
+  
+  gg_volcano <- function(data_set,
+                         x_df,
+                         y_df,
+                         facet_df,
+                         color_df,
+                         header,
+                         x_lab,
+                         y_lab,
+                         color_lab,
+                         caption_lab,
+                         subtitle_txt){
+    
+    data_set$facet <- data_set[[facet_df]]
+    ggplot(data_set ,aes(x =x_df, y = y_df, color=color_df)) +
+    geom_point(size = 1) + #, aes(shape=merge_stat_df_final$species)
+    facet_wrap(~facet) +
+      scale_y_continuous(limits = c(round(min(y_df),2), round(max(y_df),2)), breaks = seq(round(min(y_df),2), round(max(y_df),2), by = 1)) +
+      scale_x_continuous(limits = c(min(x_df), max(x_df)),breaks = seq(min(x_df), max(x_df), by = 1)) +
+      scale_color_brewer(palette = "Set1") +
+      #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
+      theme_bw() +
+      theme(legend.text = element_text(size = 15),
+          axis.title.x = element_text(size = 15),
+          axis.title.y = element_text(size = 15),
+          plot.title = element_text(size = 30),
+          legend.title = element_text(size = 15),
+          axis.text.x = element_text(size = 15),
+          axis.title = element_text(size = 15),
+          axis.text.y = element_text(size = 15)) +
+    #expand_limits(x = 0, y = 0) +
+    #geom_vline(data = actual_ratio, aes(xintercept = actual_ratio$X.1....log2.c.2..10..20..100..., size = 1, show.legend = FALSE)) + #color=c("#CC79A7","#E69F00","#56B4E9","#009E73")
+    #geom_hline(data = log10_p_thresholds, aes(yintercept = log10_p_thresholds$X.log10.p_thresholds.),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"), size = 1, linetype = 2, show.legend = FALSE)+ 
+    labs(title = header, color = color_lab, subtitle = subtitle_txt)}
+  
 }
   
   
