@@ -18,6 +18,7 @@ library(openxlsx)
 source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/get_modification_func/getModificationPositionMQ_func_edit.R")
 #source("D:/dev/Desktop_copy/PHD/data_analysis/scripts/getModificationPositionMQ_func_change_condition_current_mod_sequence.R")
 source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/roc_curve/roc_curve_generation_proline_edit.R")
+source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/ggplot/ggplot_functions.R")
 
 file_path <- "D:/dev/Pinar/PHD/wet_lab_experiments/DDA_data_analysis/experiment_3/MQ_214_optimize_param_noFAIMS/"
 #"D:/dev/Desktop_copy/PHD/wet_lab_experiments/DDA_data_analysis/experiment_2/MQ_214_optimize_param_noFAIMS/"
@@ -25,60 +26,81 @@ file_path <- "D:/dev/Pinar/PHD/wet_lab_experiments/DDA_data_analysis/experiment_
 #file_path <- "D:/dev/Desktop_copy/PHD/wet_lab_experiments/DDA_data_analysis/experiment_2/MQ_data_analysis/exp2_wo_FAIMS/rerun_using_1634/"
 
 setwd(file_path)
-exp2_wo_faims <- read_tsv("evidence.txt")
-#exp2_with_faims <- read_tsv("evidence.txt")
+exp3_wo_faims <- read_tsv("evidence.txt")
 
-theo_file_path <- "D:/dev/Desktop_copy/PHD/wet_lab_experiments/Eyers_syn_peptides_experiment/"
-theo_file_name <- "Synthetic peptides list_theo_conc_added_pool_id_iso_count_add_pep.xlsx" ### DONE!
-#theo_file_name <- "Synthetic peptides list_theo_conc_added_pool_id_iso_count.xlsx"  ### TODO CHANGE me
-sheet_theo_name <- "ISO-ref and OTHER with FC"
+# experiment_name <- c("E2-M1-R1",
+#                      "E2-M1-R2",
+#                      "E2-M1-R3",
+#                      "E2-M2-R1",
+#                      "E2-M2-R2",
+#                      "E2-M2-R3",
+#                      "E2-M3-R1",
+#                      "E2-M3-R2",
+#                      "E2-M3-R3",
+#                      "E2-M4-R1",
+#                      "E2-M4-R2",
+#                      "E2-M4-R3",
+#                      "E2-M5-R1",
+#                      "E2-M5-R2",
+#                      "E2-M5-R3")
 
-pep_list_w_theo_quant <- read.xlsx(paste0(theo_file_path, theo_file_name), sheet = sheet_theo_name)
-pep_list_w_theo_quant <- pep_list_w_theo_quant[,-1]
+exp_design <- c("E3-A1-R1","E3-A1-R2",
+                "E3-A1-R3",
+                "E3-A2-R1",
+                "E3-A2-R2",
+                "E3-A2-R3",
+                "E3-A3-R1",
+                "E3-A3-R2",
+                "E3-A3-R3",
+                "E3-A4-R1",
+                "E3-A4-R2",
+                "E3-A4-R3",
+                "E3-A5-R1",
+                "E3-A5-R2",
+                "E3-A5-R3")
 
-common_col_theo_quant <- as.data.frame(paste(pep_list_w_theo_quant$Phosphopeptide.sequence,
-                                             pep_list_w_theo_quant$modified.position.in.peptide, sep = "_"))
-colnames(common_col_theo_quant) <- "common_col_for_merging"
-pep_list_w_theo_quant_new <- cbind(common_col_theo_quant,pep_list_w_theo_quant)
 
 ### IMPUTATION
 
 # Calculate 1 percent quantile of each sample
 
-imputed_values <- exp2_wo_faims %>% 
+imputed_values <- exp3_wo_faims %>% 
   group_by(Experiment) %>% 
   summarise(first_quantile=quantile(Intensity,probs=0.01,na.rm=TRUE))
 imputed_values_vec <- as.vector(imputed_values$first_quantile)
 # Impute missing values
 
-  abundances_for_impute <- exp2_wo_faims %>% select(Experiment,Intensity) %>%
-    group_by(Experiment) %>%
-    mutate(imputed_intensity=case_when(grepl("A1-R1",Experiment) ~imputed_values_vec[1],
-                                       grepl("A1-R2",Experiment) ~imputed_values_vec[2],
-                                       grepl("A1-R3",Experiment) ~imputed_values_vec[3],
-                                       grepl("A2-R1",Experiment) ~imputed_values_vec[4],
-                                       grepl("A2-R2",Experiment) ~imputed_values_vec[5],
-                                       grepl("A2-R3",Experiment) ~imputed_values_vec[6],
-                                       grepl("A3-R1",Experiment) ~imputed_values_vec[7],
-                                       grepl("A3-R2",Experiment) ~imputed_values_vec[8],
-                                       grepl("A3-R3",Experiment) ~imputed_values_vec[9],
-                                       grepl("A4-R1",Experiment) ~imputed_values_vec[10],
-                                       grepl("A4-R2",Experiment) ~imputed_values_vec[11],
-                                       grepl("A4-R3",Experiment) ~imputed_values_vec[12],
-                                       grepl("A5-R1",Experiment) ~imputed_values_vec[13],
-                                       grepl("A5-R2",Experiment) ~imputed_values_vec[14],
-                                       grepl("A5-R3",Experiment) ~imputed_values_vec[15],
-                        TRUE ~ Intensity))
+
+  
+# abundances_for_impute <- exp3_wo_faims %>% select(Experiment,Intensity) %>%
+#   group_by(Experiment) %>%
+#   mutate(imputed_intensity=case_when(grepl("A1-R1",Experiment) ~imputed_values_vec[1],
+#                                        grepl("A1-R2",Experiment) ~imputed_values_vec[2],
+#                                        grepl("A1-R3",Experiment) ~imputed_values_vec[3],
+#                                        grepl("A2-R1",Experiment) ~imputed_values_vec[4],
+#                                        grepl("A2-R2",Experiment) ~imputed_values_vec[5],
+#                                        grepl("A2-R3",Experiment) ~imputed_values_vec[6],
+#                                        grepl("A3-R1",Experiment) ~imputed_values_vec[7],
+#                                        grepl("A3-R2",Experiment) ~imputed_values_vec[8],
+#                                        grepl("A3-R3",Experiment) ~imputed_values_vec[9],
+#                                        grepl("A4-R1",Experiment) ~imputed_values_vec[10],
+#                                        grepl("A4-R2",Experiment) ~imputed_values_vec[11],
+#                                        grepl("A4-R3",Experiment) ~imputed_values_vec[12],
+#                                        grepl("A5-R1",Experiment) ~imputed_values_vec[13],
+#                                        grepl("A5-R2",Experiment) ~imputed_values_vec[14],
+#                                        grepl("A5-R3",Experiment) ~imputed_values_vec[15],
+#                                        TRUE ~ Intensity))
   
 
-  imputed_exp2_woFAIMS <- exp2_wo_faims %>%
-  select(-Experiment,Intensity) %>% 
-  mutate(abundances_for_impute) %>% 
-  #filter(grepl(9606,`Taxonomy IDs`))%>%
-  filter(grepl("_HUMAN",Proteins)) %>% 
+###### CHANGE THE NAME OF THE OBJECT LATER ### THERE WAS NO IMPUTATION HERE ######
+  phospho_mouse <- exp3_wo_faims %>%
+  #select(Experiment,Intensity) %>% 
+  #mutate(abundances_for_impute) %>% 
+  filter(grepl(10090,`Taxonomy IDs`))%>%
+  #filter(grepl("_MOUSE",Proteins)) %>% 
   filter(grepl("Phospho",Modifications)) 
 
-id_syn_phospho_pep <- imputed_exp2_woFAIMS
+id_syn_phospho_pep <- imputed_exp3_woFAIMS
 #write.table(id_syn_phospho_pep,file="exp2_no_faims_MQ_evidences_filtered_human_phospho.tsv",sep="\t",row.names = FALSE)
 
 # ## NECESSARY FOR COUNTING NUM OF IDENTIFIED ECOLIPEPTIDES
@@ -87,8 +109,10 @@ id_syn_phospho_pep <- imputed_exp2_woFAIMS
 #   group_by(Sequence) %>% 
 #   summarise(num_id_ecoli_pep = n(), mods=unique(Modifications))
 
+###### WARNING: ALWAYS SELECT MODIFIED PEPTIDES OTHERWISE THE FINAL RESULT OF THE 
+    ## FUNCTION WILL BE THE SAME NUMBER OF LINES.
 
-df2 <- apply(as.data.frame(id_syn_phospho_pep[,"Modified sequence"]),1,getModificationPosition_MQ)
+df2 <- apply(as.data.frame(phospho_mouse[,"Modified sequence"]),1,getModificationPosition_MQ)
 
 results1 <- map_dfr(df2, ~ enframe(.x)) %>%
   filter(grepl("modification_",name)| grepl("pep_seq", name)) %>%
@@ -131,71 +155,158 @@ result_with_common_col <- reshaped_results %>%
 
 #getModificationPosition_MQ(mod_seq = id_syn_pep$`Modified sequence`,F)
 
-final_results_with_common_col <- mutate(result_with_common_col,id_syn_phospho_pep)
+final_results_with_common_col <- mutate(result_with_common_col,phospho_mouse)
+
+barplt_df <- final_results_with_common_col %>%
+  select(Sequence,Experiment,Intensity,common_col_for_merging,`Taxonomy IDs`, Modifications) %>%
+  separate(Experiment, into = c("Exp_id","Sample_id","Rep_id"),sep = "-") %>%
+  mutate(sample_rep_id_seq = paste(common_col_for_merging, Sample_id,Rep_id, sep = "_"))%>%
+  filter(duplicated(sample_rep_id_seq)==FALSE)
+  
+  #filter(grepl("10090",`Taxonomy IDs`) & grepl("Phospho",Modifications)) 
+
+
+p1 <- gg_barplt_id_pep_count(data_set = barplt_df,
+                             x_df = barplt_df$Sample_id,
+                             fill_df = barplt_df$Rep_id,
+                             ymax = 5000,
+                             header = "Total number of quantified phospho-site across each sample",
+                             caption_lab = "NA values are removed.",
+                             x_lab = "Sample id",
+                             fill_lab =  "Sample id",
+                             y_lab = "Number of identified peptides",
+                             subtitle_txt = "")
+
+barplt_df_ecoli <- exp3_wo_faims %>% 
+  filter(grepl(83333,`Taxonomy IDs`)) %>%
+  select(Sequence,Experiment,Intensity,`Taxonomy IDs`, Modifications) %>%
+  separate(Experiment, into = c("Exp_id","Sample_id", "Rep_id"), sep = "-",remove = F) %>%
+  mutate(sample_rep_id_seq = paste(Sequence, Sample_id,Rep_id, sep = "_")) %>%
+  filter(duplicated(sample_rep_id_seq)==FALSE)
+
+
+p2 <- gg_barplt_id_pep_count(data_set = barplt_df_ecoli,
+                             x_df = barplt_df_ecoli$Sample_id,
+                             fill_df = barplt_df_ecoli$Rep_id,
+                             ymax = 20000,
+                             header = "Total number of quantified Ecoli across each sample",
+                             caption_lab = "NA values are removed.",
+                             x_lab = "Sample id",
+                             fill_lab =  "Sample id",
+                             y_lab = "Number of identified peptides",
+                             subtitle_txt = "")
+
+### ELIMINATION OF MULTI-CHARGE PEPTIDES (ask for whether necessary for Exp3 or not) ###
+                                      ### IT IS DEFINETELY NECCESSAARY FOR PIVOT_WIDER()
 
 final_results_max_abun <- final_results_with_common_col %>% 
   group_by(common_col_for_merging,Experiment) %>%
   slice(which.max(Intensity)) %>%
   ungroup()
 
-# experiment_name <- c("E2-M1-R1",
-#                      "E2-M1-R2",
-#                      "E2-M1-R3",
-#                      "E2-M2-R1",
-#                      "E2-M2-R2",
-#                      "E2-M2-R3",
-#                      "E2-M3-R1",
-#                      "E2-M3-R2",
-#                      "E2-M3-R3",
-#                      "E2-M4-R1",
-#                      "E2-M4-R2",
-#                      "E2-M4-R3",
-#                      "E2-M5-R1",
-#                      "E2-M5-R2",
-#                      "E2-M5-R3")
-
-experiment_name <- c("E2-A1-R1",
-                     "E2-A1-R2",
-                     "E2-A1-R3",
-                     "E2-A2-R1",
-                     "E2-A2-R2",
-                     "E2-A2-R3",
-                     "E2-A3-R1",
-                     "E2-A3-R2",
-                     "E2-A3-R3",
-                     "E2-A4-R1",
-                     "E2-A4-R2",
-                     "E2-A4-R3",
-                     "E2-A5-R1",
-                     "E2-A5-R2",
-                     "E2-A5-R3")
 
 df_wide <- final_results_max_abun %>% 
   select(common_col_for_merging,Experiment, Intensity) %>%
   pivot_wider(names_from = Experiment,values_from = Intensity) %>%
-  select(common_col_for_merging,experiment_name) 
-  
-  
+  select(common_col_for_merging,all_of(exp_design)) %>%
+  mutate(species = "MOUSE")
 
+
+filtered_abundances_ecoli <- barplt_df_ecoli %>%
+  select(Sequence,Experiment,Intensity) %>%
+  pivot_wider(names_from = Experiment,values_from = Intensity) %>%
+  rename_with(~ paste0("common_col_for_merging"), matches("^Seq")) %>%
+  mutate(species = "ECOLI")
+
+filtered_abundances<-df_wide[rowSums(!is.na(select(df_wide,starts_with(exp_design))))>0,]
+filtered_abundances_ecoli<-filtered_abundances_ecoli[rowSums(!is.na(select(filtered_abundances_ecoli,starts_with(exp_design))))>0,]
+
+sample_size <- 5
+abundances_rowMeans <- NULL
+abundances_ecoli_rowMeans <- NULL
+
+for (k in 1:sample_size){
+  # If separate version of row means is not needed, it can be commented later.
+  # Separate row Means can be collected in temp object to merge in "log_10_filtered_abundances_rowMeans"
+  assign(paste0("abundances_A",k),as.data.frame(rowMeans(filtered_abundances  %>%
+                                                           select(contains(paste0("A",k)))))) #%>%
+  #select(starts_with("abundance_")))))
+  abundances_rowMeans<- bind_cols(abundances_rowMeans,get(paste0("abundances_A",k)))
   
+  
+  assign(paste0("ecoli_abundances_A",k),as.data.frame(rowMeans(filtered_abundances_ecoli  %>%
+                                                                 select(contains(paste0("A",k))))))# %>%
+  #select(starts_with("abundance_")))))  
+  
+  abundances_ecoli_rowMeans<- bind_cols(abundances_ecoli_rowMeans,get(paste0("ecoli_abundances_A",k)))
+  
+}
+
+quant_peptides_ECOLI_density_plot <- filtered_abundances_ecoli %>%
+  select(!starts_with("E")) %>%
+  bind_cols(abundances_ecoli_rowMeans) %>%
+  tibble() %>%
+  rename_with(~ paste0("mean_abun",1:5), matches("^row")) %>%
+  pivot_longer(cols = starts_with("mean"), 
+               values_to = "intensity",
+               names_to = "sample_ids",
+               values_drop_na = T) %>%
+  mutate(sample_id_seq = paste(common_col_for_merging, sample_ids, sep = "_")) %>%
+  filter(duplicated(sample_id_seq)==FALSE)
+
+ecoli_density_plot<- quant_peptides_ECOLI_density_plot %>%
+  select(contains(c("sample_ids","intensity","species"))) 
+
+
+colnames(abundances_rowMeans) <- paste0("mean_abun",1:sample_size)
+#### MEAN ABUNDANCE RATIO WITH  DENSITY PLOT ####
+### BEFORE IMPUTATION ###
+quant_phospho_density_plot <- filtered_abundances %>%
+  select(!starts_with("E")) %>%
+  bind_cols(abundances_rowMeans) %>% 
+  #rename_with(~ paste0("mean_abun",1:5), matches("^row")) %>%
+  tibble() %>% #mutate(pep_with_pos = sequence) %>% ###  At this stage, no need for phospho-position
+               # We only count number of sequence here.   
+  pivot_longer(cols = starts_with("mean"), 
+               names_to = "sample_ids",
+               values_to = "intensity",
+               values_drop_na = T)
+
+density_df <-quant_phospho_density_plot %>%
+  select(c(sample_ids,intensity,species)) %>%
+  bind_rows(ecoli_density_plot)
+
+p3 <- gg_density(data_set = density_df, 
+                 x_df = density_df$intensity,
+                 fill_df = density_df$species,
+                 color_df = NULL,
+                 header="Distribution of mean abundance of every sample before imputation",
+                 facet_df = "sample_ids",
+                 x_lab = "log10(intensities)",
+                 color_lab= "",
+                 fill_lab = "species",
+                 subtitle_txt = "")
+
 
 for (j in 1:length(imputed_values_vec)){
   # Number NA
-  num_NA <- length(df_wide[,j+1][is.na(df_wide[,j+1])])
+  #num_NA <- length(filtered_abundances[,j+1][is.na(filtered_abundances[,j+1])])
   
-  df_wide[,j+1][is.na(df_wide[,j+1])] <- imputed_values_vec[j]
+  filtered_abundances[,j+1][is.na(filtered_abundances[,j+1])] <- imputed_values_vec[j]
+  filtered_abundances_ecoli[,j+1][is.na(filtered_abundances_ecoli[,j+1])] <- imputed_values_vec[j]
   
   # After imputation number of imputed values
-  num_imp <-length(df_wide[,j+1][(df_wide[,j+1]==imputed_values_vec[j])])
+  #num_imp <-length(filtered_abundances[,j+1][(filtered_abundances[,j+1]==imputed_values_vec[j])])
   
   # This is verification of imputation is done successfully
   # Because we expect to see that number of imputed values should be the same amount as number of NA
-  print(setequal(num_NA,num_imp))
+  #print(setequal(num_NA,num_imp))
   #print(num_NA)
   #print(num_imp)
 }
 
-# 
+
+#  ## CONDITIONAL IMPUTATION ##
 # 
 # #######################################
 # triplicate_indx <- c(1,3,4,6,7,9,10,12,13,15)
@@ -260,57 +371,48 @@ for (j in 1:length(imputed_values_vec)){
 
 ## TEST DATA for imputation part: 
 #toy_data <- read_tsv(file = "D:/dev/Desktop_copy/PHD/wet_lab_experiments/DDA_data_analysis/comparision_DDA_noFAIMS_mq_proline_pd/toy_data_MQ.txt")
-
-
 #######################################
-#write.table(imputed_abun_df_merge, file = "MQ_exp2_woFAIMS_evidences_after_imputation.txt",sep = "\t")
 
-
-
-
-# Combine data frame (we will continue with this for further step)
-df_merge <- df_wide %>% 
-  left_join(pep_list_w_theo_quant_new,by="common_col_for_merging")
-
-#df_merge <- final_results_max_abun  %>% inner_join(df_result, 
-#                                    by="common_col_for_merging") %>% 
-#  left_join(pep_list_w_theo_quant_new,by="common_col_for_merging")
-
-# sep_df_merge <- df_merge %>% separate(Experiment, 
-#                                       c('Exp_id', 'Sample_id', 'Rep_id'),sep = "-",remove = FALSE)
-# final_data <-final_selected_abun_df_merge  %>% 
-#   left_join(imputed_abun_df_merge,by=c("common_col_for_merging","Experiment","Intensity"),keep=FALSE)
 
 
 ########################
-sample_size <- 5
+
 filtered_abundances_rowMeans <- NULL
 filtered_abundances_log10 <- NULL
+filtered_abundances_log10_rowMeans <- NULL
+
+filtered_all <- bind_rows(filtered_abundances,filtered_abundances_ecoli)
+
 for (k in 1:sample_size){
   # If separate version of row means is not needed, it can be commented later.
   # Separate row Means can be collected in temp object to merge in "log_10_filtered_abundances_rowMeans"
   
-  assign(paste0("row_means_abundances_A",k),as.data.frame(rowMeans(df_merge %>% select(contains(paste0("E2-A",k))))))
+  #### COMMENTED CODES ARE CORRESPOND TO IMPUTATION FOR ONLY MOUSE ####
   
+  # assign(paste0("aft_imp_abundances_A",k),as.data.frame(rowMeans(abundances_for_impute_mouse  %>% select(contains(paste0("A",k))))))
+  # filtered_abundances_rowMeans<- bind_cols(filtered_abundances_rowMeans,get(paste0("aft_imp_abundances_A",k)))
+  # 
+  # assign(paste0("log10_abundances_A",k),as.data.frame(log10(abundances_for_impute_mouse  %>% select(contains(paste0("A",k)))))) 
+  # filtered_abundances_log10 <- bind_cols(filtered_abundances_log10, get(paste0("log10_abundances_A",k)))
+  # 
+  # assign(paste0("rowMean_log10_abundances_A",k),as.data.frame(rowMeans(get(paste0("log10_abundances_A",k)) %>% select(contains(paste0("A",k))))))
+  # filtered_abundances_log10_rowMeans<- bind_cols(filtered_abundances_log10_rowMeans,get(paste0("rowMean_log10_abundances_A",k)))
   
-  assign(paste0("log10_abundances_A",k),as.data.frame(log10(df_merge  %>% select(contains(paste0("E2-A",k)))))) 
+  assign(paste0("aft_imp_abundances_A",k),as.data.frame(rowMeans(filtered_all  %>% select(contains(paste0("A",k))))))
+  filtered_abundances_rowMeans<- bind_cols(filtered_abundances_rowMeans,get(paste0("aft_imp_abundances_A",k)))
   
-  
-  filtered_abundances_rowMeans<- bind_cols(filtered_abundances_rowMeans,get(paste0("row_means_abundances_A",k)))
-  
+  assign(paste0("log10_abundances_A",k),as.data.frame(log10(filtered_all  %>% select(contains(paste0("A",k))))))
   filtered_abundances_log10 <- bind_cols(filtered_abundances_log10, get(paste0("log10_abundances_A",k)))
   
+  assign(paste0("rowMean_log10_abundances_A",k),as.data.frame(rowMeans(get(paste0("log10_abundances_A",k)) %>% select(contains(paste0("A",k))))))
+  filtered_abundances_log10_rowMeans<- bind_cols(filtered_abundances_log10_rowMeans,get(paste0("rowMean_log10_abundances_A",k)))
   
 }
 
-colnames(filtered_abundances_rowMeans) <- paste0("mean_abundances_A",1:sample_size)
-
+colnames(filtered_abundances_rowMeans) <- paste0("mean_abundances_aft_imp_A",1:sample_size)
+colnames(filtered_abundances_log10_rowMeans) <- paste0("mean_log10_abundances_A",1:sample_size)
 filtered_abundances_log10 <- filtered_abundances_log10 %>%
-  rename_with(~ paste0("log10_", .x), everything())# %>%
-  #mutate_all(function(x) ifelse(is.na(x), 0, x))  %>%
-  #mutate_all(function(x) ifelse(is.infinite(x), 0, x))
-
-
+  rename_with(~ paste0("log10_", .x), everything())
 
 # Calculate Fold Change by keeping A1 constant (mean(S1)/mean(S2), etc.)
 cols <- ncol(filtered_abundances_rowMeans)
@@ -319,12 +421,50 @@ for(An in 2:cols){
   
 }
 
+final_imputed_data <- cbind(filtered_all, filtered_abundances_rowMeans,filtered_abundances_log10) #filtered_abundances_log10_rowMeans
+
+test <- final_imputed_data %>% 
+  select(common_col_for_merging, contains(exp_design) | starts_with("log10") | starts_with("exp_FC")) %>%
+  pivot_longer(cols = starts_with("E3"), values_to = "abundances", names_to = "Sample_names1" ) %>%
+  pivot_longer(cols = starts_with("log10"), values_to = "mean_log10_abundances", names_to = "Sample_names2" ) %>%
+  pivot_longer(cols = starts_with("exp_FC"), values_to = "row_mean_abundances", names_to = "Sample_names3")
+
+test <- final_imputed_data %>% 
+  select(common_col_for_merging, starts_with("log10")) %>%
+  pivot_longer(cols = starts_with("log10"), values_to = "mean_log10_abundances", names_to = "Sample_names2" )
+  
+
+test1 <- final_imputed_data %>% 
+  select(common_col_for_merging, contains(exp_design)) %>%
+  pivot_longer(cols = starts_with("E3"), values_to = "abundances", names_to = "Sample_names1" )
+
+
+### COMBINE IMPUTED INTENSITIES WITH THE REST OF THE DF
+
+df_merge <- final_imputed_data %>% 
+  pivot_longer(cols = -common_col_for_merging, 
+               names_to = "Experiment", 
+               values_to = "Imputed_intesity") %>%
+  left_join(final_results_max_abun, 
+            by=c("Experiment","common_col_for_merging"))
+
+
 # To calculate all binary combination in the data frame
 #mat <- do.call(cbind, lapply(cols, function(xj) 
 #  sapply(cols, function(xi) (filtered_abundances_rowMeans[, xj]/(filtered_abundances_rowMeans[, xj])))))
 #colnames(mat) <-  outer(names(filtered_abundances_rowMeans), names(filtered_abundances_rowMeans), paste0)
 
 final_imputed_data <- cbind(df_merge,filtered_abundances_rowMeans,filtered_abundances_log10)
+
+
+
+
+
+
+
+
+
+
 #write.table(final_imputed_data,file = "exp2_without_FAIMS_MQ_min_score_0_after_merging_reshaped.tsv",sep = "\t",row.names = F)
 #test <- final_imputed_data
 
@@ -334,6 +474,122 @@ unexpectedly_id_peps <- final_imputed_data %>%
 
 output_path <- "D:/dev/Desktop_copy/PHD/wet_lab_experiments/DDA_data_analysis/comparision_DDA_noFAIMS_mq_proline_pd/"
 #write.xlsx(unexpectedly_id_peps,file = paste0(output_path,"Corrected_imputation_proline_unexpectedly_identified_phosphopeptides_exp2_noFAIMS_DDA.xlsx"))
+
+
+df_mean_ab_after_impt <- final_imputed_data %>% 
+  select(contains("aft_imp"), species) %>%
+  tibble() %>% 
+  pivot_longer(cols = contains("aft_imp"),
+               names_to = "Mean_abundance",
+               values_to = "values")
+
+df_FC_ratio_after_impt <- final_imputed_data %>% 
+  select(starts_with("exp_"),species) %>%
+  tibble() %>% 
+  pivot_longer(cols = starts_with("exp_"),
+               names_to = "exp_FC",
+               values_to = "values")
+
+p4 <- gg_density(data_set = df_mean_ab_after_impt, 
+                 x_df = df_mean_ab_after_impt$values,
+                 fill_df = df_mean_ab_after_impt$Mean_abundance,
+                 color_df = df_mean_ab_after_impt$species,
+                 header="Distribution of mean abundance of every sample after imputation",
+                 facet_df = "Mean_abundance",
+                 x_lab = "log10(values)",
+                 color_lab= "",
+                 fill_lab = "Sample Names",
+                 subtitle_txt = "")
+
+p5 <- gg_raincloud(data_set = df_mean_ab_after_impt,
+                   x_df = df_mean_ab_after_impt$Mean_abundance,
+                   y_df = df_mean_ab_after_impt$values,
+                   fill_df = df_mean_ab_after_impt$Mean_abundance,
+                   header = "Distribution of mean abundance of every sample after imputation",
+                   x_lab = "Sample Names",
+                   y_lab = " Density of log10(Mean Abundance)",
+                   fill_lab = "Sample Names",
+                   caption_lab = "",
+                   subtitle_txt = "")
+
+
+
+p6 <- gg_density(data_set = df_FC_ratio_after_impt,
+                 x_df = df_FC_ratio_after_impt$values,
+                 fill_df = df_FC_ratio_after_impt$exp_FC,
+                 color_df = df_FC_ratio_after_impt$species,
+                 header="Distribution of Fold change Ratio of every sample after imputation",
+                 facet_df = "exp_FC",
+                 x_lab = "log10(values)",
+                 color_lab= "",
+                 fill_lab = "Sample Names",
+                 subtitle_txt = "")
+# 
+
+### BOX-PLOT: Experimental Quantity Ratio of Phospho Peptides  
+
+p7 <- gg_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
+                          x_df = df_FC_ratio_after_impt$exp_FC,
+                          y_df = df_FC_ratio_after_impt$values,
+                          fill_df = df_FC_ratio_after_impt$species,
+                          header="Experimental Quantity Ratio of T-cell Phospho Peptides",
+                          x_lab="Sample Names",
+                          y_lab="Abundance Ratios",
+                          fill_lab = "Sample Names",
+                          subtitle_txt = "")
+
+
+
+### HALF-BOX-PLOT & HALF-SCATTER-PLOT: Experimental Quantity Ratio of Synthetic Peptides  
+library(gghalves)
+
+p8 <- gg_half_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
+                               x_df = df_FC_ratio_after_impt$exp_FC,
+                               y_df = df_FC_ratio_after_impt$values,
+                               fill_df = df_FC_ratio_after_impt$species,
+                               header="Experimental Quantity Ratio of T-cell Phospho Peptides with Background",
+                               x_lab="Sample Names",
+                               y_lab="Abundance Ratios",
+                               fill_lab = "Sample Names",
+                               subtitle_txt = "")
+
+### VIOLIN-PLOT: Experimental Quantity Ratio of Synthetic Peptides   
+
+### TODO: fix y scaling without trimming 
+p9 <- gg_violin_exp_ratio(data_set = df_FC_ratio_after_impt, 
+                          x_df = df_FC_ratio_after_impt$exp_FC,
+                          y_df = df_FC_ratio_after_impt$values,
+                          fill_df = df_FC_ratio_after_impt$species,
+                          header="Experimental Quantity Ratio of T-cell Phospho Peptides with Background",
+                          x_lab="Sample Names",
+                          y_lab="Abundance Ratios",
+                          fill_lab = "Sample Names",
+                          trim=TRUE,
+                          subtitle_txt = "")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ###########################################
 
