@@ -24,8 +24,8 @@ file_name_exp3_tims <- "PAL TimsTOF_data_conversion_all_exp_06062023 E3 correcte
 sample_size <- 5
 #sheet_name <- "Quantified peptide ions"
 sheet_name <- "Best PSM from protein sets"
-file_path<- file_path_exp3_faims
-file_name <- file_name_exp3_faims
+file_path<- file_path_exp3_tims
+file_name <- file_name_exp3_tims
 selected_spcies <-  "_MOUSE"
 test_type <- c("t.test","wilcoxon","limma") ## one selection at a time
 
@@ -78,7 +78,7 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   quant_peptides_cor_abun <- quant_peptides %>% 
     rename_with(~exp_design,matches("^abundance"))
   
-  quant_peptides_with_all <- quant_peptides_cor_abun %>% 
+  quant_phospho_peptides <- quant_peptides_cor_abun %>% 
     filter(grepl("_MOUSE",accession)) %>% 
     filter(grepl("Phospho",modifications)) 
   
@@ -87,7 +87,7 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
     select(sequence,modifications,accession,spectrum_title,starts_with(exp_design))
     
   
-  phospho_ptm_pos <- lapply(quant_peptides_with_all$modifications, function(each_ptm_protein_positions) {
+  phospho_ptm_pos <- lapply(quant_phospho_peptides$modifications, function(each_ptm_protein_positions) {
     
     ptm_list <- as.list(strsplit(each_ptm_protein_positions,"; ", fixed=TRUE)[[1]]) # Split ptm_protein_position depending on ";"
     
@@ -108,14 +108,15 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   phospho_ptm_pos_df <- t(as.data.frame(phospho_ptm_pos))
   rownames(phospho_ptm_pos_df) <- 1:length(phospho_ptm_pos_df)
   
-  quant_peptides_with_all$pep_with_pos <- paste(quant_peptides_with_all$sequence, phospho_ptm_pos_df, sep = "_")
+  quant_phospho_peptides$pep_with_pos <- paste(quant_phospho_peptides$sequence, phospho_ptm_pos_df, sep = "_")
 
-  # Nothing is changed
-  filtered_abundances<-quant_peptides_with_all[rowSums(!is.na(select(quant_peptides_with_all,starts_with(exp_design))))>0,]
-  filtered_abundances_ecoli <-quant_peptides_ECOLI[rowSums(!is.na(select(quant_peptides_ECOLI,starts_with(exp_design))))>0,]
   
+  # Nothing is changed
+  filtered_abundances<-quant_phospho_peptides[rowSums(!is.na(select(quant_phospho_peptides,starts_with(exp_design))))>0,]
+  filtered_abundances_ecoli <-quant_peptides_ECOLI[rowSums(!is.na(select(quant_peptides_ECOLI,starts_with(exp_design))))>0,]
+
   df_id_pep <- filtered_abundances %>% 
-    select(sequence,modifications, pep_with_pos, starts_with(exp_design)) %>%
+    select(sequence,modifications, pep_with_pos, starts_with(exp_design),accession) %>%
     tibble() %>%
     # rename(A1_R1= 4, # Using column index to rename the colnames
     #        A1_R2= 5,
@@ -128,22 +129,73 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
     #        A3_R3= 12,
     #        A4_R1= 13,
     #        A4_R2= 14,
-    #        A4_R3= 15,
-    #        A5_R1= 16,
-    #        A5_R2= 17,
-    #        A5_R3= 18) %>%
+  #        A4_R3= 15,
+  #        A5_R1= 16,
+  #        A5_R2= 17,
+  #        A5_R3= 18) %>%
+  pivot_longer(cols = starts_with("E3"), 
+               values_to = "intensity",
+               names_to = "sample_ids",
+               values_drop_na = T) %>%
+    separate(sample_ids, into = c("Exp_id","Sample_id", "Rep_id"), sep = "_",remove = F)# %>% 
+  #group_by(Sample_id) %>%
+  #count()
+  
+  ### ELIMINATION of MULTIPLE CHARGED PEPTIDES ### 
+  
+  #### 1st STRATEGY: without pivot_longer() func. 
+  
+  ### IT's an alternative way to remove duplicates from mouse dataset
+  ### DOES NOT WORK BACKGROUND DF BECAUSE POSITION IS IMPORTANT FOR THE DISCRIMINATION
+  
+  # syn_phospho_pep_proline_unique_max_absum <- filtered_abundances %>% 
+  #  #mutate(across(all_of(experiment_name), ~ ifelse(is.na(.), 0, .))) %>%
+  #  rowwise() %>%
+  #  mutate(row_sum = sum(c_across(where(is.numeric)), na.rm = TRUE)) %>%
+  #  group_by(pep_with_pos) %>%
+  #  #summarise(max_row_sum = max(row_sum, na.rm = TRUE)) %>%
+  #  slice(which.max(row_sum)) %>%
+  #  ungroup()
+  
+  ### THE RESULT OF barplt_df is the same as syn_phospho_pep_proline_unique_max_absum
+  
+  ## 2nd STRATEGY: removing duplicates automatically
+  
+  # barplt_df <- df_id_pep %>%
+  #   mutate(sample_rep_id_seq = paste(pep_with_pos, Sample_id,Rep_id, sep = "_"))%>%
+  #   filter(duplicated(sample_rep_id_seq)==FALSE)
+  
+  ## 3rd STRATEGY: removing duplicates the one has lower abundances
+  barplt_df <- df_id_pep %>%
+    mutate(sample_rep_id_seq = paste(pep_with_pos, Sample_id,Rep_id, sep = "_"))%>%
+    group_by(sample_rep_id_seq) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
+    slice(which.max(intensity)) %>%
+    ungroup()
+  
+  ## SAME STRATEGIES ABOVE (3rd) WAS APPLIED TO BACKGROUND AS WELL
+  barplt_df_ecoli <- filtered_abundances_ecoli %>% 
+    select(sequence,modifications, sequence, starts_with(exp_design),accession) %>%
     pivot_longer(cols = starts_with("E3"), 
                  values_to = "intensity",
                  names_to = "sample_ids",
                  values_drop_na = T) %>%
-    separate(sample_ids, into = c("Exp_id","Sample_id", "Rep_id"), sep = "_")# %>% 
-    #group_by(Sample_id) %>%
-    #count()
+    separate(sample_ids, into = c("Exp_id","Sample_id", "Rep_id"), sep = "_",remove = F) %>%
+    mutate(sample_rep_id_seq = paste(sequence, Sample_id,Rep_id, sep = "_")) %>%
+    group_by(sample_rep_id_seq,sample_ids) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
+    slice(which.max(intensity)) %>%
+    ungroup()
   
-  barplt_df <- df_id_pep %>%
-    mutate(sample_rep_id_seq = paste(pep_with_pos, Sample_id,Rep_id, sep = "_"))%>%
-    filter(duplicated(sample_rep_id_seq)==FALSE)
+  # barplt_df_ecoli <- filtered_abundances_ecoli %>% 
+  #   pivot_longer(cols = starts_with("E3"), 
+  #                values_to = "intensity",
+  #                names_to = "sample_ids",
+  #                values_drop_na = T) %>%
+  #   separate(sample_ids, into = c("Exp_id","Sample_id", "Rep_id"), sep = "_") %>%
+  #   mutate(sample_rep_id_seq = paste(sequence, Sample_id,Rep_id, sep = "_")) %>%
+  #   filter(duplicated(sample_rep_id_seq)==FALSE)
   
+  
+
   p1 <- gg_barplt_id_pep_count(data_set = barplt_df,
                          x_df = barplt_df$Sample_id,
                          fill_df = barplt_df$Rep_id,
@@ -155,14 +207,6 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
                          y_lab = "Number of identified peptides",
                          subtitle_txt = "")
   
-  barplt_df_ecoli <- filtered_abundances_ecoli %>% 
-    pivot_longer(cols = starts_with("E3"), 
-                 values_to = "intensity",
-                 names_to = "sample_ids",
-                 values_drop_na = T) %>%
-    separate(sample_ids, into = c("Exp_id","Sample_id", "Rep_id"), sep = "_") %>%
-    mutate(sample_rep_id_seq = paste(sequence, Sample_id,Rep_id, sep = "_")) %>%
-    filter(duplicated(sample_rep_id_seq)==FALSE)
   
   p2 <- gg_barplt_id_pep_count(data_set = barplt_df_ecoli,
                          x_df = barplt_df_ecoli$Sample_id,
@@ -174,7 +218,16 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
                          fill_lab =  "Sample id",
                          y_lab = "Number of identified peptides",
                          subtitle_txt = "")
+  
+  ## THIS RESHAPING IS ONLY FOR ELIMINATION OF MULTIPLE PHOSPHO-SITES and ECOLI PEPTIDES
+   ## ELIMINATION STEP IS NOT NECESSARY FOR ECOLI, 1st STRATEGY can be used only (this will decrease lines of code)
+  barplt_df_wide <- barplt_df %>% 
+    select(pep_with_pos, accession, sample_ids,intensity) %>%
+    pivot_wider(names_from = "sample_ids",values_from = "intensity")
 
+  barplt_df_ecoli_wide <- barplt_df_ecoli %>% 
+    select(sequence, accession, sample_ids,intensity) %>%
+    pivot_wider(names_from = "sample_ids",values_from = "intensity")
   
   ## DENSITY PLOT OF BEFORE IMPUTATION 
   
@@ -184,13 +237,13 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   for (k in 1:sample_size){
     # If separate version of row means is not needed, it can be commented later.
     # Separate row Means can be collected in temp object to merge in "log_10_filtered_abundances_rowMeans"
-    assign(paste0("abundances_A",k),as.data.frame(rowMeans(filtered_abundances  %>%
+    assign(paste0("abundances_A",k),as.data.frame(rowMeans(barplt_df_wide  %>%
                                                              select(contains(paste0("A",k)))))) #%>%
                                                              #select(starts_with("abundance_")))))
     abundances_rowMeans<- bind_cols(abundances_rowMeans,get(paste0("abundances_A",k)))
     
     
-    assign(paste0("ecoli_abundances_A",k),as.data.frame(rowMeans(filtered_abundances_ecoli  %>%
+    assign(paste0("ecoli_abundances_A",k),as.data.frame(rowMeans(barplt_df_ecoli_wide  %>%
                                                              select(contains(paste0("A",k))))))# %>%
                                                              #select(starts_with("abundance_")))))  
     
@@ -199,7 +252,7 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   }
   
 
-  quant_peptides_ECOLI_density_plot <- filtered_abundances_ecoli %>%
+  quant_peptides_ECOLI_density_plot <- barplt_df_ecoli_wide %>%
     select(!starts_with("E")) %>%
     bind_cols(abundances_ecoli_rowMeans) %>%
     tibble() %>%
@@ -208,32 +261,31 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
                  values_to = "intensity",
                  names_to = "sample_ids",
                  values_drop_na = T) %>%
-    mutate(sample_id_seq = paste(sequence, sample_ids, sep = "_")) %>%
-    filter(duplicated(sample_id_seq)==FALSE) %>%
-    mutate(species="ECOLI") 
+    mutate(sample_id_seq = paste(sequence, sample_ids, sep = "_"))
   
   ecoli_density_plot<- quant_peptides_ECOLI_density_plot %>%
-    select(contains(c("sample_ids","intensity","species"))) 
+    select(contains(c("sample_ids","intensity","accession"))) 
   
   
   colnames(abundances_rowMeans) <- paste0("mean_abun",1:sample_size)
   
   #### MEAN ABUNDANCE RATIO WITH  DENSITY PLOT ####
       ### BEFORE IMPUTATION ###
-  quant_phospho_density_plot <- filtered_abundances %>%
+  quant_phospho_density_plot <- barplt_df_wide %>%
     select(!starts_with("E")) %>%
     bind_cols(abundances_rowMeans) %>% 
     #rename_with(~ paste0("mean_abun",1:5), matches("^row")) %>%
-    tibble() %>% #mutate(pep_with_pos = sequence) %>% ###  At this stage, no need for phospho-position
-    mutate(species="MOUSE") %>%                         # We only count number of sequence here.   
-    pivot_longer(cols = starts_with("mean"), 
+    tibble() %>% #mutate(pep_with_pos = sequence) %>% ###  At this stage, no need for phospho-position#   
+    pivot_longer(cols = starts_with("mean"),
                  names_to = "sample_ids",
                  values_to = "intensity",
-                 values_drop_na = T)
+                 values_drop_na = T) %>%
+    mutate(sample_id_seq = paste(pep_with_pos, sample_ids, sep = "_"))
   
   density_df <-quant_phospho_density_plot %>%
-    select(c(sample_ids,intensity,species)) %>%
-    bind_rows(ecoli_density_plot)
+    select(c(sample_ids,intensity,accession)) %>%
+    bind_rows(ecoli_density_plot) %>%
+    separate(accession, into = c("prot_id","species"),remove = F)
   
   
   p3 <- gg_density(data_set = density_df, 
@@ -246,39 +298,60 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
              color_lab= "",
              fill_lab = "species",
              subtitle_txt = "")
-
-  # Calculate 1 percent quantile of each sample
   
+  
+  library(kableExtra)
+  na_phospho_mouse <- apply(X = is.na(filtered_abundances), MARGIN = 2, FUN = sum)
+  na_ecoli <- apply(X = is.na(filtered_abundances_ecoli), MARGIN = 2, FUN = sum)
+  
+  na_table <- bind_rows(na_phospho_mouse,na_ecoli)
+  na_table$species <- c("MOUSE","ECOLI")
+  na_table$total <- c(dim(filtered_abundances)[1],dim(filtered_abundances_ecoli)[1])
+  
+  p4 <- na_table %>% select(-common_col_for_merging) %>%
+    kbl(caption = "Number of NA values across all samples") %>%
+    kable_material(c("striped", "hover")) %>%
+    kable_styling(bootstrap_options = "striped", full_width = F, position = "left", font_size = 12) %>%
+    kable_minimal(full_width = F) %>%
+    footnote(general = "This table was created after elimination of multiple charges by selecting either phospho-sites of mouse or background sequences \n that has the highest abundace.",
+             # number = c("Footnote 1; ", "Footnote 2; "),
+             # alphabet = c("Footnote A; ", "Footnote B; "),
+             # symbol = c("Footnote Symbol 1; ", "Footnote Symbol 2")
+             footnote_as_chunk = T, title_format = c("italic", "underline")
+    )
+  
+  
+  abundances_for_before_impt <- barplt_df_wide %>%
+    bind_rows(barplt_df_ecoli_wide) %>% select(exp_design)
+  
+  # Calculate 1 percent quantile of each sample
   impute_values <- apply(abundances_for_impute, 2 , quantile , probs = 0.01 , na.rm = TRUE )
   
-  #abundances_for_impute_ecoli <- filtered_abundances_ecoli %>% select(exp_design)
-  
-  abundances_for_impute_all <- filtered_abundances %>%
-    bind_rows(filtered_abundances_ecoli) %>% select(exp_design)
-
   # Impute missing values
   for (j in 1:length(impute_values)){
     # Number NA
-    num_NA <- length(abundances_for_impute_all[,j][is.na(abundances_for_impute_all[,j])])
+    #num_NA <- length(abundances_for_impute_all[,j+2][is.na(abundances_for_impute_all[,j+2])])
     
-    #abundances_for_impute_mouse[,j][is.na(abundances_for_impute_mouse[,j])] <- impute_values[j]
-    #abundances_for_impute_ecoli[,j][is.na(abundances_for_impute_ecoli[,j])] <- impute_values[j]
+    barplt_df_wide[,j+2][is.na(barplt_df_wide[,j+2])] <- impute_values[j]
+    barplt_df_ecoli_wide[,j+2][is.na(barplt_df_ecoli_wide[,j+2])] <- impute_values[j]
     
-    abundances_for_impute_all[,j][is.na(abundances_for_impute_all)[,j]] <- impute_values[j]
+    #abundances_for_impute_all[,j+2][is.na(abundances_for_impute_all)[,j+2]] <- impute_values[j]
     # After imputation number of imputed values
-    num_imp <-length(abundances_for_impute_all[,j][(abundances_for_impute_all[,j]==impute_values[j])])
+    #num_imp <-length(abundances_for_impute_all[,j+2][(abundances_for_impute_all[,j+2]==impute_values[j])])
     
     # This is verification of imputation is done successfully
     # Because we expect to see that number of imputed values should be the same amount as number of NA
-    print(setequal(num_NA,num_imp))
+    #print(setequal(num_NA,num_imp))
     #print(num_NA)
     #print(num_imp)
   }
   
-  abundances_all_aft_imputation <- filtered_abundances %>%
-    bind_rows(filtered_abundances_ecoli) %>% 
-    select(sequence, accession, spectrum_title) %>%
-    bind_cols(abundances_for_impute_all)
+  # UNNECESSARY TO KEEP DATA BEFORE IMPUTATION
+  abundances_all_aft_imputation <- barplt_df_ecoli_wide %>%
+    rename_with(~ paste0("pep_with_pos"), matches("^seq")) %>%
+    bind_rows(barplt_df_wide) 
+    #select(sequence, accession) %>% #spectrum_title
+    #bind_cols(abundances_for_before_impt)
   
   # Take log10 
   #log_10_abundances_only_for_impute <- log10(abundances_only_for_impute)
@@ -290,8 +363,6 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   # Take mean of triplicates of each sample 
   # Ask sample_size additional parameter
   
-  
-
   
   filtered_abundances_rowMeans <- NULL
   filtered_abundances_log10 <- NULL
@@ -498,9 +569,9 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   }
   ## TODO: ADD LIMMA
   stat_analysis <- final_imputed_data %>%
-    select(sequence,spectrum_title,accession, starts_with("log10_") | starts_with("mean_log10_") | starts_with("exp_FC"))
+    select(pep_with_pos,accession, starts_with("log10_") | starts_with("mean_log10_") | starts_with("exp_FC")) #spectrum_title
   
-  rownames(stat_analysis) <- paste0(stat_analysis$sequence,"@",stat_analysis$spectrum_title,"@",stat_analysis$accession,"@",(1:nrow(stat_analysis)))
+  rownames(stat_analysis) <- paste0(stat_analysis$pep_with_pos,"@",stat_analysis$accession,"@",(1:nrow(stat_analysis))) #stat_analysis$spectrum_title,"@"
   if(test_type== "t.test" | test_type== "wilcoxon"){
     all_pvalues <- NULL
     
@@ -527,39 +598,56 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
       
     }
     all_pvalues_common_col <- stat_analysis %>% 
-      select(sequence, spectrum_title, accession) %>%
+      select(pep_with_pos, accession) %>% #spectrum_title
       bind_cols(all_pvalues) %>% 
       pivot_longer(cols = starts_with("pvalues_"), values_to = "pvalues", names_to ="p_ratios") %>%
       separate(p_ratios, into = c("tmp","ratio"),sep = "_") %>%
       select(!tmp) %>%
-      mutate(common_col = paste(sequence,spectrum_title,accession,ratio,1:((sample_size-1)*nrow(stat_analysis)),sep="@"))
+      mutate(common_col = paste(pep_with_pos,accession,ratio,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) #spectrum_title
+    
+    merge_stat_df <- final_imputed_data %>%
+      select(pep_with_pos, accession, starts_with("exp_FC")) %>%
+      pivot_longer(cols = starts_with("exp_FC"), values_to = "fold_change_values", names_to ="fold_change_ratios") %>%
+      separate(fold_change_ratios, into = c("tmp","tmp1","ratio"),sep = "_") %>%
+      select(!c(tmp,tmp1)) %>%
+      mutate(common_col = paste(pep_with_pos,accession,1:((sample_size-1)*nrow(final_imputed_data)),sep="@")) %>%
+      bind_cols(all_pvalues_common_col$ratio,all_pvalues_common_col$pvalues) %>%
+      rename_with(.col =6 , ~"ratio1") %>%
+      rename_with(.col=7, ~ "pvalues") %>%
+      separate(accession, into = c("prot_id","species"),sep = "_")
     
     ### MERGING I: All used columns are merged and used to combine pvalues and ratios
           ## Before changing the shape of data 
           ## This eliminates any duplication and mismatching btw dataframes
           ## We are 100% sured that all pvalues are associated with its ratio.
       ## Shape of volcano plot looks quite weird esspecially in the A1vsA5.
-    merge_stat_df <- stat_analysis %>%
-      select(sequence, spectrum_title, accession, starts_with("exp_FC")) %>%
+    
+  ## THIS IS CORRECT BUT UNNECESSARILY LONG WAY
+    test <- stat_analysis %>%
+      select(pep_with_pos, accession, starts_with("exp_FC")) %>% #spectrum_title
       bind_cols(all_pvalues) %>%
       pivot_longer(cols = starts_with("exp_FC"), values_to = "fold_change_values", names_to ="fold_change_ratios") %>%
       separate(fold_change_ratios, into = c("tmp","tmp1","ratio"),sep = "_") %>%
       select(!c(tmp,tmp1)) %>%
-      mutate(common_col = paste(sequence,spectrum_title,accession,ratio,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) %>%
+      mutate(common_col = paste(pep_with_pos,accession,ratio,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) %>%
       left_join(all_pvalues_common_col, by="common_col") %>%
       separate(accession.x, into = c("uniprot_id","species"),sep = "_")
+    
     
     ### MERGING II: Previous version of combining pvalues and ratios
         ## No errors were appeared when I double pivot_longer()
         ## But there is no common column between those values so that
         ## We cannot know which pvalues correspond to which ratio (MAYBE WE DON'T NEED IT)
     ## Shape of volcano plot looks better when I used this way.
-      merge_stat_df1 <- stat_analysis %>%
-        select(sequence, spectrum_title, accession, starts_with("exp_FC")) %>%
-        bind_cols(all_pvalues) %>%
-        pivot_longer(cols = starts_with("exp_FC"), values_to = "fold_change_values", names_to ="fold_change_ratios") %>%
-        pivot_longer(cols = starts_with("pvalues_"), values_to = "pvalues", names_to ="p_ratios") %>%
-        separate(accession, into = c("uniprot_id","species"),sep = "_")
+    
+    ## IT's NOT CORRECT ##
+    
+      # merge_stat_df1 <- stat_analysis %>%
+      #   select(pep_with_pos, accession, starts_with("exp_FC")) %>%
+      #   bind_cols(all_pvalues) %>%
+      #   pivot_longer(cols = starts_with("exp_FC"), values_to = "fold_change_values", names_to ="fold_change_ratios") %>%
+      #   pivot_longer(cols = starts_with("pvalues_"), values_to = "pvalues", names_to ="p_ratios") %>%
+      #   separate(accession, into = c("uniprot_id","species"),sep = "_")
       
       
   }else if(test_type=="limma"){
@@ -641,9 +729,9 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
         colnames(design_matrix) <- c("Intercept", paste0("A1-A",i))
         #print(colnames(design_matrix))
         # Col selection for each comparison
-        assign(paste0("df_A1vsA",i),stat_analysis %>% select(1:3 | contains("log10_E3_A1") | contains(paste0("log10_E3_A",i))))
+        assign(paste0("df_A1vsA",i),stat_analysis %>% select(1:2 | contains("log10_E3_A1") | contains(paste0("log10_E3_A",i))))
         # First, linear model was built
-        assign(paste0("fit",i) ,lmFit(get(paste0("df_A1vsA",i))[,3:9], design_matrix))
+        assign(paste0("fit",i) ,lmFit(get(paste0("df_A1vsA",i))[,3:8], design_matrix))
         assign(paste0("fit",i), eBayes(get(paste0("fit",i))))
         # Readable dataframe format was generated 
         assign(paste0("alllimma",i), topTable(get(paste0("fit",i)), coef=2,adjust.method="BH",p.value=1,"P"))
@@ -661,8 +749,8 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
       
       merge_stat_df_final <- merge_stat_df %>%  #
         rename_with(.col =1 , ~"mult_col") %>%
-        rename_with(.col=9, ~ "ratios") %>%
-        separate(mult_col, into = c("sequence", "spectrum_title","accession","id"),sep = "@") %>%
+        rename_with(.col=8, ~ "ratios") %>%
+        separate(mult_col, into = c("pep_with_pos","accession","id"),sep = "@") %>% #"spectrum_title"
         separate(accession, into = c("uniprot_id","species"),sep = "_")
       
       
@@ -710,7 +798,7 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
     actual_ratio <- data.frame(Ratio_col=unique(merge_stat_df_pivot$fold_change_ratios),-1*(log2(c(2,10,20,100))))
     
     
-    p10 <- ggplot(merge_stat_df ,aes(x =log2(fold_change_values), y = -log10(merge_stat_df$pvalues), color=species)) +
+    p10 <- ggplot(test ,aes(x =log2(fold_change_values), y = -log10(test$pvalues), color=species)) +
       geom_point(size = 1) + #, aes(shape=merge_stat_df_final$species)
       facet_wrap(~ratio.x) +
       #scale_y_continuous(limits = c(0, 8), breaks = seq(0, 8, by = 0.8)) +
