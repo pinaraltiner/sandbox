@@ -1,63 +1,4 @@
-#library(PhosR)
-library(stringr)
-library(dplyr)
-library(data.table)
-library(openxlsx)
-library(ggplot2)
-library(tidyr)
-###############################################
-
-source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/ggplot/ggplot_functions.R")
-# 
-# file_path_exp3 <- "D:/dev/Desktop_copy/PHD/wet_lab_experiments/DDA_data_analysis/experiment_3/Proline_data_analysis/quant_pep_06022023/"
-# file_name_exp3 <- "PAL _Tcell_Exp3_( 5 conc 3reps)_NoFAIMS_DDA_with_cont_230206.xlsx"
-# selected_spcies = "_MOUSE"
-# sheet_name <- "Quantified peptide ions"
-# 
-
-
-### BE INVOLVED ECOLI IN THE STATISTICAL PART
-
-file_path_exp3_tims <- "D:/dev/Pinar/PHD/wet_lab_experiments/DDA_data_analysis/experiment_3/Proline_timsdata/"
-file_name_exp3_tims <- "PAL TimsTOF_data_conversion_all_exp_06062023 E3 corrected_2023-06-28_1522.xlsx"
-# Common constant objects
-sample_size <- 5
-#sheet_name <- "Quantified peptide ions"
-sheet_name <- "Best PSM from protein sets"
-file_path<- file_path_exp3_tims
-file_name <- file_name_exp3_tims
-selected_spcies <-  "_MOUSE"
-test_type <- c("t.test","wilcoxon","limma") ## one selection at a time
-
-exp_design <- c("E3_A1_R1","E3_A1_R2",
-                "E3_A1_R3",
-                "E3_A2_R1",
-                "E3_A2_R2",
-                "E3_A2_R3",
-                "E3_A3_R1",
-                "E3_A3_R2",
-                "E3_A3_R3",
-                "E3_A4_R1",
-                "E3_A4_R2",
-                "E3_A4_R3",
-                "E3_A5_R1",
-                "E3_A5_R2",
-                "E3_A5_R3")
-
-num_reps <- 3
-sample_size <- length(exp_design) / num_reps
-sample_names <- paste0("A",1:sample_size)
-comparisons <- NULL
-for (i in 1:sample_size){
-  tmp <- paste0(sample_names[1], "_vs_",sample_names[i])
-  comparisons[i] <- tmp
-  rm(tmp)
-}
-
-acquisiton_type <- c("DDA Exploris with FAIMS","DDA Exploris no FAIMS","DDA TIMS-TOF")
-exp_id <- 1:3
-software_name <- c("Proline", "MaxQuant", "PD")
-
+#
 final_proline_pep_quant_analysis_bio <- function(file_path,
                                              file_name,
                                              sheet_name,
@@ -65,10 +6,31 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
                                              theo_file_name,
                                              sheet_theo_name,
                                              selected_spcies,
-                                             sample_size,
                                              acquisiton_type,
                                              exp_id,
-                                             software_name){
+                                             software_name,
+                                             test_type,
+                                             exp_design,
+                                             num_reps){
+  #library(PhosR)
+  library(stringr)
+  library(dplyr)
+  library(data.table)
+  library(openxlsx)
+  library(ggplot2)
+  library(tidyr)
+  
+  source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/ggplot/ggplot_functions.R")
+  
+  sample_size <- length(exp_design) / num_reps
+  sample_names <- paste0("A",1:sample_size)
+  comparisons <- NULL
+  for (i in 1:sample_size){
+    tmp <- paste0(sample_names[1], "_vs_",sample_names[i])
+    comparisons[i] <- tmp
+    rm(tmp)
+  }
+  
   quant_peptides <- read.xlsx(paste0(file_path,file_name), sheet = sheet_name)
   
   abundances_for_impute <- quant_peptides %>% 
@@ -79,7 +41,7 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
     rename_with(~exp_design,matches("^abundance"))
   
   quant_phospho_peptides <- quant_peptides_cor_abun %>% 
-    filter(grepl("_MOUSE",accession)) %>% 
+    filter(grepl(selected_spcies,accession)) %>% 
     filter(grepl("Phospho",modifications)) 
   
   quant_peptides_ECOLI <- quant_peptides_cor_abun %>% 
@@ -308,8 +270,8 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   na_table$species <- c("MOUSE","ECOLI")
   na_table$total <- c(dim(filtered_abundances)[1],dim(filtered_abundances_ecoli)[1])
   
-  p4 <- na_table %>% select(-common_col_for_merging) %>%
-    kbl(caption = "Number of NA values across all samples") %>%
+  na_table %>% select(-common_col_for_merging) %>%
+    kbl(caption = paste("Number of NA values across all samples \n Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) %>%
     kable_material(c("striped", "hover")) %>%
     kable_styling(bootstrap_options = "striped", full_width = F, position = "left", font_size = 12) %>%
     kable_minimal(full_width = F) %>%
@@ -317,8 +279,9 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
              # number = c("Footnote 1; ", "Footnote 2; "),
              # alphabet = c("Footnote A; ", "Footnote B; "),
              # symbol = c("Footnote Symbol 1; ", "Footnote Symbol 2")
-             footnote_as_chunk = T, title_format = c("italic", "underline")
-    )
+             footnote_as_chunk = T, title_format = c("italic", "underline")) %>%
+    #as_image(width = 8) %>%
+    save_kable(paste0(file_path,"table1.png"))
   
   
   abundances_for_before_impt <- barplt_df_wide %>%
@@ -442,20 +405,20 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
                    fill_lab = "Sample Names",
                    subtitle_txt = "")
   
-  p5 <- gg_raincloud(data_set = df_mean_ab_after_impt,
-                     x_df = df_mean_ab_after_impt$Mean_abundance,
-                     y_df = df_mean_ab_after_impt$values,
-                     fill_df = df_mean_ab_after_impt$Mean_abundance,
-                     header = "Distribution of mean abundance of every sample after imputation",
-                     x_lab = "Sample Names",
-                     y_lab = " Density of log10(Mean Abundance)",
-                     fill_lab = "Sample Names",
-                     caption_lab = "",
-                     subtitle_txt = "")
+  # px <- gg_raincloud(data_set = df_mean_ab_after_impt,
+  #                    x_df = df_mean_ab_after_impt$Mean_abundance,
+  #                    y_df = df_mean_ab_after_impt$values,
+  #                    fill_df = df_mean_ab_after_impt$Mean_abundance,
+  #                    header = "Distribution of mean abundance of every sample after imputation",
+  #                    x_lab = "Sample Names",
+  #                    y_lab = " Density of log10(Mean Abundance)",
+  #                    fill_lab = "Sample Names",
+  #                    caption_lab = "",
+  #                    subtitle_txt = "")
   
   
   
-  p6 <- gg_density(data_set = df_FC_ratio_after_impt,
+  p5 <- gg_density(data_set = df_FC_ratio_after_impt,
                    x_df = df_FC_ratio_after_impt$values,
                    fill_df = df_FC_ratio_after_impt$exp_FC,
                    color_df = df_FC_ratio_after_impt$species,
@@ -469,7 +432,7 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
 
   ### BOX-PLOT: Experimental Quantity Ratio of Phospho Peptides  
   
-  p7 <- gg_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
+  p6 <- gg_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
                             x_df = df_FC_ratio_after_impt$exp_FC,
                             y_df = df_FC_ratio_after_impt$values,
                             fill_df = df_FC_ratio_after_impt$species,
@@ -483,7 +446,7 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   ### HALF-BOX-PLOT & HALF-SCATTER-PLOT: Experimental Quantity Ratio of Synthetic Peptides  
   library(gghalves)
   
-  p8 <- gg_half_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
+  p7 <- gg_half_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
                                  x_df = df_FC_ratio_after_impt$exp_FC,
                                  y_df = df_FC_ratio_after_impt$values,
                                  fill_df = df_FC_ratio_after_impt$species,
@@ -496,7 +459,7 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   ### VIOLIN-PLOT: Experimental Quantity Ratio of Synthetic Peptides   
   
   ### TODO: fix y scaling without trimming 
-  p9 <- gg_violin_exp_ratio(data_set = df_FC_ratio_after_impt, 
+  p8 <- gg_violin_exp_ratio(data_set = df_FC_ratio_after_impt, 
                             x_df = df_FC_ratio_after_impt$exp_FC,
                             y_df = df_FC_ratio_after_impt$values,
                             fill_df = df_FC_ratio_after_impt$species,
@@ -571,10 +534,10 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
   stat_analysis <- final_imputed_data %>%
     select(pep_with_pos,accession, starts_with("log10_") | starts_with("mean_log10_") | starts_with("exp_FC")) #spectrum_title
   
-  rownames(stat_analysis) <- paste0(stat_analysis$pep_with_pos,"@",stat_analysis$accession,"@",(1:nrow(stat_analysis))) #stat_analysis$spectrum_title,"@"
+  rownames(stat_analysis) <- paste0(stat_analysis$common_col_for_merging,"@",stat_analysis$Pool,"@",(1:nrow(stat_analysis))) #stat_analysis$spectrum_title,"@"
   if(test_type== "t.test" | test_type== "wilcoxon"){
     all_pvalues <- NULL
-    
+    all_adjust_pval <- NULL
     for (i in 2:sample_size){
       p_values_tmp <- NULL
       
@@ -586,15 +549,27 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
           
         }else if(test_type=="wilcoxon"){
           p_values_tmp[j] <- wilcox.test(select(stat_analysis,contains("A1_") & contains("log10_"))[j,],     ### FOR DIFFERENT KIND OF EXP SETUP, 
-                                        select(stat_analysis,contains(paste0("A",i,"_")) & contains("log10_"))[j,])     ## It should be defined as an input.
+                                         select(stat_analysis,contains(paste0("A",i,"_")) & contains("log10_"))[j,])
+          ## It should be defined as an input.
         }
-        
         
       }
       p_values_tmp <- as.data.frame(p_values_tmp)
       colnames(p_values_tmp) <- paste0("pvalues_A1","/","A",i)
       all_pvalues <- bind_cols(all_pvalues,p_values_tmp)
+      rownames(all_pvalues) <- row.names(stat_analysis)
       rm(p_values_tmp)
+      
+      #### p-value adjust at a given FDR ####
+      #procs<-c("Bonferroni","Holm","Hochberg","SidakSS","SidakSD","BH","BY","ABH","TSBH")
+      adjust_pval_tmp <-  mt.rawp2adjp(all_pvalues[,paste0("pvalues_A1","/","A",i)],
+                                       proc="BH", alpha=0.05)
+      qval <- data.frame(adjust_pval_tmp$adjp,adjust_pval_tmp$index)[order(adjust_pval_tmp$index),2]
+      qval <- as.data.frame(qval)
+      colnames(qval) <- paste0("adjust_pval_A1","/","A",i)
+      all_adjust_pval <- bind_cols(all_adjust_pval,qval)
+      rownames(all_adjust_pval) <- row.names(stat_analysis)
+      rm(adjust_pval_tmp,qval)
       
     }
     all_pvalues_common_col <- stat_analysis %>% 
@@ -605,6 +580,7 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
       select(!tmp) %>%
       mutate(common_col = paste(pep_with_pos,accession,ratio,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) #spectrum_title
     
+    ## THE BEST WAY TO DO is this:
     merge_stat_df <- final_imputed_data %>%
       select(pep_with_pos, accession, starts_with("exp_FC")) %>%
       pivot_longer(cols = starts_with("exp_FC"), values_to = "fold_change_values", names_to ="fold_change_ratios") %>%
@@ -616,6 +592,33 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
       rename_with(.col=7, ~ "pvalues") %>%
       separate(accession, into = c("prot_id","species"),sep = "_")
     
+    
+    
+    p9_t_test <- ggplot(merge_stat_df ,aes(x =log2(fold_change_values), y = -log10(merge_stat_df$pvalues), color=ratio)) +
+      geom_point(size = 2,aes(shape=Pool)) + #, aes(shape=merge_stat_df_final$species)
+      #facet_wrap(~ratio) +
+      #scale_y_continuous(limits = c(0, 8), breaks = seq(0, 8, by = 0.8)) +
+      #scale_x_continuous(limits = c(-3,3),breaks = seq(-3, 3, by = 0.8)) +
+      scale_color_brewer(palette = "Set1") +
+      #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
+      theme_bw() +
+      theme(legend.text = element_text(size = 15),
+            axis.title.x = element_text(size = 15),
+            axis.title.y = element_text(size = 15),
+            plot.title = element_text(size = 30),
+            legend.title = element_text(size = 15),
+            axis.text.x = element_text(size = 15),
+            axis.title = element_text(size = 15),
+            axis.text.y = element_text(size = 15)) +
+      labs(title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = "T-test was used")
+    #expand_limits(x = 0, y = 0) +
+    #geom_vline(data = actual_ratio, aes(xintercept = actual_ratio$X.1....log2.c.2..10..20..100..., size = 1, show.legend = FALSE)) + #color=c("#CC79A7","#E69F00","#56B4E9","#009E73")
+    #geom_hline(data = log10_p_thresholds, aes(yintercept = log10_p_thresholds$X.log10.p_thresholds.),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"), size = 1, linetype = 2, show.legend = FALSE)+ 
+    #
+    
+    
+    
+    
     ### MERGING I: All used columns are merged and used to combine pvalues and ratios
           ## Before changing the shape of data 
           ## This eliminates any duplication and mismatching btw dataframes
@@ -623,17 +626,17 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
       ## Shape of volcano plot looks quite weird esspecially in the A1vsA5.
     
   ## THIS IS CORRECT BUT UNNECESSARILY LONG WAY
-    test <- stat_analysis %>%
-      select(pep_with_pos, accession, starts_with("exp_FC")) %>% #spectrum_title
-      bind_cols(all_pvalues) %>%
-      pivot_longer(cols = starts_with("exp_FC"), values_to = "fold_change_values", names_to ="fold_change_ratios") %>%
-      separate(fold_change_ratios, into = c("tmp","tmp1","ratio"),sep = "_") %>%
-      select(!c(tmp,tmp1)) %>%
-      mutate(common_col = paste(pep_with_pos,accession,ratio,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) %>%
-      left_join(all_pvalues_common_col, by="common_col") %>%
-      separate(accession.x, into = c("uniprot_id","species"),sep = "_")
-    
-    
+    # test <- stat_analysis %>%
+    #   select(pep_with_pos, accession, starts_with("exp_FC")) %>% #spectrum_title
+    #   bind_cols(all_pvalues) %>%
+    #   pivot_longer(cols = starts_with("exp_FC"), values_to = "fold_change_values", names_to ="fold_change_ratios") %>%
+    #   separate(fold_change_ratios, into = c("tmp","tmp1","ratio"),sep = "_") %>%
+    #   select(!c(tmp,tmp1)) %>%
+    #   mutate(common_col = paste(pep_with_pos,accession,ratio,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) %>%
+    #   left_join(all_pvalues_common_col, by="common_col") %>%
+    #   separate(accession.x, into = c("uniprot_id","species"),sep = "_")
+    # 
+    # 
     ### MERGING II: Previous version of combining pvalues and ratios
         ## No errors were appeared when I double pivot_longer()
         ## But there is no common column between those values so that
@@ -753,7 +756,16 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
         separate(mult_col, into = c("pep_with_pos","accession","id"),sep = "@") %>% #"spectrum_title"
         separate(accession, into = c("uniprot_id","species"),sep = "_")
       
-      
+      p9_limma <- gg_volcano(data_set = merge_stat_df_final,
+                   x_df = merge_stat_df_final$logFC,  
+                   y_df = -log10(merge_stat_df_final$P.Value),
+                   color_df = merge_stat_df_final$species,
+                   facet_df = "ratios",
+                   header = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), ## Specifications of the header will be asked as an input.
+                   color_lab = "Classes",
+                   subtitle_txt = "Limma was used",
+                   x_lab = "log2(fold_change_values)",
+                   y_lab = "-log10(p_values)")   
       
       #select(accession, spectrum_title, contains("P.value") | contains("logFC")) %>%
       #pivot_longer(cols = contains("P.value"), values_to = "pvalues", names_to ="p_ratios") %>%
@@ -794,68 +806,31 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
     # ## Be careful that merging correct rownames to pvalues
     # 
     
-    actual_ratio <- c(2,10,20,100)
-    actual_ratio <- data.frame(Ratio_col=unique(merge_stat_df_pivot$fold_change_ratios),-1*(log2(c(2,10,20,100))))
-    
-    
-    p10 <- ggplot(test ,aes(x =log2(fold_change_values), y = -log10(test$pvalues), color=species)) +
-      geom_point(size = 1) + #, aes(shape=merge_stat_df_final$species)
-      facet_wrap(~ratio.x) +
-      #scale_y_continuous(limits = c(0, 8), breaks = seq(0, 8, by = 0.8)) +
-      #scale_x_continuous(limits = c(-3,3),breaks = seq(-3, 3, by = 0.8)) +
-      scale_color_brewer(palette = "Set1") +
-      #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
-      theme_bw() +
-      theme(legend.text = element_text(size = 15),
-            axis.title.x = element_text(size = 15),
-            axis.title.y = element_text(size = 15),
-            plot.title = element_text(size = 30),
-            legend.title = element_text(size = 15),
-            axis.text.x = element_text(size = 15),
-            axis.title = element_text(size = 15),
-            axis.text.y = element_text(size = 15)) +
-      labs(title = paste0("Experiment - ", exp_id[3], acquisiton_type[2], " data processed by ", software_name[1]), subtitle = "T-test was used")
-      #expand_limits(x = 0, y = 0) +
-      #geom_vline(data = actual_ratio, aes(xintercept = actual_ratio$X.1....log2.c.2..10..20..100..., size = 1, show.legend = FALSE)) + #color=c("#CC79A7","#E69F00","#56B4E9","#009E73")
-      #geom_hline(data = log10_p_thresholds, aes(yintercept = log10_p_thresholds$X.log10.p_thresholds.),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"), size = 1, linetype = 2, show.legend = FALSE)+ 
-      #
-      
-      
-      
-      
-      # gg_volcano(data_set = merge_stat_df,
-      #                 x_df = log2(merge_stat_df$fold_change_values),
-      #                 y_df = -log10(merge_stat_df$pvalues),
-      #                 color_df = merge_stat_df_final$species,
-      #                 facet_df = "ratio.x",
-      #                 header ="", #paste0("Experiment ", exp_id[3], acquisiton_type[2], " data processed by ", software_name[1]),
-      #                 color_lab = "Classes",
-      #                 subtitle_txt = "with adjusted p values")
-    
-    p11 <- gg_volcano(data_set = merge_stat_df_final,
-                      x_df = merge_stat_df_final$logFC,
-                      y_df = -log10(merge_stat_df_final$P.Value),
-                      color_df = merge_stat_df_final$species,
-                      facet_df = "ratios",
-                      header = paste0("Experiment - ", exp_id[3], acquisiton_type[2], " data processed by ", software_name[1]), ## Specifications of the header will be asked as an input.
-                      color_lab = "Classes",
-                      subtitle_txt = "limma was used")    
     
     # ggplot(data=merge_stat_df1,aes(x=log2(merge_stat_df1$fold_change_values),y=-log10(merge_stat_df1$pvalues),color=species)) +
     #   geom_point() + facet_wrap(~fold_change_ratios)
     # 
-    
-     
-    
-    
-    
-    sapply(10:11,function(x) ggsave(filename = paste0("p",x,".tiff"),
+    sapply(1:8,function(x) ggsave(filename = paste0("p",x,".tiff"),
                                   width = 50, height = 40, 
                                   path = paste0(file_path,"/outputs_with_new_script/"),
                                   units = "cm",
                                   get(paste0("p",x)),
                                   device = "tiff", #".svg"
     ))
+    
+    ggsave(filename = paste0("p9_t_test.tiff"),
+           width = 50, height = 40, 
+           path = paste0(file_path,"/outputs_with_new_script/"),
+           units = "cm",
+           p9_t_test,
+           device = "tiff")
+    
+    ggsave(filename = paste0("p9_limma.tiff"),
+           width = 50, height = 40, 
+           path = paste0(file_path,"/outputs_with_new_script/"),
+           units = "cm",
+           p9_limma,
+           device = "tiff")
     
    
   }
