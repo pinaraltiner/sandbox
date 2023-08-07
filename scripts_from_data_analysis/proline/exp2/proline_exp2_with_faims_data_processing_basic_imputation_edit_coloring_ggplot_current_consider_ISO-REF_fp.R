@@ -27,8 +27,8 @@ sheet_theo_name <- "ISO-ref and OTHER with FC"
 sample_size <- 5
 sheet_name <- "Best PSM from protein sets"
 #sheet_name <- "Quantified peptide ions"
-
-
+exp_id <- 3
+background_species <- "ECOLI"
 
 final_proline_pep_quant_analysis <- function(file_path,
                                              file_name,
@@ -37,7 +37,9 @@ final_proline_pep_quant_analysis <- function(file_path,
                                              theo_file_name,
                                              sheet_theo_name,
                                              background_species,
-                                             selected_spcies){
+                                             selected_spcies,
+                                             exp_id,
+                                             exp_design){
   quant_peptides <- read.xlsx(paste0(file_path,file_name), sheet = sheet_name)
   
   pep_list_w_theo_quant <- read.xlsx(paste0(theo_file_path, theo_file_name), sheet = sheet_theo_name)
@@ -438,15 +440,15 @@ final_proline_pep_quant_analysis <- function(file_path,
     
     final_imputed_data <- cbind(abundances_all_aft_imputation, filtered_abundances_rowMeans,filtered_abundances_log10,filtered_abundances_log10_rowMeans) #filtered_abundances
     
-    final_imputed_data_syn <- final_imputed_data %>% filter(grepl("HUMAN", accession))
+    final_imputed_data_syn <- final_imputed_data %>% filter(grepl(selected_spcies, accession))
     
-    final_imputed_data_ecoli <- final_imputed_data  %>% filter(!grepl("HUMAN", accession))
+    final_imputed_data_ecoli <- final_imputed_data  %>% filter(!grepl(selected_spcies, accession))
     
     df_merge <- final_imputed_data_syn %>%
       left_join(pep_list_w_theo_quant_new,by="common_col_for_merging") %>% 
       mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
       bind_rows(final_imputed_data_ecoli) %>%
-      mutate_at("Pool", ~replace_na(.,"ECOLI")) 
+      mutate_at("Pool", ~replace_na(.,background_species)) 
   
     #write.table(final_imputed_data, file = "final_imputed_normalized_data_PAL _T_cell_Exp3_( 5 conc 3reps)_NoFAIMS_DDA_with_cont_230206_2023-02-07_0947.txt",sep = "\t",row.names = F)
     
@@ -457,7 +459,7 @@ final_proline_pep_quant_analysis <- function(file_path,
       pivot_longer(cols = contains("aft_imp"),
                    names_to = "Mean_abundance",
                    values_to = "values") %>%
-      mutate_at("Pool", ~replace_na(.,"ECOLI"))
+      mutate_at("Pool", ~replace_na(.,background_species))
       
     
     df_FC_ratio_after_impt <- df_merge %>% 
@@ -467,7 +469,7 @@ final_proline_pep_quant_analysis <- function(file_path,
       pivot_longer(cols = starts_with("exp_"),
                    names_to = "exp_FC",
                    values_to = "values") %>%
-      mutate_at("Pool", ~replace_na(.,"ECOLI"))
+      mutate_at("Pool", ~replace_na(.,background_species))
     
     p4 <- gg_density(data_set = df_mean_ab_after_impt, 
                      x_df = df_mean_ab_after_impt$values,
@@ -630,8 +632,9 @@ final_proline_pep_quant_analysis <- function(file_path,
   ## ALWAYS KEEP IT COMMENTED TO PREVENT OVERWRITE
   #write.xlsx(df_merge,file = "D:/dev/Pinar/PHD/wet_lab_experiments/experiment2_quantification_peptide_level/Correct_imputation_exp2proline_and_peplist_theo_before_stast_analysis.xlsx")
 
-  unexpectedly_id_peps <- final_imputed_data %>% 
-    filter_at(vars(Pool), all_vars(is.na(.)))
+  unexpectedly_id_peps <- df_merge %>% 
+      filter(grepl("Unexpected",Pool))
+   # filter_at(vars(Pool), all_vars(is.na(.)))
   
   #output_path <- "D:/dev/Pinar/PHD/wet_lab_experiments/DDA_data_analysis/comparision_DDA_noFAIMS_mq_proline_pd/"
   #write.xlsx(unexpectedly_id_peps,file = paste0(output_path,"Corrected_imputation_proline_unexpectedly_identified_phosphopeptides_exp2_noFAIMS_DDA.xlsx"))
@@ -662,260 +665,352 @@ final_proline_pep_quant_analysis <- function(file_path,
     wilcox.test(as.numeric(x), as.numeric(y),alternative = c("two.sided"))$p.value
   }
   ## TODO: ADD LIMMA
-  stat_analysis <- final_imputed_data %>%
-    select(pep_with_pos,accession, starts_with("log10_") | starts_with("mean_log10_") | starts_with("exp_FC")) #spectrum_title
+  stat_analysis <- df_merge %>%
+    select(common_col_for_merging,Pool,accession,isomericity,starts_with("log10_") | starts_with("mean_log10_") | starts_with("exp_FC"))
+    #filter(grepl("HUMAN",accession)) #spectrum_title
   
-  rownames(stat_analysis) <- paste0(stat_analysis$pep_with_pos,"@",stat_analysis$accession,"@",(1:nrow(stat_analysis))) #stat_analysis$spectrum_title,"@"
+  rownames(stat_analysis) <- paste0(stat_analysis$common_col_for_merging,"@",stat_analysis$Pool,"@",(1:nrow(stat_analysis))) #stat_analysis$spectrum_title,"@"
+  library(multtest)
   if(test_type== "t.test" | test_type== "wilcoxon"){
-    all_pvalues <- NULL
+    # Pre-allocate memory for results
+    num_iterations <- sample_size - 1
+    all_pvalues <- matrix(NA, nrow(stat_analysis), num_iterations)
+    all_adjust_pval <- matrix(NA, nrow(stat_analysis), num_iterations)
     
-    for (i in 2:sample_size){
-      p_values_tmp <- NULL
-      
-      for(j in 1:dim(stat_analysis)[1]){
-        
-        if(test_type=="t.test"){
-          p_values_tmp[j] <- ttest_func(select(stat_analysis,contains("A1_") & contains("log10_"))[j,],     ### FOR DIFFERENT KIND OF EXP SETUP, 
-                                        select(stat_analysis,contains(paste0("A",i,"_")) & contains("log10_"))[j,] ) ## It should be defined as an input.
-          
-        }else if(test_type=="wilcoxon"){
-          p_values_tmp[j] <- wilcox.test(select(stat_analysis,contains("A1_") & contains("log10_"))[j,],     ### FOR DIFFERENT KIND OF EXP SETUP, 
-                                         select(stat_analysis,contains(paste0("A",i,"_")) & contains("log10_"))[j,])     ## It should be defined as an input.
+    # Loop through iterations using lapply
+    for (i in 2:sample_size) {
+      p_values_tmp <- lapply(1:dim(stat_analysis)[1], function(j) {
+        if (test_type == "t.test") {
+          ttest_func(select(stat_analysis, contains("A1_") & contains("log10_"))[j,],
+                     select(stat_analysis, contains(paste0("A", i, "_")) & contains("log10_"))[j,])
+        } else if (test_type == "wilcoxon") {
+          wilcox.test(select(stat_analysis, contains("A1_") & contains("log10_"))[j,],
+                      select(stat_analysis, contains(paste0("A", i, "_")) & contains("log10_"))[j,])
         }
-        
-      }
-      p_values_tmp <- as.data.frame(p_values_tmp)
-      colnames(p_values_tmp) <- paste0("pvalues_A1","/","A",i)
+      })
       
-      p_values_tmp <- p_values_tmp[order(p_values_tmp[,paste0("pvalues_A1","/","A",i)]),]
-      colnames(p_values_12)[1] <- "common_col_for_merging"
-      p_values_12["rank12"] <- 1:test_num
-      p_values_12[j,"test12"] <- (p_values_12[j,"rank12"]/test_num)*0.05
-      p_values_12[j,"test_bool"] <- p_values_12[j,"test12"] > p_values_12[j,"p_values_12"]
+      # Extract p-values from the list
+      p_values_tmp <- sapply(p_values_tmp, function(x) x)
       
-      all_pvalues <- bind_cols(all_pvalues,p_values_tmp)
-      rm(p_values_tmp)
+      # Store p-values in the pre-allocated matrix
+      all_pvalues[, i - 1] <- p_values_tmp
       
+      # Perform adjustment
+      adjust_pval_tmp <- mt.rawp2adjp(p_values_tmp, proc = "BH", alpha = 0.05)
+      qval <- data.frame(adjust_pval_tmp$adjp, adjust_pval_tmp$index)[order(adjust_pval_tmp$index), 2]
+      
+      # Store adjusted p-values in the pre-allocated matrix
+      all_adjust_pval[, i - 1] <- qval
     }
+    
+    # Create data frames from matrices
+    all_pvalues <- as.data.frame(all_pvalues)
+    colnames(all_pvalues) <- paste0("pvalues_A1/", "A", 2:sample_size)
+    rownames(all_pvalues) <- row.names(stat_analysis)
+    
+    all_adjust_pval <- as.data.frame(all_adjust_pval)
+    colnames(all_adjust_pval) <- paste0("adjust_pval_A1/", "A", 2:sample_size)
+    rownames(all_adjust_pval) <- row.names(stat_analysis)
+    
+    
     all_pvalues_common_col <- stat_analysis %>% 
-      select(pep_with_pos, accession) %>% #spectrum_title
-      bind_cols(all_pvalues) %>% 
-      pivot_longer(cols = starts_with("pvalues_"), values_to = "pvalues", names_to ="p_ratios") %>%
-      separate(p_ratios, into = c("tmp","ratio"),sep = "_") %>%
-      select(!tmp) %>%
-      mutate(common_col = paste(pep_with_pos,accession,ratio,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) #spectrum_title
+      select(common_col_for_merging, isomericity,accession, Pool) %>% #spectrum_title
+      bind_cols(all_adjust_pval) %>%  #all_pvalues
+      pivot_longer(cols = starts_with("adjust_pval"), values_to = "adj_pval", names_to ="adj_pratios") %>%
+      separate(adj_pratios, into = c("tmp","tmp1","ratio"),sep = "_") %>%
+      select(!c(tmp,tmp1)) %>%
+      mutate(common_col = paste(common_col_for_merging,Pool,ratio,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) #spectrum_title
     
     ## THE BEST WAY TO DO is this:
-    merge_stat_df <- final_imputed_data %>%
-      select(pep_with_pos, accession, starts_with("exp_FC")) %>%
+    merge_stat_df <- stat_analysis %>%
+      select(common_col_for_merging, Pool, isomericity,starts_with("exp_FC")) %>%
       pivot_longer(cols = starts_with("exp_FC"), values_to = "fold_change_values", names_to ="fold_change_ratios") %>%
       separate(fold_change_ratios, into = c("tmp","tmp1","ratio"),sep = "_") %>%
       select(!c(tmp,tmp1)) %>%
-      mutate(common_col = paste(pep_with_pos,accession,1:((sample_size-1)*nrow(final_imputed_data)),sep="@")) %>%
-      bind_cols(all_pvalues_common_col$ratio,all_pvalues_common_col$pvalues) %>%
+      #mutate(common_col = paste(common_col_for_merging,Pool,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) %>%
+      bind_cols(all_pvalues_common_col$ratio,all_pvalues_common_col$adj_pval) %>%
       rename_with(.col =6 , ~"ratio1") %>%
       rename_with(.col=7, ~ "pvalues") %>%
-      separate(accession, into = c("prot_id","species"),sep = "_")
+      #filter(!grepl("ECOLI",Pool))
+      #separate(accession, into = c("prot_id","species"),sep = "_")
+      mutate(isomericity = ifelse(is.na(isomericity), "False Positive", isomericity)) %>%
+      unite(Pool_new, Pool, isomericity,sep = "_",remove = FALSE) %>%
+      unite('new_col_coloring',Pool_new,ratio,sep = "_",remove = FALSE) %>%
+      mutate(new_col_coloring = if_else(grepl("ISO-REF", new_col_coloring), "ISO-REF", new_col_coloring)) %>%
+      mutate(new_col_coloring = if_else(grepl("unexpected", new_col_coloring), "unexpected", new_col_coloring))
+    
     
     ###############################################################################
-  # 
-  # # iterate through each column of the data set and calculate t-tests
-  # triplicate_indx <- c(1,3,4,6,7,9,10,12,13,15) +1
-  # 
-  # 
-  # p_values_12 <- NULL
-  # p_values_13 <- NULL
-  # p_values_14 <- NULL
-  # p_values_15 <- NULL
-  #   
-  # ##TODO put this into another for loop to reduce redundancy of the code  
-  #   for(j in 1:dim(stat_analysis)[1]){
-  #     
-  #     #if ((sum(stat_analysis[j,2:4])/3) !=  stat_analysis[j,2:4][1] | (sum(stat_analysis[j,5:7])/3) !=  stat_analysis[j,5:7][1]){
-  #       
-  #     p_values_12[j] <- ttest_func(stat_analysis[j,2:4], stat_analysis[j,5:7])
-  #     #p_values_13[j] <- ttest_func(stat_analysis[j,2:4], stat_analysis[j,8:10])
-  #     #p_values_14[j] <- ttest_func(stat_analysis[j,2:4], stat_analysis[j,11:13])
-  #     #p_values_15[j] <- ttest_func(stat_analysis[j,2:4], stat_analysis[j,14:16])
-  #     #}else{
-  #       
-  #     #}
-  #     #if ((sum(stat_analysis[j,2:4])/3) !=  stat_analysis[j,2:4][1] | (sum(stat_analysis[j,8:10])/3) !=  stat_analysis[j,8:10][1]){
-  #       
-  #       p_values_13[j] <- ttest_func(stat_analysis[j,2:4], stat_analysis[j,8:10])
-  # 
-  #     #}else{
-  #       
-  #     #} 
-  #     #if ((sum(stat_analysis[j,2:4])/3) !=  stat_analysis[j,2:4][1] | (sum(stat_analysis[j,11:13])/3) !=  stat_analysis[j,11:13][1]){
-  #       
-  #       
-  #       p_values_14[j] <- ttest_func(stat_analysis[j,2:4], stat_analysis[j,11:13])
-  #      
-  #     #}else{
-  #       
-  #    # }
-  #     #if ((sum(stat_analysis[j,2:4])/3) !=  stat_analysis[j,2:4][1] | (sum(stat_analysis[j,14:16])/3) !=  stat_analysis[j,14:16][1]){
-  #       
-  #       p_values_15[j] <- ttest_func(stat_analysis[j,2:4], stat_analysis[j,14:16])
-  #    # }else{
-  #       
-  #    # } 
-  #     }
-  # 
-  # 
-  # p_values_12 <- as.data.frame(p_values_12)
-  # p_values_13 <- as.data.frame(p_values_13)
-  # p_values_14 <- as.data.frame(p_values_14)
-  # p_values_15 <- as.data.frame(p_values_15)
-  # 
-  # 
-  #   for (i in 2:sample_size){
-  #     
-  #     assign(paste0("p_values_1",i), 
-  #            cbind(stat_analysis$common_col_for_merging,
-  #                  as.data.frame(get(paste0("p_values_1",i)))))
-  #     
-  #   }
-  # 
+    
+    
+    p9<- ggplot(merge_stat_df ,aes(x =log2(fold_change_values), y = -log10(merge_stat_df$pvalues))) +
+      geom_point(aes(color = new_col_coloring,shape=Pool_new), size = 2.5) +
+      #geom_line(aes(color = new_col_coloring), size = 1) +  # Add color aesthetic to geom_line()
+      scale_color_manual(values = c("ISO-REF" = "#000000",
+                                    "Unexpected_False Positive_A1/A2"="#999999",
+                                    "Unexpected_False Positive_A1/A3" ="#999999",
+                                    "Unexpected_False Positive_A1/A4"="#999999",
+                                    "Unexpected_False Positive_A1/A5"="#999999",
+                                    "Others_multi_A1/A2" = "#CC79A7",
+                                    "Others_mono_A1/A2" = "#CC79A7",
+                                    "Others_multi_A1/A3" = "#E69F00",
+                                    "Others_mono_A1/A3" = "#E69F00",
+                                    "Others_multi_A1/A4" = "#56B4E9",
+                                    "Others_mono_A1/A4" = "#56B4E9",
+                                    "Others_multi_A1/A5" = "#009E73",
+                                    "Others_mono_A1/A5" = "#009E73"),
+                         
+                         labels = c('Non-variant', 'Variant non-isomeric A1 vs A2',
+                                    'Variant non-isomeric A1 vs A3',
+                                    'Variant non-isomeric A1 vs A4',
+                                    'Variant non-isomeric A1 vs A5',
+                                    'Variant isomeric A1 vs A2',
+                                    'Variant isomeric A1 vs A3',
+                                    'Variant isomeric A1 vs A4',
+                                    'Variant isomeric A1 vs A5',
+                                    "Unexpected_False Positive_A1/A2",
+                                    "Unexpected_False Positive_A1/A3",
+                                    "Unexpected_False Positive_A1/A4",
+                                    "Unexpected_False Positive_A1/A5")) +
+      # scale_shape_manual(values = c(16, 15, 12, 17),
+      # labels = c('Non-variant', 'Variant isomeric', 'Variant non-isomeric', 'Unexpected')) +
+      scale_y_continuous(limits = c(0, max(-log10(merge_stat_df$pvalues))), breaks = seq(0, max(-log10(merge_stat_df$pvalues)), by = 0.8)) +
+      scale_x_continuous(limits = c(min(log2(merge_stat_df$fold_change_values)),max(log2(merge_stat_df$fold_change_values)))) +#facet_wrap(~ratio) +
+      #scale_y_continuous(limits = c(0, 8), breaks = seq(0, 8, by = 0.8)) +
+      #scale_x_continuous(limits = c(-3,3),breaks = seq(-3, 3, by = 0.8)) +
+      #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
+      theme_bw() +
+      theme(legend.text = element_text(size = 15),
+            axis.title.x = element_text(size = 15),
+            axis.title.y = element_text(size = 15),
+            plot.title = element_text(size = 30),
+            legend.title = element_text(size = 15),
+            axis.text.x = element_text(size = 15),
+            axis.title = element_text(size = 15),
+            axis.text.y = element_text(size = 15)) +
+      labs(title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = "T-test was used")
+    #expand_limits(x = 0, y = 0) +
+    #geom_vline(data = actual_ratio, aes(xintercept = actual_ratio$X.1....log2.c.2..10..20..100..., size = 1, show.legend = FALSE)) + #color=c("#CC79A7","#E69F00","#56B4E9","#009E73")
+    #geom_hline(data = log10_p_thresholds, aes(yintercept = log10_p_thresholds$X.log10.p_thresholds.),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"), size = 1, linetype = 2, show.legend = FALSE)+ 
+    #
   
-  test_num <- nrow(stat_analysis)
-  
-  for (j in 1:nrow(stat_analysis)){
-    
-    p_values_12 <- p_values_12[order(p_values_12$p_values_12),]
-    colnames(p_values_12)[1] <- "common_col_for_merging"
-    p_values_12["rank12"] <- 1:test_num
-    p_values_12[j,"test12"] <- (p_values_12[j,"rank12"]/test_num)*0.05
-    p_values_12[j,"test_bool"] <- p_values_12[j,"test12"] > p_values_12[j,"p_values_12"]
-  
-    
-    p_values_13 <- p_values_13[order(p_values_13$p_values_13),]
-    colnames(p_values_13)[1] <- "common_col_for_merging"
-    p_values_13["rank13"] <- 1:test_num
-    p_values_13[j,"test13"] <- (p_values_13[j,"rank13"]/test_num)*0.05
-    p_values_13[j,"test_bool"] <- p_values_13[j,"test13"] > p_values_13[j,"p_values_13"]
-    
-    
-    p_values_14 <- p_values_14[order(p_values_14$p_values_14),]
-    colnames(p_values_14)[1] <- "common_col_for_merging"
-    p_values_14["rank14"] <- 1:test_num
-    p_values_14[j,"test14"] <- (p_values_14[j,"rank14"]/test_num)*0.05
-    p_values_14[j,"test_bool"] <- p_values_14[j,"test14"] > p_values_14[j,"p_values_14"]
-    
-    
-    p_values_15 <- p_values_15[order(p_values_15$p_values_15),]
-    colnames(p_values_15)[1] <- "common_col_for_merging"
-    p_values_15["rank15"] <- 1:test_num
-    p_values_15[j,"test15"] <- (p_values_15[j,"rank15"]/test_num)*0.05
-    p_values_15[j,"test_bool"] <- p_values_15[j,"test15"] > p_values_15[j,"p_values_15"]
-    
+  }else if(test_type=="limma"){
+    library(limma)
+  }else{
+    print("Statistical test could not be assessed. Check the input files!")
   }
- ### TODO: Extract where the first FALSE was generated to use for threshold of each comparison.
-  #p_thresholds <- c(2.100824e-02,2.381169e-02,3.119312e-02,2.567998e-02)
-  p_thresholds<- c(2.045695e-02,2.359024e-02,2.751729e-02,2.703404e-02)
-  col_sel_stat_analysis <- c("common_col_for_merging",
-                             #"modifications",
-                             #"accession",
-                             "isomericity",
-                             "isomeric_count",
-                             #"pool_id",
-                             "Pool",
-                             "A1-A2_Ratio",
-                             "A1-A3_Ratio",
-                             "A1-A3_Ratio",
-                             "A1-A4_Ratio",
-                             "A1-A5_Ratio",
-                             "exp_FC_A1/A2",
-                             "exp_FC_A1/A3",
-                             "exp_FC_A1/A4",
-                             "exp_FC_A1/A5")
     
-  
+  #default_ratio_threshold: 1
+  #default_pval_threshold: 0.01
+  min_pval: 0.001
+  max_pval: 0.05
+  min_ratio: 0.5
+  max_ratio: 3
+  nb_tests: 20
+    
+    
+    
+    roc_data_all <- compute_roc_curve(complete_pvalues_all,flag = "Others",expected = 145)
+    
+    
+    ## ROC CURVE GENERATION ### 
+    roc_data121 <- cbind(roc_data12, "A1 vs A2","Others", "Proline")
+    roc_data131 <- cbind(roc_data13, "A1 vs A3","Others", "Proline")
+    roc_data141 <- cbind(roc_data14, "A1 vs A4","Others", "Proline")
+    roc_data151 <- cbind(roc_data15, "A1 vs A5","Others", "Proline")
+    
+    colnames(roc_data121)[c(4:6)] <- c("Comparison","Pool","Software")
+    colnames(roc_data131)[c(4:6)] <- c("Comparison","Pool","Software")
+    colnames(roc_data141)[c(4:6)] <- c("Comparison","Pool","Software")
+    colnames(roc_data151)[c(4:6)] <- c("Comparison","Pool","Software")
+    
+    roc_final <- rbind(roc_data121,roc_data131,roc_data141,roc_data151)
+    
+    #roc_curve_data_exp2_noFAIMS_MQ <- read.delim("D:/dev/Pinar/PHD/wet_lab_experiments/DDA_data_analysis/experiment_2/MQ_data_analysis/exp2_wo_FAIMS/exp2_wo_FAIMSwith_MBR/roc_curve_data_exp2_noFAIMS_MQ.txt")
+    write.table(roc_final,file = "D:/dev/Pinar/PHD/wet_lab_experiments/DDA_data_analysis/experiment_2/Proline_data_analysis/exp2_re_injection/exp2_no_FAIMS_proline_roc_curve_data_consider_isoref_fp.tsv",sep = "\t",row.names = F)
+    #roc_curve_data_pro_faims <- read.delim("D:/dev/Pinar/PHD/wet_lab_experiments/DDA_data_analysis/experiment_2/Proline_data_analysis/exp2_re_injection/exp2wo_FAIMS_DDA_Proline_volcano_plot_data.tsv",sep = "\t")
+    
+    
+    roc_proline_mq <- rbind(roc_curve_data_exp2_noFAIMS_MQ,roc_final)
+    
+    
+    roc_data_unexpected121 <- cbind(roc_data_unexpected12, "A1 vs A2","unexcepted")
+    roc_data_unexpected131 <- cbind(roc_data_unexpected13, "A1 vs A3","unexcepted")
+    roc_data_unexpected141 <- cbind(roc_data_unexpected14, "A1 vs A4","unexcepted")
+    roc_data_unexpected151 <- cbind(roc_data_unexpected15, "A1 vs A5","unexcepted")
+    
+    colnames(roc_data_unexpected121)[c(4,5)] <- c("Comparison","Pool")
+    colnames(roc_data_unexpected131)[c(4,5)] <- c("Comparison","Pool")
+    colnames(roc_data_unexpected141)[c(4,5)] <- c("Comparison","Pool")
+    colnames(roc_data_unexpected151)[c(4,5)] <- c("Comparison","Pool")
+    
+    
+    
+    roc_final2 <- rbind(roc_data_unexpected121,roc_data_unexpected131,
+                        roc_data_unexpected141,roc_data_unexpected151)
+    
+    roc_curve_combine_proline_mq_score_40 <- read.delim("D:/dev/Pinar/PHD/wet_lab_experiments/DDA_data_analysis/comparision_DDA_noFAIMS_mq_proline_pd/comparison_wrong_localized_pep_MQ_Proline_with_out_FAIMS/final_figures/roc_curve_combine_proline_mq_score_40.txt")
+    
+    line_types <- c("solid","dashed" )
+    
+    ##TODO: make it more professional
+    ggplot(roc_final,aes(x=fdp,y=tpr)) + 
+      geom_line(size=1.2,aes(color=Comparison,linetype=Software)) +
+      scale_color_manual(values = c("#CC79A7", "#E69F00", "#56B4E9", "#009E73"),
+                         labels=c('A1 vs A2','A1 vs A3','A1 vs A4','A1 vs A5')) +
+      scale_linetype_manual(values = line_types)+
+      theme_bw() +
+      theme(legend.text = element_text(size=15), 
+            axis.title.x = element_text(size = 15),
+            axis.title.y = element_text(size = 15),
+            plot.title = element_text(size=30),
+            legend.title=element_text(size=15),
+            axis.text.x=element_text(size=15),
+            axis.title=element_text(size=15),
+            axis.text.y = element_text(size = 15)) + 
+      expand_limits(x = 0, y = 0) +
+      scale_y_continuous(limits = c(0,100)) +
+      #facet_wrap(~Ratio_col,scales = "free_x") +
+      labs(title = "Experiment 2 - DDA without FAIMS - \n Comparision of Softwares")
+    
+ #    
+ #  # 
+ #  # # iterate through each column of the data set and calculate t-tests
+ #  # triplicate_indx <- c(1,3,4,6,7,9,10,12,13,15) +1
+ #  # 
+ # 
+ #  p_values_12 <- NULL
+ #  p_values_13 <- NULL
+ #  p_values_14 <- NULL
+ #  p_values_15 <- NULL
+ # 
+ #  ##TODO put this into another for loop to reduce redundancy of the code
+ #    for(j in 1:dim(stat_analysis)[1]){
+ # 
+ #      #if ((sum(stat_analysis[j,2:4])/3) !=  stat_analysis[j,2:4][1] | (sum(stat_analysis[j,5:7])/3) !=  stat_analysis[j,5:7][1]){
+ # 
+ #      p_values_12[j] <- ttest_func(stat_analysis[j,3:5], stat_analysis[j,6:8])
+ #      #p_values_13[j] <- ttest_func(stat_analysis[j,2:4], stat_analysis[j,8:10])
+ #      #p_values_14[j] <- ttest_func(stat_analysis[j,2:4], stat_analysis[j,11:13])
+ #      #p_values_15[j] <- ttest_func(stat_analysis[j,2:4], stat_analysis[j,14:16])
+ #      #}else{
+ # 
+ #      #}
+ #      #if ((sum(stat_analysis[j,2:4])/3) !=  stat_analysis[j,2:4][1] | (sum(stat_analysis[j,8:10])/3) !=  stat_analysis[j,8:10][1]){
+ # 
+ #        p_values_13[j] <- ttest_func(stat_analysis[j,3:5], stat_analysis[j,9:11])
+ # 
+ #      #}else{
+ # 
+ #      #}
+ #      #if ((sum(stat_analysis[j,2:4])/3) !=  stat_analysis[j,2:4][1] | (sum(stat_analysis[j,11:13])/3) !=  stat_analysis[j,11:13][1]){
+ # 
+ # 
+ #        p_values_14[j] <- ttest_func(stat_analysis[j,3:5], stat_analysis[j,12:14])
+ # 
+ #      #}else{
+ # 
+ #     # }
+ #      #if ((sum(stat_analysis[j,2:4])/3) !=  stat_analysis[j,2:4][1] | (sum(stat_analysis[j,14:16])/3) !=  stat_analysis[j,14:16][1]){
+ # 
+ #        p_values_15[j] <- ttest_func(stat_analysis[j,3:5], stat_analysis[j,15:17])
+ #     # }else{
+ # 
+ #     # }
+ #      }
+ # 
+ # 
+ #  p_values_12 <- as.data.frame(p_values_12)
+ #  p_values_13 <- as.data.frame(p_values_13)
+ #  p_values_14 <- as.data.frame(p_values_14)
+ #  p_values_15 <- as.data.frame(p_values_15)
+ # 
+ # 
+ #    for (i in 2:sample_size){
+ # 
+ #      assign(paste0("p_values_1",i),
+ #             cbind(stat_analysis$common_col_for_merging,
+ #                   as.data.frame(get(paste0("p_values_1",i)))))
+ # 
+ #    }
+ # 
+ #  
+ #  test_num <- nrow(stat_analysis)
+ #  
+ #  for (j in 1:nrow(stat_analysis)){
+ #    
+ #    p_values_12 <- p_values_12[order(p_values_12$p_values_12),]
+ #    colnames(p_values_12)[1] <- "common_col_for_merging"
+ #    p_values_12["rank12"] <- 1:test_num
+ #    p_values_12[j,"test12"] <- (p_values_12[j,"rank12"]/test_num)*0.05
+ #    p_values_12[j,"test_bool"] <- p_values_12[j,"test12"] > p_values_12[j,"p_values_12"]
+ #  
+ #    
+ #    p_values_13 <- p_values_13[order(p_values_13$p_values_13),]
+ #    colnames(p_values_13)[1] <- "common_col_for_merging"
+ #    p_values_13["rank13"] <- 1:test_num
+ #    p_values_13[j,"test13"] <- (p_values_13[j,"rank13"]/test_num)*0.05
+ #    p_values_13[j,"test_bool"] <- p_values_13[j,"test13"] > p_values_13[j,"p_values_13"]
+ #    
+ #    
+ #    p_values_14 <- p_values_14[order(p_values_14$p_values_14),]
+ #    colnames(p_values_14)[1] <- "common_col_for_merging"
+ #    p_values_14["rank14"] <- 1:test_num
+ #    p_values_14[j,"test14"] <- (p_values_14[j,"rank14"]/test_num)*0.05
+ #    p_values_14[j,"test_bool"] <- p_values_14[j,"test14"] > p_values_14[j,"p_values_14"]
+ #    
+ #    
+ #    p_values_15 <- p_values_15[order(p_values_15$p_values_15),]
+ #    colnames(p_values_15)[1] <- "common_col_for_merging"
+ #    p_values_15["rank15"] <- 1:test_num
+ #    p_values_15[j,"test15"] <- (p_values_15[j,"rank15"]/test_num)*0.05
+ #    p_values_15[j,"test_bool"] <- p_values_15[j,"test15"] > p_values_15[j,"p_values_15"]
+ #    
+ #  }
+ # ### TODO: Extract where the first FALSE was generated to use for threshold of each comparison.
+ #  #p_thresholds <- c(2.100824e-02,2.381169e-02,3.119312e-02,2.567998e-02)
+ #  p_thresholds<- c(2.045695e-02,2.359024e-02,2.751729e-02,2.703404e-02)
+ #  col_sel_stat_analysis <- c("common_col_for_merging",
+ #                             #"modifications",
+ #                             #"accession",
+ #                             "isomericity",
+ #                             "isomeric_count",
+ #                             #"pool_id",
+ #                             "Pool",
+ #                             "A1-A2_Ratio",
+ #                             "A1-A3_Ratio",
+ #                             "A1-A3_Ratio",
+ #                             "A1-A4_Ratio",
+ #                             "A1-A5_Ratio",
+ #                             "exp_FC_A1/A2",
+ #                             "exp_FC_A1/A3",
+ #                             "exp_FC_A1/A4",
+ #                             "exp_FC_A1/A5")
+ #    
+ #  
 
-  for (i in 12:15){
-    assign(paste0("complete_p_values_",i), 
-            final_imputed_data %>% 
-              select(col_sel_stat_analysis) %>%
-              left_join(get(paste0("p_values_",i)),
-                        by="common_col_for_merging") %>%
-              mutate(ls_correctness = ifelse(test_bool == FALSE, 0, 1)))}
-    
-    assign(paste0("roc_data",i),compute_roc_curve(get(paste0("complete_p_values_",i)),flag = "Others",expected = 145 ))
-    #assign(paste0("roc_data_unexpected",i),compute_roc_curve(get(paste0("complete_p_values_",i)),flag = "unexpected",expected = 100))
-    #assign(paste0("roc_data_isoref",i),compute_roc_curve(get(paste0("complete_p_values_",i)),flag = "ISO-REF",expected = 37 ))
-    
-  common_colnames <-c("common_col_for_merging", "p_values","rank","test","test_bool")
-  
-  
-  
-  colnames(p_values_12) <- common_colnames
-  colnames(p_values_13) <- common_colnames
-  colnames(p_values_14) <- common_colnames
-  colnames(p_values_15) <- common_colnames
-  complete_pvalues_all <- rbind(p_values_12,p_values_13,p_values_14,p_values_15)
-  roc_data_all <- compute_roc_curve(complete_pvalues_all,flag = "Others",expected = 145 )
-   
-  
-  ## ROC CURVE GENERATION ### 
-  roc_data121 <- cbind(roc_data12, "A1 vs A2","Others", "Proline")
-  roc_data131 <- cbind(roc_data13, "A1 vs A3","Others", "Proline")
-  roc_data141 <- cbind(roc_data14, "A1 vs A4","Others", "Proline")
-  roc_data151 <- cbind(roc_data15, "A1 vs A5","Others", "Proline")
-  
-  colnames(roc_data121)[c(4:6)] <- c("Comparison","Pool","Software")
-  colnames(roc_data131)[c(4:6)] <- c("Comparison","Pool","Software")
-  colnames(roc_data141)[c(4:6)] <- c("Comparison","Pool","Software")
-  colnames(roc_data151)[c(4:6)] <- c("Comparison","Pool","Software")
-  
-  roc_final <- rbind(roc_data121,roc_data131,roc_data141,roc_data151)
-  
-  #roc_curve_data_exp2_noFAIMS_MQ <- read.delim("D:/dev/Pinar/PHD/wet_lab_experiments/DDA_data_analysis/experiment_2/MQ_data_analysis/exp2_wo_FAIMS/exp2_wo_FAIMSwith_MBR/roc_curve_data_exp2_noFAIMS_MQ.txt")
-  write.table(roc_final,file = "D:/dev/Pinar/PHD/wet_lab_experiments/DDA_data_analysis/experiment_2/Proline_data_analysis/exp2_re_injection/exp2_no_FAIMS_proline_roc_curve_data_consider_isoref_fp.tsv",sep = "\t",row.names = F)
-  #roc_curve_data_pro_faims <- read.delim("D:/dev/Pinar/PHD/wet_lab_experiments/DDA_data_analysis/experiment_2/Proline_data_analysis/exp2_re_injection/exp2wo_FAIMS_DDA_Proline_volcano_plot_data.tsv",sep = "\t")
-  
+  # for (i in 12:15){
+  #   assign(paste0("complete_p_values_",i), 
+  #           final_imputed_data %>% 
+  #             select(col_sel_stat_analysis) %>%
+  #             left_join(get(paste0("p_values_",i)),
+  #                       by="common_col_for_merging") %>%
+  #             mutate(ls_correctness = ifelse(test_bool == FALSE, 0, 1)))}
+  #   
+  #   assign(paste0("roc_data",i),compute_roc_curve(get(paste0("complete_p_values_",i)),flag = "Others",expected = 145 ))
+  #   #assign(paste0("roc_data_unexpected",i),compute_roc_curve(get(paste0("complete_p_values_",i)),flag = "unexpected",expected = 100))
+  #   #assign(paste0("roc_data_isoref",i),compute_roc_curve(get(paste0("complete_p_values_",i)),flag = "ISO-REF",expected = 37 ))
+  #   
+  # common_colnames <-c("common_col_for_merging", "p_values","rank","test","test_bool")
+  # 
+  # 
+  # 
+  # colnames(p_values_12) <- common_colnames
+  # colnames(p_values_13) <- common_colnames
+  # colnames(p_values_14) <- common_colnames
+  # colnames(p_values_15) <- common_colnames
+  # complete_pvalues_all <- rbind(p_values_12,p_values_13,p_values_14,p_values_15)
  
-  roc_proline_mq <- rbind(roc_curve_data_exp2_noFAIMS_MQ,roc_final)
-  
-  
-  roc_data_unexpected121 <- cbind(roc_data_unexpected12, "A1 vs A2","unexcepted")
-  roc_data_unexpected131 <- cbind(roc_data_unexpected13, "A1 vs A3","unexcepted")
-  roc_data_unexpected141 <- cbind(roc_data_unexpected14, "A1 vs A4","unexcepted")
-  roc_data_unexpected151 <- cbind(roc_data_unexpected15, "A1 vs A5","unexcepted")
-  
-  colnames(roc_data_unexpected121)[c(4,5)] <- c("Comparison","Pool")
-  colnames(roc_data_unexpected131)[c(4,5)] <- c("Comparison","Pool")
-  colnames(roc_data_unexpected141)[c(4,5)] <- c("Comparison","Pool")
-  colnames(roc_data_unexpected151)[c(4,5)] <- c("Comparison","Pool")
-  
-  
-  
-  roc_final2 <- rbind(roc_data_unexpected121,roc_data_unexpected131,
-                      roc_data_unexpected141,roc_data_unexpected151)
-  
-  roc_curve_combine_proline_mq_score_40 <- read.delim("D:/dev/Pinar/PHD/wet_lab_experiments/DDA_data_analysis/comparision_DDA_noFAIMS_mq_proline_pd/comparison_wrong_localized_pep_MQ_Proline_with_out_FAIMS/final_figures/roc_curve_combine_proline_mq_score_40.txt")
-  
-  line_types <- c("solid","dashed" )
-
-  ##TODO: make it more professional
-  ggplot(roc_final,aes(x=fdp,y=tpr)) + 
-    geom_line(size=1.2,aes(color=Comparison,linetype=Software)) +
-    scale_color_manual(values = c("#CC79A7", "#E69F00", "#56B4E9", "#009E73"),
-                       labels=c('A1 vs A2','A1 vs A3','A1 vs A4','A1 vs A5')) +
-    scale_linetype_manual(values = line_types)+
-    theme_bw() +
-    theme(legend.text = element_text(size=15), 
-          axis.title.x = element_text(size = 15),
-          axis.title.y = element_text(size = 15),
-          plot.title = element_text(size=30),
-          legend.title=element_text(size=15),
-          axis.text.x=element_text(size=15),
-          axis.title=element_text(size=15),
-          axis.text.y = element_text(size = 15)) + 
-    expand_limits(x = 0, y = 0) +
-    scale_y_continuous(limits = c(0,100)) +
-    #facet_wrap(~Ratio_col,scales = "free_x") +
-    labs(title = "Experiment 2 - DDA without FAIMS - \n Comparision of Softwares")
   
   ##TODO: make it more professional
   ggplot(roc_data12,aes(x=fdp,y=tpr)) + geom_line()
