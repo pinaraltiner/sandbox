@@ -103,7 +103,7 @@ gg_boxplt_exp_ratio <- function(data_set,
 library(gghalves)
 
 ### HALF-BOX-PLOT & HALF-SCATTER-PLOT: Experimental Quantity Ratio of Synthetic Peptides  
-
+ 
 gg_half_boxplt_exp_ratio <- function(data_set,
                                 x_df,
                                 y_df,
@@ -127,7 +127,8 @@ gg_half_boxplt_exp_ratio <- function(data_set,
           legend.title=element_text(size=25),
           axis.text=element_text(size=25),
           axis.title=element_text(size=25)
-    ) + scale_fill_brewer(palette="Set1") +
+    ) + scale_fill_brewer(palette = "Set1") +
+        scale_color_brewer(palette = "Set1")+ 
     labs(x=x_lab,y=y_lab,fill=fill_lab,subtitle = subtitle_txt) +
     ggtitle(header)
 }
