@@ -86,7 +86,7 @@ final_results_with_common_col <- mutate(result_with_common_col,id_syn_phospho_pe
 
 sheet_theo_name <- "final_pep_list_with_pos"
 theo_path = "D:/dev/Desktop_copy/PHD/wet_lab_experiments/Eyers_syn_peptides_experiment/"
-theo_file = "pep_list_ordered_in_pool_id_with_pos.xlsx"
+theo_file = "pep_list_ordered_in_pool_id_with_pos.xlsx" # can also be used same as exp2 "Synthetic peptides list_theo_conc_corrected_pool_id_iso_count_final.xlsx"
 pep_list_w_theo <- read.xlsx(paste0(theo_path, theo_file), sheet = sheet_theo_name)
 #pep_list_w_theo <- pep_list_w_theo[,-1]
 
