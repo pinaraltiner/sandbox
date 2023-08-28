@@ -27,27 +27,8 @@ final_pd_pep_quant_analysis_bio <- function(file_path,
                                                  num_reps){
     
     source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/ggplot/ggplot_functions.R")
-    
-    exp_id <- 3
-    acquisiton_type <- "DDA without FAIMS"
-    software_name <- "Proteome Discoverer"
-    
-    exp_design <- c("E3-A1-R1",
-                    "E3-A1-R2",
-                    "E3-A1-R3",
-                    "E3-A2-R1",
-                    "E3-A2-R2",
-                    "E3-A2-R3",
-                    "E3-A3-R1",
-                    "E3-A3-R2",
-                    "E3-A3-R3",
-                    "E3-A4-R1",
-                    "E3-A4-R2",
-                    "E3-A4-R3",
-                    "E3-A5-R1",
-                    "E3-A5-R2",
-                    "E3-A5-R3")
-    num_reps <- 3
+    source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/roc_curve/roc_curve_generation_proline_edit.R")
+    exp_design <- experimental_design
     sample_size <- length(exp_design) / num_reps
     sample_names <- paste0("A",1:sample_size)
     comparisons <- NULL
@@ -80,8 +61,8 @@ final_pd_pep_quant_analysis_bio <- function(file_path,
     }
     ######################
     
-    setwd("D:/dev/Pinar/PHD/wet_lab_experiments/DDA_data_analysis/experiment_3/PD_data_analysis/target_decoy_no_FAIMS/")
-    quant_peptides <- read.table("Multiconsensus_Exp3_TCells_TargetDecoy_woFAIMS_230531_PeptideIsoforms.txt", sep = "\t", header = T)
+    setwd(file_path)
+    quant_peptides <- read.table(file_name, sep = "\t", header = T)
     
     abundances_for_impute <- quant_peptides %>% 
         select(starts_with("Abundances.Normalized")) %>% #### BEFORE RENAME IT BE SURED THAT COLUMNS ARE THE SAME ORDER AS EXP_DESIGN
@@ -294,7 +275,7 @@ final_pd_pep_quant_analysis_bio <- function(file_path,
         bind_rows(barplt_df_ecoli_wide) %>% select(exp_design)
     
     # Calculate 1 percent quantile of each sample
-    impute_values <- apply(abundances_for_impute, 2 , quantile , probs = 0.01 , na.rm = TRUE )
+    impute_values <- apply(abundances_for_impute, 2 , quantile , probs = 0.01 , na.rm = TRUE,type=6 ) # Type =6 is to obtain the same result as Excel.
     
     # Impute missing values
     for (j in 1:length(impute_values)){
@@ -468,7 +449,7 @@ final_pd_pep_quant_analysis_bio <- function(file_path,
         # }else{
         #   
         # }
-        t.test(x, y,alternative = c("two.sided"))$p.value
+        t.test(x, y,var.equal=TRUE,alternative = c("two.sided"))$p.value  ## var.equal=TRUE ???
     }
     
     wilcox_func <- function(x, y) {
@@ -477,75 +458,72 @@ final_pd_pep_quant_analysis_bio <- function(file_path,
         # }else{
         #   
         # }
-        wilcox.test(as.numeric(x), as.numeric(y),alternative = c("two.sided"))$p.value
+        wilcox.test(as.numeric(x), as.numeric(y),alternative = c("two.sided"))$p.value ## var.equal=TRUE ???
     }
     ## TODO: ADD LIMMA
     stat_analysis <- final_imputed_data %>%
         select(pep_with_pos,Marked.as, starts_with("log10_") | starts_with("mean_log10_") | starts_with("exp_FC")) #spectrum_title
     
     rownames(stat_analysis) <- paste0(stat_analysis$pep_with_pos,"@",stat_analysis$Marked.as,"@",(1:nrow(stat_analysis))) #stat_analysis$spectrum_title,"@"
-    if(test_type== "t.test" | test_type== "wilcoxon"){
-        all_pvalues <- NULL
-        all_adjust_pval <- NULL
-        for (i in 2:sample_size){
-            p_values_tmp <- NULL
+    if (test_type == "t.test" || test_type == "wilcoxon") {
+        all_pvalues <- matrix(NA, nrow = nrow(stat_analysis), ncol = sample_size - 1)
+        all_adjust_pval <- matrix(NA, nrow = nrow(stat_analysis), ncol = sample_size - 1)
+        
+        for (i in 2:sample_size) {
+            col_A1 <- select(stat_analysis, contains("A1-") & contains("log10_"))
+            col_Ai <- select(stat_analysis, contains(paste0("A", i, "-")) & contains("log10_"))
             
-            for(j in 1:dim(stat_analysis)[1]){
-                
-                if(test_type=="t.test"){
-                    p_values_tmp[j] <- ttest_func(select(stat_analysis,contains("A1-") & contains("log10_"))[j,],     ### FOR DIFFERENT KIND OF EXP SETUP, 
-                                                  select(stat_analysis,contains(paste0("A",i,"-")) & contains("log10_"))[j,] ) ## It should be defined as an input.
-                    
-                }else if(test_type=="wilcoxon"){
-                    p_values_tmp[j] <- wilcox.test(select(stat_analysis,contains("A1-") & contains("log10_"))[j,],     ### FOR DIFFERENT KIND OF EXP SETUP, 
-                                                   select(stat_analysis,contains(paste0("A",i,"-")) & contains("log10_"))[j,])
-                    ## It should be defined as an input.
+            p_values_tmp <- vector("numeric", length = nrow(stat_analysis))
+            
+            for (j in seq_along(p_values_tmp)) {
+                if (test_type == "t.test") {
+                    p_values_tmp[j] <- ttest_func(col_A1[j,], col_Ai[j,])
+                } else if (test_type == "wilcoxon") {
+                    p_values_tmp[j] <- wilcox.test(col_A1[j,], col_Ai[j,])
                 }
-                
             }
-            p_values_tmp <- as.data.frame(p_values_tmp)
-            colnames(p_values_tmp) <- paste0("pvalues_A1","/","A",i)
-            all_pvalues <- bind_cols(all_pvalues,p_values_tmp)
-            rownames(all_pvalues) <- row.names(stat_analysis)
-            rm(p_values_tmp)
             
-            #### p-value adjust at a given FDR ####
-            #procs<-c("Bonferroni","Holm","Hochberg","SidakSS","SidakSD","BH","BY","ABH","TSBH")
-            adjust_pval_tmp <-  mt.rawp2adjp(all_pvalues[,paste0("pvalues_A1","/","A",i)],
-                                             proc="BH", alpha=0.05)
-            qval <- data.frame(adjust_pval_tmp$adjp,adjust_pval_tmp$index)[order(adjust_pval_tmp$index),2]
-            qval <- as.data.frame(qval)
-            colnames(qval) <- paste0("adjust_pval_A1","/","A",i)
-            all_adjust_pval <- bind_cols(all_adjust_pval,qval)
-            rownames(all_adjust_pval) <- row.names(stat_analysis)
-            rm(adjust_pval_tmp,qval)
+            all_pvalues[, i - 1] <- p_values_tmp
             
+            adjust_pval_tmp <- mt.rawp2adjp(all_pvalues[, i - 1], proc = "BH", alpha = 0.05)
+            qval <- data.frame(adjust_pval_tmp$adjp, adjust_pval_tmp$index)[order(adjust_pval_tmp$index), 2]
+            all_adjust_pval[, i - 1] <- qval
         }
+        
+        all_pvalues <- as.data.frame(all_pvalues)
+        all_adjust_pval <- as.data.frame(all_adjust_pval)
+        
+        colnames(all_pvalues) <- paste0("pvalues_A1/A", 2:sample_size)
+        colnames(all_adjust_pval) <- paste0("adjust_pval_A1/A", 2:sample_size)
+        
+        rownames(all_pvalues) <- row.names(stat_analysis)
+        rownames(all_adjust_pval) <- row.names(stat_analysis)
+    }
         all_pvalues_common_col <- stat_analysis %>% 
-            select(pep_with_pos, accession) %>% #spectrum_title
+            select(pep_with_pos, Marked.as) %>% #spectrum_title
             bind_cols(all_pvalues) %>% 
             pivot_longer(cols = starts_with("pvalues_"), values_to = "pvalues", names_to ="p_ratios") %>%
             separate(p_ratios, into = c("tmp","ratio"),sep = "_") %>%
             select(!tmp) %>%
-            mutate(common_col = paste(pep_with_pos,accession,ratio,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) #spectrum_title
+            mutate(common_col = paste(pep_with_pos,Marked.as,ratio,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) #spectrum_title
         
         ## THE BEST WAY TO DO is this:
         merge_stat_df <- final_imputed_data %>%
-            select(pep_with_pos, accession, starts_with("exp_FC")) %>%
+            select(pep_with_pos, Marked.as, starts_with("exp_FC")) %>%
             pivot_longer(cols = starts_with("exp_FC"), values_to = "fold_change_values", names_to ="fold_change_ratios") %>%
             separate(fold_change_ratios, into = c("tmp","tmp1","ratio"),sep = "_") %>%
             select(!c(tmp,tmp1)) %>%
-            mutate(common_col = paste(pep_with_pos,accession,1:((sample_size-1)*nrow(final_imputed_data)),sep="@")) %>%
+            mutate(common_col = paste(pep_with_pos,Marked.as,1:((sample_size-1)*nrow(final_imputed_data)),sep="@")) %>%
             bind_cols(all_pvalues_common_col$ratio,all_pvalues_common_col$pvalues) %>%
             rename_with(.col =6 , ~"ratio1") %>%
-            rename_with(.col=7, ~ "pvalues") %>%
-            separate(accession, into = c("prot_id","species"),sep = "_")
+            rename_with(.col=7, ~ "pvalues") #%>%
+            #separate(accession, into = c("prot_id","species"),sep = "_")
         
         
         
-        p9_t_test <- ggplot(merge_stat_df ,aes(x =log2(fold_change_values), y = -log10(merge_stat_df$pvalues), color=ratio)) +
-            geom_point(size = 2,aes(shape=Pool)) + #, aes(shape=merge_stat_df_final$species)
-            #facet_wrap(~ratio) +
+        p9_t_test <- ggplot(merge_stat_df ,aes(x =log2(fold_change_values), y = -log10(merge_stat_df$pvalues), color=Marked.as)) +
+            geom_point(size = 2,aes(shape=ratio)) + #, aes(shape=merge_stat_df_final$species)
+            facet_wrap(~ratio) +
             #scale_y_continuous(limits = c(0, 8), breaks = seq(0, 8, by = 0.8)) +
             #scale_x_continuous(limits = c(-3,3),breaks = seq(-3, 3, by = 0.8)) +
             scale_color_brewer(palette = "Set1") +
@@ -601,7 +579,7 @@ final_pd_pep_quant_analysis_bio <- function(file_path,
         #   pivot_longer(cols = starts_with("pvalues_"), values_to = "pvalues", names_to ="p_ratios") %>%
         #   separate(accession, into = c("uniprot_id","species"),sep = "_")
         
-        
+
     }else if(test_type=="limma"){
         library(limma)
         ## DESIGN SETUP FOR LIMMA (TODO: supply this matrix as an imput makes it faster)
@@ -681,7 +659,7 @@ final_pd_pep_quant_analysis_bio <- function(file_path,
             colnames(design_matrix) <- c("Intercept", paste0("A1-A",i))
             #print(colnames(design_matrix))
             # Col selection for each comparison
-            assign(paste0("df_A1vsA",i),stat_analysis %>% select(1:2 | contains("log10_E3_A1") | contains(paste0("log10_E3_A",i))))
+            assign(paste0("df_A1vsA",i),stat_analysis %>% select(1:2 | contains("A1-") & contains("log10_") | contains(paste0("A",i,"-")) & contains("log10_")))
             # First, linear model was built
             assign(paste0("fit",i) ,lmFit(get(paste0("df_A1vsA",i))[,3:8], design_matrix))
             assign(paste0("fit",i), eBayes(get(paste0("fit",i))))
@@ -702,8 +680,8 @@ final_pd_pep_quant_analysis_bio <- function(file_path,
         merge_stat_df_final <- merge_stat_df %>%  #
             rename_with(.col =1 , ~"mult_col") %>%
             rename_with(.col=8, ~ "ratios") %>%
-            separate(mult_col, into = c("pep_with_pos","accession","id"),sep = "@") %>% #"spectrum_title"
-            separate(accession, into = c("uniprot_id","species"),sep = "_")
+            separate(mult_col, into = c("pep_with_pos","species","id"),sep = "@") #%>% #"spectrum_title"
+            #separate(accession, into = c("uniprot_id","species"),sep = "_")
         
         p9_limma <- gg_volcano(data_set = merge_stat_df_final,
                                x_df = merge_stat_df_final$logFC,  
@@ -759,6 +737,9 @@ final_pd_pep_quant_analysis_bio <- function(file_path,
     # ggplot(data=merge_stat_df1,aes(x=log2(merge_stat_df1$fold_change_values),y=-log10(merge_stat_df1$pvalues),color=species)) +
     #   geom_point() + facet_wrap(~fold_change_ratios)
     # 
+    
+    #roc_data_all <- compute_roc_curve(complete_pvalues_all,flag = "Others",expected = 145)
+    
     sapply(1:8,function(x) ggsave(filename = paste0("p",x,".tiff"),
                                   width = 50, height = 40, 
                                   path = paste0(file_path,"/outputs_with_new_script/"),
@@ -767,360 +748,337 @@ final_pd_pep_quant_analysis_bio <- function(file_path,
                                   device = "tiff", #".svg"
     ))
     
+    
     ggsave(filename = paste0("p9_t_test.tiff"),
-           width = 50, height = 40, 
+           width = 50, height = 40,
            path = paste0(file_path,"/outputs_with_new_script/"),
            units = "cm",
            p9_t_test,
            device = "tiff")
-    
-    ggsave(filename = paste0("p9_limma.tiff"),
-           width = 50, height = 40, 
-           path = paste0(file_path,"/outputs_with_new_script/"),
-           units = "cm",
-           p9_limma,
-           device = "tiff")
-    
-    
-    ## PLOT GENERATION
-    ggplot(length_id_phospho_pep_all_samples,
-           aes(x=length_id_phospho_pep_all_samples$c..M1.170ng.µL....M2.85ng.µL....M3.17ng.µL....M4.8.5ng.µL...,
-               y=length_id_phospho_pep_all_samples$c.dim.quant_peptides_s1..1...dim.quant_peptides_s2..1...dim.quant_peptides_s3..1...,
-               fill=length_id_phospho_pep_all_samples$c..M1.170ng.µL....M2.85ng.µL....M3.17ng.µL....M4.8.5ng.µL...)) + 
-        geom_bar(stat = "identity") + 
-        theme_light() + scale_y_continuous(breaks = seq(0, 4642, by = 80)) +
-        theme(legend.text = element_text(size=15), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
-              axis.title.x = element_text(size = 15),axis.title.y = element_text(size = 15),
-              plot.title = element_text(size=20),
-              legend.title=element_text(size=15),
-              axis.text=element_text(size=15,angle = 0),
-              axis.title=element_text(size=15)
-        ) +   ggtitle("Number of identified T cell enriched phospho-peptides") +
-        scale_x_discrete(labels=c("M1 170ng/µL",
-                                  "M2 85ng/µL",
-                                  "M3 17ng/µL",
-                                  "M4 8.5ng/µL",
-                                  "M5 1.7ng/µL")) +
-        labs(x="Sample Names",y="Number of phospho-peptides", fill="Sample name")+
-        scale_fill_brewer(palette="Set1")
-    
-    
-    
-    #pep_list_w_theo_quant <- read.xlsx("D:/dev/Desktop_copy/PHD/wet_lab_experiments/experiment2_quantification_peptide_level/Synthetic peptides list_theo_conc_added_080122.xlsx", sheet = "ISO-ref and OTHER with FC")
-    #pep_list_w_theo_quant <- read.xlsx("D:/dev/Desktop_copy/PHD/wet_lab_experiments/experiment2_quantification_peptide_level/Synthetic peptides list -060122.xlsx", sheet = "ISO-ref and OTHER with FC")
-    
-    #pep_list_w_theo_quant <- pep_list_w_theo_quant[,-1]
-    
-    # Extraction of phospho positions from quant peptides object
-    phospho_ptm_pos <- lapply(quant_peptides$ptm_protein_positions, function(each_ptm_protein_positions) {
-        
-        ptm_list <- as.list(strsplit(each_ptm_protein_positions,"; ", fixed=TRUE)[[1]]) # Split ptm_protein_position depending on ";"
-        ptm_list <- ptm_list[grepl("Phospho", ptm_list, fixed = TRUE)] # Extract only which contains "Phospho"
-        phospho_positions <- lapply(ptm_list, function(ptm) { 
-            #sub('Phospho \\(([A-Z]\\d+)\\)', "\\d+", ptm) #then, remove "Phospho" and remain only positions
-            as.character(str_extract(ptm, "\\d+"))
-            
-        })
-        
-        phospho_positions_as_str <- paste(phospho_positions, collapse="&") #combine each position with "|"
-        
-    })
-    # Data conversion 
-    phospho_ptm_pos_df <- t(as.data.frame(phospho_ptm_pos))
-    rownames(phospho_ptm_pos_df) <- 1:length(phospho_ptm_pos_df)
-    
-    
-    # Creation of common column merging peptide sequence and phospho positions -> experimental data
-    common_col_exp_quant <- as.data.frame(paste(quant_peptides$sequence, phospho_ptm_pos_df, sep = "_"))
-    colnames(common_col_exp_quant) <- "common_col_for_merging"
-    
-    # Keep actual colnames to add after merging (because it contains duplicate col_names which prevents merging btw two df)
-    
-    quant_peptides_new <- cbind(common_col_exp_quant,quant_peptides)
-    
-    ####################
-    
-    
-    ### If row count is needed, it can be extracted from here:
-    #abundances_with_row_count <- cbind(abundances,rowSums(!is.na(abundances)))
-    
-    # Nothing is changed
-    #filtered_abundances<-data_abundace[rowSums(!is.na(data_abundace) > 0)]
-    
-    abundances_only_for_impute <- data_abundace 
-    
-    ## DENSITY PLOT OF BEFORE IMPUTATION 
-    
-    sample_name <- c("A","B","C","D","E")
-    abundances_rowMeans <- NULL
-    for (k in 1:length(sample_name)){
-        
-        assign(paste0("abundances",sample_name[k]),
-               as.data.frame(rowMeans(data_abundace  %>% 
-                                          select(contains(paste0("Ecoli.",
-                                                                 sample_name[k],"."))))))
-        abundances_rowMeans<- bind_cols(abundances_rowMeans,
-                                        get(paste0("abundances",sample_name[k])))
-        
-    }
-    
-    colnames(abundances_rowMeans) <- paste0("mean_abundances",
-                                            sample_name[1:5])
-    
-    melt_abundances_rowMeans <- melt(abundances_rowMeans[,1:5])
-    
-    #### MEAN ABUNDANCE RATIO WITH  DENSITY PLOT ####
-    
-    ggplot(data = melt_abundances_rowMeans, aes(x= log2(log2(value)))) + 
-        geom_density(aes(linetype=variable, color=variable),size=1) +
-        
-        #geom_violin(colour = "black",size = 0.8) + #bw(0.6)  + #geom_point() +
-        theme_bw() +
-        theme(legend.text = element_text(size=15), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
-              axis.title.x = element_text(size = 15),
-              axis.title.y = element_text(size = 15),
-              plot.title = element_text(size=20),
-              legend.title=element_text(size=15),
-              axis.text=element_text(size=15),
-              axis.title=element_text(size=15)
-        ) +   ggtitle("Experimental Abundances of Phosphopeptides from T cells (log2)") +
-        scale_x_discrete(labels=c("A1","A2","A3","A4","A5")) + 
-        #scale_y_continuous(breaks = seq(10,34,2)) +
-        labs(x="Sample Names",y="Abundance Means", 
-             color="Pool Names") +
-        scale_fill_brewer(palette="Set1")
-    
-    
-    
-    # Calculate 1 percent quantile of each sample
-    impute_values <- apply(data_abundace, 2 , 
-                           quantile ,
-                           probs = 0.01 , na.rm = TRUE )
-    
-    # Impute missing values
-    for (j in 1:length(data_abundace)){
-        # Number NA
-        num_NA <- length(abundances_only_for_impute[,j][is.na(abundances_only_for_impute[,j])])
-        
-        abundances_only_for_impute[,j][is.na(abundances_only_for_impute[,j])] <- impute_values[j]
-        
-        # After imputation number of imputed values
-        num_imp <-length(abundances_only_for_impute[,j][(abundances_only_for_impute[,j]==impute_values[j])])
-        
-        # This is verification of imputation is done successfully
-        # Because we expect to see that number of imputed values should be the same amount as number of NA
-        # However there is also possibility that data has already had the same value just by chance.
-        
-        print(setequal(num_NA,num_imp))
-        print(num_NA)
-        print(num_imp)
-        print(impute_values[j])
-    }
-    
-    
-    # Take log10 
-    #log_10_abundances_only_for_impute <- log10(abundances_only_for_impute)
-    #colnames(log_10_abundances_only_for_impute) <- paste0(colnames(abundances_only_for_impute),"_log10")
-    
-    ## No need is right now. I will cont with "log_10_abundances_only_for_impute" for rowMeans and FC
-    #log_10_filtered_abundances <- cbind(filtered_abundances,log_10_abundances_only_for_impute)
-    
-    # Take mean of triplicates of each sample 
-    # Ask sample_size additional parameter
-    #sample_size <- 1:5
-    sample_name <- c("A","B","C","D","E")
-    filtered_abundances_rowMeans <- NULL
-    for (k in 1:length(sample_name)){
-        # If separate version of row means is not needed, it can be commented later.
-        # Separate row Means can be collected in temp object to merge in "log_10_filtered_abundances_rowMeans"
-        assign(paste0("abundances",sample_name[k]),
-               as.data.frame(rowMeans(abundances_only_for_impute  %>% 
-                                          select(contains(paste0("Ecoli.",
-                                                                 sample_name[k],"."))))))
-        filtered_abundances_rowMeans<- bind_cols(filtered_abundances_rowMeans,
-                                                 get(paste0("abundances",
-                                                            sample_name[k])))
-        
-    }
-    
-    colnames(filtered_abundances_rowMeans) <- paste0("mean_abundances",
-                                                     sample_name[1:5])
-    
-    # Calculate Fold Change by keeping A1 constant (mean(S1)/mean(S2), etc.)
-    cols <- ncol(filtered_abundances_rowMeans)
-    for(An in 2:cols){
-        filtered_abundances_rowMeans[,paste0("exp_FC_A1/A",An)] <- filtered_abundances_rowMeans[,1]/filtered_abundances_rowMeans[,An]
-        
-    }
-    # To calculate all binary combination in the data frame
-    #mat <- do.call(cbind, lapply(cols, function(xj) 
-    #  sapply(cols, function(xi) (filtered_abundances_rowMeans[, xj]/(filtered_abundances_rowMeans[, xj])))))
-    #colnames(mat) <-  outer(names(filtered_abundances_rowMeans), names(filtered_abundances_rowMeans), paste0)
-    
-    final_imputed_normalized_data <- cbind(filtered_abundances_rowMeans)
-    
-    # final_imputed_normalized_data_tcell <- final_imputed_normalized_data %>% 
-    #   filter(grepl("_MOUSE",accession)) %>% 
-    #   filter(grepl("Phospho",modifications))
-    # write.table(final_imputed_normalized_data, file = "final_imputed_normalized_data_PAL _T_cell_Exp3_( 5 conc 3reps)_NoFAIMS_DDA_with_cont_230206_2023-02-07_0947.txt",sep = "\t",row.names = F)
-    
-    melt_filtered_abundances_rowMeans_FC <- melt(final_imputed_normalized_data[,6:9])
-    
-    melt_filtered_abundances_rowMeans <- melt(filtered_abundances_rowMeans[,1:5])
-    
-    #### MEAN ABUNDANCE RATIO WITH VIOLIN AND DENSITY PLOT ####
-    
-    ggplot(data = melt_filtered_abundances_rowMeans, aes(x =variable,y= log2(value),fill=variable)) + 
-        #geom_density(aes(linetype=variable, color=variable),size=1) +
-        
-        geom_violin(colour = "black",size = 0.8) + #bw(0.6)  + #geom_point() +
-        theme_bw() +
-        theme(legend.text = element_text(size=15), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
-              axis.title.x = element_text(size = 15),
-              axis.title.y = element_text(size = 15),
-              plot.title = element_text(size=20),
-              legend.title=element_text(size=15),
-              axis.text=element_text(size=15),
-              axis.title=element_text(size=15)
-        ) +   ggtitle("Experimental Abundances of Phosphopeptides from T cells (log2)") +
-        scale_x_discrete(labels=c("A1","A2","A3","A4","A5")) + #scale_y_continuous(breaks = seq(10,34,2)) +
-        labs(x="Sample Names",y="Abundance Means", 
-             color="Pool Names") +
-        scale_fill_brewer(palette="Set1")
-    
-    #### LOG FOLD CHANGE RATIO WITH VIOLIN PLOT ####
-    ## Change only geom_density() and geom_violin()
-    ggplot(melt_filtered_abundances_rowMeans_FC,aes(x =variable
-                                                    , y =log2(value),
-                                                    fill = variable)  ) +
-        geom_violin(colour = "black",size = 0.8) + #bw(0.6)  + #geom_point() +
-        theme_bw() +
-        theme(legend.text = element_text(size=15), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
-              axis.title.x = element_text(size = 15),
-              axis.title.y = element_text(size = 15),
-              plot.title = element_text(size=20),
-              legend.title=element_text(size=15),
-              axis.text=element_text(size=15),
-              axis.title=element_text(size=15)
-        ) +   ggtitle("Experimental Quantity Ratio of Phosphopeptides from T cells (log2)") +
-        scale_x_discrete(labels=c("A1/A2 \n (1.00)","A1/A3 \n (3.21)","A1/A4 \n (4.32)","A1/A5 \n(6.64)")) + scale_y_continuous(breaks = seq(-10,15,2)) +
-        labs(x="Sample Names",y="Abundance Ratios", 
-             color="Pool Names") +
-        scale_fill_brewer(palette="Set1")
-    
-    
-    
-    
-    ############################ # Do t-test # ############################
-    
-    # The code below does t-test for each row. Because of that, multiple test correction (like BH, Bonferoni)
-    p_values_for_all_ratio <- NULL
-    for(k in 2:sample_size){
-        
-        assign(paste0("t_test_res_A1_to_A",k) , 
-               lapply(na.omit(correct_identifed_peps$mean_abundances_A1),
-                      na.omit(correct_identifed_peps[,paste0("mean_abundances_A",k)], 
-                              function(x,y) t.test(x,y,alternative = "two.sided", 
-                                                   var.equal = TRUE))))
-        assign(paste0("p_values_A1_vs_A",k), cbind(p_values_for_all_ratio,
-                                                   get(paste0("t_test_res_A1_to_A",k))$p.value))
-        
-    }
-    
-    #adjusted_p_values <- as.data.frame(p.adjust(p_values_A1_vs_A5, method = "BH", n = length(p_values_A1_vs_A5)))
-    adjusted_p_values <- lapply(p_values_for_all_ratio, 
-                                function(x) p.adjust (x, 
-                                                      method = "BH", n = length(x)))
-    
-    #plot(correct_identifed_peps$mean_abundances_log10_A1,correct_identifed_peps$mean_abundances_log10_A5, pch = 16, col = "blue")
-    #abline(h = mean(na.omit(correct_identifed_peps$mean_abundances_log10_A1)) - mean(na.omit(correct_identifed_peps$mean_abundances_log10_A5)), col = "red")
-    
-    boxplot(correct_identifed_peps$mean_abundances_log10_A1,correct_identifed_peps$mean_abundances_log10_A5)
-    ggplot(correct_identifed_peps, aes(x = mean_abundances_log10_A1, y = mean_abundances_log10_A5)) +
-        geom_point(aes(color = "red", size = 5))# +
-    #scale_color_discrete(name = "") +
-    #scale_size_discrete(name = "Size")
-    # 
-    # Take -log10() of results
-    ggplot(log_10_filtered_abundances_rowMeans_A1_A5,aes(x=log_10_filtered_abundances_rowMeans_A1_A5$mean_abundances_log10_A1,
-                                                         y =log_10_filtered_abundances_rowMeans_A1_A5$mean_abundances_log10_A5,
-    )) +
-        geom_point()+
-        #facet_wrap(vars(df_for_figure$common_col_for_merging))  + 
-        #geom_smooth(method = "lm", colour = "green", fill = "green") +
-        theme_light()
-    
-    library(gginference)
-    ggttest(t.test(na.omit(correct_identifed_peps$mean_abundances_log10_A1),na.omit(correct_identifed_peps$mean_abundances_log10_A5), alternative = "two.sided", var.equal = TRUE))
-    
-    
-    
-    df_for_figure_exp <- correct_identifed_peps[,c(11,74:77)]
-    df_for_figure <- correct_identifed_peps[,c(11:15,74:77)]
-    melt_df_for_figure_exp <- melt(df_for_figure_exp)
-    
-    df_for_figure_theo <- correct_identifed_peps[,c(11:15)]
-    melt_df_for_figure_theo <- melt(df_for_figure_theo)
-    
-    p1 <- ggplot(melt_df_for_figure_theo,aes(x =melt_df_for_figure_theo$variable , y =log2(melt_df_for_figure_theo$value),fill = melt_df_for_figure_theo$Pool)  ) +
-        geom_boxplot() +
-        theme_light() + #scale_y_continuous(limits = c(-60, 60),breaks = seq(-60, 60, by = 20)) +
-        theme(legend.text = element_text(size=15), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
-              axis.title.x = element_text(size = 15),axis.title.y = element_text(size = 15),
-              plot.title = element_text(size=20),
-              legend.title=element_text(size=15),
-              axis.text=element_text(size=15),
-              axis.title=element_text(size=15)
-        ) +   stat_boxplot(geom = "errorbar") + ggtitle("Theoretical Quantity Ratio of Synthetic Peptides") +
-        scale_x_discrete(labels=c("A1/A2","A1/A2","A1/A4","A1/A5")) +
-        labs(x="Sample Names",y="Abundance Ratios", color="Pool Names")+
-        scale_fill_brewer(palette="Set1")
-    
-    p2 <-ggplot(melt_df_for_figure_exp,aes(x =melt_df_for_figure_exp$variable , y =log2(melt_df_for_figure_exp$value),fill = melt_df_for_figure_exp$Pool)  ) +
-        geom_boxplot() +
-        theme_light() +
-        theme(legend.text = element_text(size=15), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
-              axis.title.x = element_text(size = 15),axis.title.y = element_text(size = 15),
-              plot.title = element_text(size=20),
-              legend.title=element_text(size=15),
-              axis.text=element_text(size=15),
-              axis.title=element_text(size=15)
-        ) +   stat_boxplot(geom = "errorbar") + ggtitle("Experimental  Quantity Ratio of Synthetic Peptides") +
-        scale_x_discrete(labels=c("A1/A2","A1/A2","A1/A4","A1/A5")) +
-        labs(x="Sample Names",y="Abundance Ratios", color="Pool Names") +
-        scale_fill_brewer(palette="Set1")
-    
-    p3 <-ggplot(melt_df_for_figure_exp,aes(x =melt_df_for_figure_exp$variable , y =melt_df_for_figure_exp$value,color = melt_df_for_figure_exp$Pool)  ) +
-        geom_point() +
-        theme_light() +
-        theme(legend.text = element_text(size=15), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
-              axis.title.x = element_text(size = 15),axis.title.y = element_text(size = 15),
-              plot.title = element_text(size=20),
-              legend.title=element_text(size=15),
-              axis.text=element_text(size=15),
-              axis.title=element_text(size=15)
-        ) +   ggtitle("Experimental Quantity Ratio of Synthetic Peptides") +
-        scale_x_discrete(labels=c("A1/A2","A1/A3","A1/A4","A1/A5")) +
-        labs(x="Sample Names",y="Abundance Ratios", color="Pool Names") +
-        scale_color_brewer(palette="Set1")
-    
-    p4 <-ggplot(melt_df_for_figure_theo,aes(x =melt_df_for_figure_theo$variable , y =melt_df_for_figure_theo$value,color = melt_df_for_figure_theo$Pool)  ) +
-        geom_point() +
-        theme_light() +
-        theme(legend.text = element_text(size=15), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
-              axis.title.x = element_text(size = 15),axis.title.y = element_text(size = 15),
-              plot.title = element_text(size=20),
-              legend.title=element_text(size=15),
-              axis.text=element_text(size=15),
-              axis.title=element_text(size=15),
-        ) +   ggtitle("Theoretical Quantity Ratio of Synthetic Peptides") +
-        scale_x_discrete(labels=c("A1/A2","A1/A3","A1/A4","A1/A5")) +
-        labs(x="Sample Names",y="Abundance Ratios", color="Pool Names") +
-        scale_color_brewer(palette="Set1")
-    
-    p1
-    library(ggpubr)
-    ggarrange(p1, p2, common.legend = TRUE, legend="right")
-    ggarrange(p4, p3, common.legend = TRUE, legend="right")
 
+    
+    # ggsave(filename = paste0("p9_limma.tiff"),
+    #        width = 50, height = 40, 
+    #        path = paste0(file_path,"/outputs_with_new_script/"),
+    #        units = "cm",
+    #        p9_limma,
+    #        device = "tiff")
 }
+    
+    
+    # ## PLOT GENERATION
+    # ggplot(length_id_phospho_pep_all_samples,
+    #        aes(x=length_id_phospho_pep_all_samples$c..M1.170ng.µL....M2.85ng.µL....M3.17ng.µL....M4.8.5ng.µL...,
+    #            y=length_id_phospho_pep_all_samples$c.dim.quant_peptides_s1..1...dim.quant_peptides_s2..1...dim.quant_peptides_s3..1...,
+    #            fill=length_id_phospho_pep_all_samples$c..M1.170ng.µL....M2.85ng.µL....M3.17ng.µL....M4.8.5ng.µL...)) + 
+    #     geom_bar(stat = "identity") + 
+    #     theme_light() + scale_y_continuous(breaks = seq(0, 4642, by = 80)) +
+    #     theme(legend.text = element_text(size=15), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
+    #           axis.title.x = element_text(size = 15),axis.title.y = element_text(size = 15),
+    #           plot.title = element_text(size=20),
+    #           legend.title=element_text(size=15),
+    #           axis.text=element_text(size=15,angle = 0),
+    #           axis.title=element_text(size=15)
+    #     ) +   ggtitle("Number of identified T cell enriched phospho-peptides") +
+    #     scale_x_discrete(labels=c("M1 170ng/µL",
+    #                               "M2 85ng/µL",
+    #                               "M3 17ng/µL",
+    #                               "M4 8.5ng/µL",
+    #                               "M5 1.7ng/µL")) +
+    #     labs(x="Sample Names",y="Number of phospho-peptides", fill="Sample name")+
+    #     scale_fill_brewer(palette="Set1")
+    # 
+    # 
+    
+
+
+    # # Keep actual colnames to add after merging (because it contains duplicate col_names which prevents merging btw two df)
+    # 
+    # quant_peptides_new <- cbind(common_col_exp_quant,quant_peptides)
+    # 
+    # ####################
+    # 
+    # 
+    # ### If row count is needed, it can be extracted from here:
+    # #abundances_with_row_count <- cbind(abundances,rowSums(!is.na(abundances)))
+    # 
+    # # Nothing is changed
+    # #filtered_abundances<-data_abundace[rowSums(!is.na(data_abundace) > 0)]
+    # 
+    # abundances_only_for_impute <- data_abundace 
+    # 
+    # ## DENSITY PLOT OF BEFORE IMPUTATION 
+    # 
+    # sample_name <- c("A","B","C","D","E")
+    # abundances_rowMeans <- NULL
+    # for (k in 1:length(sample_name)){
+    #     
+    #     assign(paste0("abundances",sample_name[k]),
+    #            as.data.frame(rowMeans(data_abundace  %>% 
+    #                                       select(contains(paste0("Ecoli.",
+    #                                                              sample_name[k],"."))))))
+    #     abundances_rowMeans<- bind_cols(abundances_rowMeans,
+    #                                     get(paste0("abundances",sample_name[k])))
+    #     
+    # }
+    # 
+    # colnames(abundances_rowMeans) <- paste0("mean_abundances",
+    #                                         sample_name[1:5])
+    # 
+    # melt_abundances_rowMeans <- melt(abundances_rowMeans[,1:5])
+    # 
+    # #### MEAN ABUNDANCE RATIO WITH  DENSITY PLOT ####
+    # 
+    # ggplot(data = melt_abundances_rowMeans, aes(x= log2(log2(value)))) + 
+    #     geom_density(aes(linetype=variable, color=variable),size=1) +
+    #     
+    #     #geom_violin(colour = "black",size = 0.8) + #bw(0.6)  + #geom_point() +
+    #     theme_bw() +
+    #     theme(legend.text = element_text(size=15), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
+    #           axis.title.x = element_text(size = 15),
+    #           axis.title.y = element_text(size = 15),
+    #           plot.title = element_text(size=20),
+    #           legend.title=element_text(size=15),
+    #           axis.text=element_text(size=15),
+    #           axis.title=element_text(size=15)
+    #     ) +   ggtitle("Experimental Abundances of Phosphopeptides from T cells (log2)") +
+    #     scale_x_discrete(labels=c("A1","A2","A3","A4","A5")) + 
+    #     #scale_y_continuous(breaks = seq(10,34,2)) +
+    #     labs(x="Sample Names",y="Abundance Means", 
+    #          color="Pool Names") +
+    #     scale_fill_brewer(palette="Set1")
+    # 
+    # 
+    # 
+    # # Calculate 1 percent quantile of each sample
+    # impute_values <- apply(data_abundace, 2 , 
+    #                        quantile ,
+    #                        probs = 0.01 , na.rm = TRUE )
+    # 
+    # # Impute missing values
+    # for (j in 1:length(data_abundace)){
+    #     # Number NA
+    #     num_NA <- length(abundances_only_for_impute[,j][is.na(abundances_only_for_impute[,j])])
+    #     
+    #     abundances_only_for_impute[,j][is.na(abundances_only_for_impute[,j])] <- impute_values[j]
+    #     
+    #     # After imputation number of imputed values
+    #     num_imp <-length(abundances_only_for_impute[,j][(abundances_only_for_impute[,j]==impute_values[j])])
+    #     
+    #     # This is verification of imputation is done successfully
+    #     # Because we expect to see that number of imputed values should be the same amount as number of NA
+    #     # However there is also possibility that data has already had the same value just by chance.
+    #     
+    #     print(setequal(num_NA,num_imp))
+    #     print(num_NA)
+    #     print(num_imp)
+    #     print(impute_values[j])
+    
+    
+    
+    # # Take log10 
+    # #log_10_abundances_only_for_impute <- log10(abundances_only_for_impute)
+    # #colnames(log_10_abundances_only_for_impute) <- paste0(colnames(abundances_only_for_impute),"_log10")
+    # 
+    # ## No need is right now. I will cont with "log_10_abundances_only_for_impute" for rowMeans and FC
+    # #log_10_filtered_abundances <- cbind(filtered_abundances,log_10_abundances_only_for_impute)
+    # 
+    # # Take mean of triplicates of each sample 
+    # # Ask sample_size additional parameter
+    # #sample_size <- 1:5
+    # sample_name <- c("A","B","C","D","E")
+    # filtered_abundances_rowMeans <- NULL
+    # for (k in 1:length(sample_name)){
+    #     # If separate version of row means is not needed, it can be commented later.
+    #     # Separate row Means can be collected in temp object to merge in "log_10_filtered_abundances_rowMeans"
+    #     assign(paste0("abundances",sample_name[k]),
+    #            as.data.frame(rowMeans(abundances_only_for_impute  %>% 
+    #                                       select(contains(paste0("Ecoli.",
+    #                                                              sample_name[k],"."))))))
+    #     filtered_abundances_rowMeans<- bind_cols(filtered_abundances_rowMeans,
+    #                                              get(paste0("abundances",
+    #                                                         sample_name[k])))
+    #     
+    # }
+    # 
+    # colnames(filtered_abundances_rowMeans) <- paste0("mean_abundances",
+    #                                                  sample_name[1:5])
+    # 
+    # # Calculate Fold Change by keeping A1 constant (mean(S1)/mean(S2), etc.)
+    # cols <- ncol(filtered_abundances_rowMeans)
+    # for(An in 2:cols){
+    #     filtered_abundances_rowMeans[,paste0("exp_FC_A1/A",An)] <- filtered_abundances_rowMeans[,1]/filtered_abundances_rowMeans[,An]
+    #     
+    # }
+    # # To calculate all binary combination in the data frame
+    # #mat <- do.call(cbind, lapply(cols, function(xj) 
+    # #  sapply(cols, function(xi) (filtered_abundances_rowMeans[, xj]/(filtered_abundances_rowMeans[, xj])))))
+    # #colnames(mat) <-  outer(names(filtered_abundances_rowMeans), names(filtered_abundances_rowMeans), paste0)
+    # 
+    # final_imputed_normalized_data <- cbind(filtered_abundances_rowMeans)
+    # 
+    # # final_imputed_normalized_data_tcell <- final_imputed_normalized_data %>% 
+    # #   filter(grepl("_MOUSE",accession)) %>% 
+    # #   filter(grepl("Phospho",modifications))
+    # # write.table(final_imputed_normalized_data, file = "final_imputed_normalized_data_PAL _T_cell_Exp3_( 5 conc 3reps)_NoFAIMS_DDA_with_cont_230206_2023-02-07_0947.txt",sep = "\t",row.names = F)
+    # 
+    # melt_filtered_abundances_rowMeans_FC <- melt(final_imputed_normalized_data[,6:9])
+    # 
+    # melt_filtered_abundances_rowMeans <- melt(filtered_abundances_rowMeans[,1:5])
+    # 
+    # #### MEAN ABUNDANCE RATIO WITH VIOLIN AND DENSITY PLOT ####
+    # 
+    # ggplot(data = melt_filtered_abundances_rowMeans, aes(x =variable,y= log2(value),fill=variable)) + 
+    #     #geom_density(aes(linetype=variable, color=variable),size=1) +
+    #     
+    #     geom_violin(colour = "black",size = 0.8) + #bw(0.6)  + #geom_point() +
+    #     theme_bw() +
+    #     theme(legend.text = element_text(size=15), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
+    #           axis.title.x = element_text(size = 15),
+    #           axis.title.y = element_text(size = 15),
+    #           plot.title = element_text(size=20),
+    #           legend.title=element_text(size=15),
+    #           axis.text=element_text(size=15),
+    #           axis.title=element_text(size=15)
+    #     ) +   ggtitle("Experimental Abundances of Phosphopeptides from T cells (log2)") +
+    #     scale_x_discrete(labels=c("A1","A2","A3","A4","A5")) + #scale_y_continuous(breaks = seq(10,34,2)) +
+    #     labs(x="Sample Names",y="Abundance Means", 
+    #          color="Pool Names") +
+    #     scale_fill_brewer(palette="Set1")
+    # 
+    # #### LOG FOLD CHANGE RATIO WITH VIOLIN PLOT ####
+    # ## Change only geom_density() and geom_violin()
+    # ggplot(melt_filtered_abundances_rowMeans_FC,aes(x =variable
+    #                                                 , y =log2(value),
+    #                                                 fill = variable)  ) +
+    #     geom_violin(colour = "black",size = 0.8) + #bw(0.6)  + #geom_point() +
+    #     theme_bw() +
+    #     theme(legend.text = element_text(size=15), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
+    #           axis.title.x = element_text(size = 15),
+    #           axis.title.y = element_text(size = 15),
+    #           plot.title = element_text(size=20),
+    #           legend.title=element_text(size=15),
+    #           axis.text=element_text(size=15),
+    #           axis.title=element_text(size=15)
+    #     ) +   ggtitle("Experimental Quantity Ratio of Phosphopeptides from T cells (log2)") +
+    #     scale_x_discrete(labels=c("A1/A2 \n (1.00)","A1/A3 \n (3.21)","A1/A4 \n (4.32)","A1/A5 \n(6.64)")) + scale_y_continuous(breaks = seq(-10,15,2)) +
+    #     labs(x="Sample Names",y="Abundance Ratios", 
+    #          color="Pool Names") +
+    #     scale_fill_brewer(palette="Set1")
+    # 
+    # 
+    # 
+    # 
+    # ############################ # Do t-test # ############################
+    # 
+    # # The code below does t-test for each row. Because of that, multiple test correction (like BH, Bonferoni)
+    # p_values_for_all_ratio <- NULL
+    # for(k in 2:sample_size){
+    #     
+    #     assign(paste0("t_test_res_A1_to_A",k) , 
+    #            lapply(na.omit(correct_identifed_peps$mean_abundances_A1),
+    #                   na.omit(correct_identifed_peps[,paste0("mean_abundances_A",k)], 
+    #                           function(x,y) t.test(x,y,alternative = "two.sided", 
+    #                                                var.equal = TRUE))))
+    #     assign(paste0("p_values_A1_vs_A",k), cbind(p_values_for_all_ratio,
+    #                                                get(paste0("t_test_res_A1_to_A",k))$p.value))
+    #     
+    # }
+    # 
+    # #adjusted_p_values <- as.data.frame(p.adjust(p_values_A1_vs_A5, method = "BH", n = length(p_values_A1_vs_A5)))
+    # adjusted_p_values <- lapply(p_values_for_all_ratio, 
+    #                             function(x) p.adjust (x, 
+    #                                                   method = "BH", n = length(x)))
+    # 
+    # #plot(correct_identifed_peps$mean_abundances_log10_A1,correct_identifed_peps$mean_abundances_log10_A5, pch = 16, col = "blue")
+    # #abline(h = mean(na.omit(correct_identifed_peps$mean_abundances_log10_A1)) - mean(na.omit(correct_identifed_peps$mean_abundances_log10_A5)), col = "red")
+    # 
+    # boxplot(correct_identifed_peps$mean_abundances_log10_A1,correct_identifed_peps$mean_abundances_log10_A5)
+    # ggplot(correct_identifed_peps, aes(x = mean_abundances_log10_A1, y = mean_abundances_log10_A5)) +
+    #     geom_point(aes(color = "red", size = 5))# +
+    # #scale_color_discrete(name = "") +
+    # #scale_size_discrete(name = "Size")
+    # # 
+    # # Take -log10() of results
+    # ggplot(log_10_filtered_abundances_rowMeans_A1_A5,aes(x=log_10_filtered_abundances_rowMeans_A1_A5$mean_abundances_log10_A1,
+    #                                                      y =log_10_filtered_abundances_rowMeans_A1_A5$mean_abundances_log10_A5,
+    # )) +
+    #     geom_point()+
+    #     #facet_wrap(vars(df_for_figure$common_col_for_merging))  + 
+    #     #geom_smooth(method = "lm", colour = "green", fill = "green") +
+    #     theme_light()
+    # 
+    # library(gginference)
+    # ggttest(t.test(na.omit(correct_identifed_peps$mean_abundances_log10_A1),na.omit(correct_identifed_peps$mean_abundances_log10_A5), alternative = "two.sided", var.equal = TRUE))
+    # 
+    # 
+    # 
+    # df_for_figure_exp <- correct_identifed_peps[,c(11,74:77)]
+    # df_for_figure <- correct_identifed_peps[,c(11:15,74:77)]
+    # melt_df_for_figure_exp <- melt(df_for_figure_exp)
+    # 
+    # df_for_figure_theo <- correct_identifed_peps[,c(11:15)]
+    # melt_df_for_figure_theo <- melt(df_for_figure_theo)
+    # 
+    # p1 <- ggplot(melt_df_for_figure_theo,aes(x =melt_df_for_figure_theo$variable , y =log2(melt_df_for_figure_theo$value),fill = melt_df_for_figure_theo$Pool)  ) +
+    #     geom_boxplot() +
+    #     theme_light() + #scale_y_continuous(limits = c(-60, 60),breaks = seq(-60, 60, by = 20)) +
+    #     theme(legend.text = element_text(size=15), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
+    #           axis.title.x = element_text(size = 15),axis.title.y = element_text(size = 15),
+    #           plot.title = element_text(size=20),
+    #           legend.title=element_text(size=15),
+    #           axis.text=element_text(size=15),
+    #           axis.title=element_text(size=15)
+    #     ) +   stat_boxplot(geom = "errorbar") + ggtitle("Theoretical Quantity Ratio of Synthetic Peptides") +
+    #     scale_x_discrete(labels=c("A1/A2","A1/A2","A1/A4","A1/A5")) +
+    #     labs(x="Sample Names",y="Abundance Ratios", color="Pool Names")+
+    #     scale_fill_brewer(palette="Set1")
+    # 
+    # p2 <-ggplot(melt_df_for_figure_exp,aes(x =melt_df_for_figure_exp$variable , y =log2(melt_df_for_figure_exp$value),fill = melt_df_for_figure_exp$Pool)  ) +
+    #     geom_boxplot() +
+    #     theme_light() +
+    #     theme(legend.text = element_text(size=15), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
+    #           axis.title.x = element_text(size = 15),axis.title.y = element_text(size = 15),
+    #           plot.title = element_text(size=20),
+    #           legend.title=element_text(size=15),
+    #           axis.text=element_text(size=15),
+    #           axis.title=element_text(size=15)
+    #     ) +   stat_boxplot(geom = "errorbar") + ggtitle("Experimental  Quantity Ratio of Synthetic Peptides") +
+    #     scale_x_discrete(labels=c("A1/A2","A1/A2","A1/A4","A1/A5")) +
+    #     labs(x="Sample Names",y="Abundance Ratios", color="Pool Names") +
+    #     scale_fill_brewer(palette="Set1")
+    # 
+    # p3 <-ggplot(melt_df_for_figure_exp,aes(x =melt_df_for_figure_exp$variable , y =melt_df_for_figure_exp$value,color = melt_df_for_figure_exp$Pool)  ) +
+    #     geom_point() +
+    #     theme_light() +
+    #     theme(legend.text = element_text(size=15), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
+    #           axis.title.x = element_text(size = 15),axis.title.y = element_text(size = 15),
+    #           plot.title = element_text(size=20),
+    #           legend.title=element_text(size=15),
+    #           axis.text=element_text(size=15),
+    #           axis.title=element_text(size=15)
+    #     ) +   ggtitle("Experimental Quantity Ratio of Synthetic Peptides") +
+    #     scale_x_discrete(labels=c("A1/A2","A1/A3","A1/A4","A1/A5")) +
+    #     labs(x="Sample Names",y="Abundance Ratios", color="Pool Names") +
+    #     scale_color_brewer(palette="Set1")
+    # 
+    # p4 <-ggplot(melt_df_for_figure_theo,aes(x =melt_df_for_figure_theo$variable , y =melt_df_for_figure_theo$value,color = melt_df_for_figure_theo$Pool)  ) +
+    #     geom_point() +
+    #     theme_light() +
+    #     theme(legend.text = element_text(size=15), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
+    #           axis.title.x = element_text(size = 15),axis.title.y = element_text(size = 15),
+    #           plot.title = element_text(size=20),
+    #           legend.title=element_text(size=15),
+    #           axis.text=element_text(size=15),
+    #           axis.title=element_text(size=15),
+    #     ) +   ggtitle("Theoretical Quantity Ratio of Synthetic Peptides") +
+    #     scale_x_discrete(labels=c("A1/A2","A1/A3","A1/A4","A1/A5")) +
+    #     labs(x="Sample Names",y="Abundance Ratios", color="Pool Names") +
+    #     scale_color_brewer(palette="Set1")
+    # 
+    # p1
+    # library(ggpubr)
+    # ggarrange(p1, p2, common.legend = TRUE, legend="right")
+    # ggarrange(p4, p3, common.legend = TRUE, legend="right")
+
+
