@@ -498,7 +498,7 @@ final_pd_pep_quant_analysis_bio <- function(file_path,
         
         rownames(all_pvalues) <- row.names(stat_analysis)
         rownames(all_adjust_pval) <- row.names(stat_analysis)
-    }
+    
         all_pvalues_common_col <- stat_analysis %>% 
             select(pep_with_pos, Marked.as) %>% #spectrum_title
             bind_cols(all_pvalues) %>% 
@@ -518,15 +518,15 @@ final_pd_pep_quant_analysis_bio <- function(file_path,
             rename_with(.col =6 , ~"ratio1") %>%
             rename_with(.col=7, ~ "pvalues") #%>%
             #separate(accession, into = c("prot_id","species"),sep = "_")
+        ###############################################################################
         
         
-        
-        p9_t_test <- ggplot(merge_stat_df ,aes(x =log2(fold_change_values), y = -log10(merge_stat_df$pvalues), color=Marked.as)) +
+        p9 <- ggplot(merge_stat_df ,aes(x =log2(fold_change_values), y = -log10(merge_stat_df$pvalues), color=Marked.as)) +
             geom_point(size = 2,aes(shape=ratio)) + #, aes(shape=merge_stat_df_final$species)
             facet_wrap(~ratio) +
             #scale_y_continuous(limits = c(0, 8), breaks = seq(0, 8, by = 0.8)) +
             #scale_x_continuous(limits = c(-3,3),breaks = seq(-3, 3, by = 0.8)) +
-            scale_color_brewer(palette = "Set1") +
+            scale_color_brewer(palette = "Dark2") +
             #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
             theme_bw() +
             theme(legend.text = element_text(size = 15),
@@ -537,13 +537,11 @@ final_pd_pep_quant_analysis_bio <- function(file_path,
                   axis.text.x = element_text(size = 15),
                   axis.title = element_text(size = 15),
                   axis.text.y = element_text(size = 15)) +
-            labs(title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = "T-test was used")
+            labs(title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("T-test was used \n", subtitle[i]))
         #expand_limits(x = 0, y = 0) +
         #geom_vline(data = actual_ratio, aes(xintercept = actual_ratio$X.1....log2.c.2..10..20..100..., size = 1, show.legend = FALSE)) + #color=c("#CC79A7","#E69F00","#56B4E9","#009E73")
         #geom_hline(data = log10_p_thresholds, aes(yintercept = log10_p_thresholds$X.log10.p_thresholds.),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"), size = 1, linetype = 2, show.legend = FALSE)+ 
         #
-        
-        
         
         
         ### MERGING I: All used columns are merged and used to combine pvalues and ratios
@@ -673,38 +671,60 @@ final_pd_pep_quant_analysis_bio <- function(file_path,
             merge_stat_df <- bind_rows(merge_stat_df,get(paste0("alllimma",i)))
         }
         
-        merge_stat_df <- bind_cols(rownames(merge_stat_df),merge_stat_df)
+        merge_stat_df <- bind_cols(rownames(merge_stat_df),merge_stat_df) 
+        colnames(merge_stat_df)[1] <- "common_col"
+
+        merge_stat_df1 <- merge_stat_df %>% 
+            separate(common_col, into = c("pep_with_pos","Marked.as","tmp"),sep = "@") %>%
+            select(!tmp) %>%
+            rename_with(.col=9, ~ "A1vs_Ai") %>%
+            separate(A1vs_Ai, into = c("first","second"),sep = "-") %>%
+            mutate(A1vs_Ai = paste(first,second,sep = "/")) %>%
+            mutate(common_col_for_merging = paste(pep_with_pos,Marked.as,A1vs_Ai,sep = "@")) %>%
+            select(!c(first,second)) #%>% sort(merge_stat_df$common_col)
         
-        ## MULTIPLE PIVOTING IN ONE DATAFRAME DOES NOT WORK - RATHER THAN THAT, BIND_ROWS() WAS USED ABOVE.
+        merge_stat_df_final <- stat_analysis %>%
+            select(pep_with_pos, Marked.as, starts_with("exp_FC")) %>%
+            pivot_longer(cols = starts_with("exp_FC"), values_to = "fold_change_values", names_to ="fold_change_ratios") %>%
+            separate(fold_change_ratios, into = c("tmp","tmp1","ratio"),sep = "_") %>%
+            select(!c(tmp,tmp1)) %>%
+            #mutate(common_col = paste(common_col_for_merging,Pool,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) %>%
+            #bind_cols(merge_stat_df$logFC,merge_stat_df$P.Value,merge_stat_df$adj.P.Val) %>%
+            mutate(common_col_for_merging = paste(pep_with_pos,Marked.as,ratio,sep = "@")) %>%
+            #rename_with(.col =8 , ~"common_col") %>%
+            left_join(merge_stat_df1,by="common_col_for_merging") 
+           
         
-        merge_stat_df_final <- merge_stat_df %>%  #
-            rename_with(.col =1 , ~"mult_col") %>%
-            rename_with(.col=8, ~ "ratios") %>%
-            separate(mult_col, into = c("pep_with_pos","species","id"),sep = "@") #%>% #"spectrum_title"
-            #separate(accession, into = c("uniprot_id","species"),sep = "_")
+        # p9 <- gg_volcano(data_set = merge_stat_df_final,
+        #                        x_df = log2(merge_stat_df_final$fold_change_values),  
+        #                        y_df = -log10(merge_stat_df_final$adj.P.Val),
+        #                        color_df = merge_stat_df_final$Marked.as.x,
+        #                        facet_df = "ratio",
+        #                        header = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), ## Specifications of the header will be asked as an input.
+        #                        color_lab = "Classes",
+        #                        subtitle_txt = "Limma was used",
+        #                        x_lab = "log2(fold_change_values)",
+        #                        y_lab = "-log10(p_values)")  
         
-        p9_limma <- gg_volcano(data_set = merge_stat_df_final,
-                               x_df = merge_stat_df_final$logFC,  
-                               y_df = -log10(merge_stat_df_final$P.Value),
-                               color_df = merge_stat_df_final$species,
-                               facet_df = "ratios",
-                               header = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), ## Specifications of the header will be asked as an input.
-                               color_lab = "Classes",
-                               subtitle_txt = "Limma was used",
-                               x_lab = "log2(fold_change_values)",
-                               y_lab = "-log10(p_values)")   
         
-        #select(accession, spectrum_title, contains("P.value") | contains("logFC")) %>%
-        #pivot_longer(cols = contains("P.value"), values_to = "pvalues", names_to ="p_ratios") %>%
-        #pivot_longer(cols = contains("logFC"), values_to = "fold_change_values", names_to ="fold_change_ratios")
-        
-        # Filter the results based on the FDR threshold
-        # Add column that defined values either above or lower the threshold as Boolean 
-        
-        #desired_fdr_threshold <- 0.005
-        #merge_stat_df$sig <- merge_stat_df$adj.P.Val < desired_fdr_threshold
-        #significant_results_A1_vs_A2 <- subset(results_A1_vs_A2, adj.P.Val <= desired_fdr_threshold)
-        
+        p9 <- ggplot(merge_stat_df_final ,aes(x =log2(merge_stat_df_final$fold_change_values), y = -log10(merge_stat_df_final$adj.P.Val), color=Marked.as.y)) +
+            geom_point(size = 2,aes(shape=ratio)) + #, aes(shape=merge_stat_df_final$species)
+            facet_wrap(~ratio) +
+            #scale_y_continuous(limits = c(0, 8), breaks = seq(0, 8, by = 0.8)) +
+            #scale_x_continuous(limits = c(-3,3),breaks = seq(-3, 3, by = 0.8)) +
+            scale_color_brewer(palette = "Dark2") +
+            #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
+            theme_bw() +
+            theme(legend.text = element_text(size = 15),
+                  axis.title.x = element_text(size = 15),
+                  axis.title.y = element_text(size = 15),
+                  plot.title = element_text(size = 30),
+                  legend.title = element_text(size = 15),
+                  axis.text.x = element_text(size = 15),
+                  axis.title = element_text(size = 15),
+                  axis.text.y = element_text(size = 15)) +
+            labs(title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n", subtitle[i]))
+       
     }else{
         print("Statistical test could not be assessed. Check the input files!")
     }
@@ -740,7 +760,7 @@ final_pd_pep_quant_analysis_bio <- function(file_path,
     
     #roc_data_all <- compute_roc_curve(complete_pvalues_all,flag = "Others",expected = 145)
     
-    sapply(1:8,function(x) ggsave(filename = paste0("p",x,".tiff"),
+    sapply(1:9,function(x) ggsave(filename = paste0("p",x,".tiff"),
                                   width = 50, height = 40, 
                                   path = paste0(file_path,"/outputs_with_new_script/"),
                                   units = "cm",
@@ -748,13 +768,6 @@ final_pd_pep_quant_analysis_bio <- function(file_path,
                                   device = "tiff", #".svg"
     ))
     
-    
-    ggsave(filename = paste0("p9_t_test.tiff"),
-           width = 50, height = 40,
-           path = paste0(file_path,"/outputs_with_new_script/"),
-           units = "cm",
-           p9_t_test,
-           device = "tiff")
 
     
     # ggsave(filename = paste0("p9_limma.tiff"),
