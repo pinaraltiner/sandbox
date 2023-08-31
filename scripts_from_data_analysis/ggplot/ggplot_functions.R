@@ -96,7 +96,7 @@ gg_boxplt_exp_ratio <- function(data_set,
     ) +   stat_boxplot(geom = "errorbar") + 
     ggtitle(header) +
     labs(x=x_lab,y=y_lab,fill = fill_lab,subtitle = subtitle_txt) +
-    scale_fill_brewer(palette="Set1")
+    scale_fill_brewer(palette="Dark2")
   
 }
 
@@ -127,8 +127,8 @@ gg_half_boxplt_exp_ratio <- function(data_set,
           legend.title=element_text(size=25),
           axis.text=element_text(size=25),
           axis.title=element_text(size=25)
-    ) + scale_fill_brewer(palette = "Set1") +
-        scale_color_brewer(palette = "Set1")+ 
+    ) + scale_fill_brewer(palette = "Dark2") +
+        scale_color_brewer(palette = "Dark2")+ 
     labs(x=x_lab,y=y_lab,fill=fill_lab,subtitle = subtitle_txt) +
     ggtitle(header)
 }
@@ -159,7 +159,7 @@ gg_violin_exp_ratio <- function(data_set,
           legend.title=element_text(size=25),
           axis.text=element_text(size=25),
           axis.title=element_text(size=25)
-    ) + scale_fill_brewer(palette="Set1") +
+    ) + scale_fill_brewer(palette="Dark2") +
     labs(x=x_lab,y=y_lab, fill= fill_lab,subtitle = subtitle_txt) +
     ggtitle(header)
 }
@@ -235,7 +235,7 @@ gg_raincloud <- function(data_set,
           axis.title=element_text(size=25)) + 
     ggtitle(header) + 
     labs(x=x_lab,y=y_lab, fill= fill_lab, caption = caption_lab,subtitle = subtitle_txt) +
-    scale_fill_brewer(palette="Set1")
+    scale_fill_brewer(palette="Dark2")
 
   
 }
@@ -258,7 +258,7 @@ gg_volcano <- function(data_set,
     facet_wrap(~facet) +
     scale_y_continuous(limits = c(round(min(y_df),2), round(max(y_df),2)), breaks = seq(round(min(y_df),2), round(max(y_df),2), by = 1)) +
     scale_x_continuous(limits = c(min(x_df), max(x_df)),breaks = seq(min(x_df), max(x_df), by = 1)) +
-    scale_color_brewer(palette = "Set1") +
+    scale_color_brewer(palette = "Dark2") +
     #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
     theme_bw() +
     theme(legend.text = element_text(size = 15),
