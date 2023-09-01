@@ -279,13 +279,13 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
         kable_material(c("striped", "hover")) %>%
         kable_styling(bootstrap_options = "striped", full_width = F, position = "left", font_size = 12) %>%
         kable_minimal(full_width = F) %>%
-        footnote(general = "This table was created after elimination of multiple charges by selecting either phospho-sites of mouse or background sequences \n that has the highest abundace.",
+        footnote(general =  paste("This table was created after elimination of multiple charges by selecting either phospho-sites of", selected_spcies, "and", background_species, "sequences \n that has the highest abundace."),
                  # number = c("Footnote 1; ", "Footnote 2; "),
                  # alphabet = c("Footnote A; ", "Footnote B; "),
                  # symbol = c("Footnote Symbol 1; ", "Footnote Symbol 2")
                  footnote_as_chunk = T, title_format = c("italic", "underline")) %>%
         #as_image(width = 8) %>%
-        save_kable(paste0(file_path,"table1.png"))
+        save_kable(paste0(file_path,"/outputs_with_new_script/table1.png"))
     
     ## DENSITY PLOT OF BEFORE IMPUTATION 
     
@@ -742,62 +742,6 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
         
         ###############################################################################
         merge_stat_df_final <- merge_stat_df
-        ## Generation of df -> expected abundance ratio for volcano plot
-        actual_ratio_col <- merge_stat_df_final %>%
-            select(A1vs_Ai) %>% distinct() %>%
-            mutate(actual_ratio_val = case_when(grepl(comparisons[1],A1vs_Ai) ~actual_ratio[1],
-                                                grepl(comparisons[2],A1vs_Ai) ~actual_ratio[2],
-                                                grepl(comparisons[3],A1vs_Ai) ~actual_ratio[3],
-                                                grepl(comparisons[4],A1vs_Ai) ~actual_ratio[4]))
-        
-        p9<- ggplot(merge_stat_df, aes(x =log2(fold_change_values), y = -log10(merge_stat_df$pvalues))) +
-            geom_point(aes(color = new_col_coloring,shape=Pool_new), size = 2.5) +
-            #geom_line(aes(color = new_col_coloring), size = 1) +  # Add color aesthetic to geom_line()
-            scale_color_manual(values = c("ISO-REF" = "#000000",
-                                          "Unexpected_False Positive_A1/A2"="#999999",
-                                          "Unexpected_False Positive_A1/A3" ="#999999",
-                                          "Unexpected_False Positive_A1/A4"="#999999",
-                                          "Unexpected_False Positive_A1/A5"="#999999",
-                                          "Others_multi_A1/A2" = "#CC79A7",
-                                          "Others_mono_A1/A2" = "#CC79A7",
-                                          "Others_multi_A1/A3" = "#E69F00",
-                                          "Others_mono_A1/A3" = "#E69F00",
-                                          "Others_multi_A1/A4" = "#56B4E9",
-                                          "Others_mono_A1/A4" = "#56B4E9",
-                                          "Others_multi_A1/A5" = "#009E73",
-                                          "Others_mono_A1/A5" = "#009E73"),
-                               
-                               labels = c('Non-variant', 'Variant non-isomeric A1 vs A2',
-                                          'Variant non-isomeric A1 vs A3',
-                                          'Variant non-isomeric A1 vs A4',
-                                          'Variant non-isomeric A1 vs A5',
-                                          'Variant isomeric A1 vs A2',
-                                          'Variant isomeric A1 vs A3',
-                                          'Variant isomeric A1 vs A4',
-                                          'Variant isomeric A1 vs A5',
-                                          "Unexpected_False Positive_A1/A2",
-                                          "Unexpected_False Positive_A1/A3",
-                                          "Unexpected_False Positive_A1/A4",
-                                          "Unexpected_False Positive_A1/A5")) +
-            # scale_shape_manual(values = c(16, 15, 12, 17),
-            # labels = c('Non-variant', 'Variant isomeric', 'Variant non-isomeric', 'Unexpected')) +
-            scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df$fold_change_values))), to=(round(max(log2(merge_stat_df$fold_change_values)))+2),by=1)) +
-            scale_y_continuous(breaks = seq(from =round(min(-log10(as.numeric(merge_stat_df$pvalues)))), to=(round(max(-log10(as.numeric(merge_stat_df$pvalues))))+2),by=1)) +
-            #scale_y_continuous(limits = c(0, 8), breaks = seq(0, 8, by = 0.8)) +
-            #scale_x_continuous(limits = c(-3,3),breaks = seq(-3, 3, by = 0.8)) +
-            #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
-            theme_bw() +
-            theme(legend.text = element_text(size = 15),
-                  axis.title.x = element_text(size = 15),
-                  axis.title.y = element_text(size = 15),
-                  plot.title = element_text(size = 30),
-                  legend.title = element_text(size = 15),
-                  axis.text.x = element_text(size = 15),
-                  axis.title = element_text(size = 15),
-                  axis.text.y = element_text(size = 15)) +
-            labs(title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = "T-test was used") +
-            geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"),size=1) + 
-            geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=1)
         
         
     }else if(test_type=="limma"){
@@ -856,19 +800,53 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
             mutate(new_col_coloring = if_else(grepl("ISO-REF", new_col_coloring), "ISO-REF", new_col_coloring)) %>%
             mutate(new_col_coloring = if_else(grepl("unexpected", new_col_coloring), "unexpected", new_col_coloring))
         
-        
+    }else{
+        print("Statistical test could not be assessed. Check the input files!")
+    }
     
-        ## Generation of df -> expected abundance ratio for volcano plot
-        actual_ratio_col <- merge_stat_df_final %>%
-            select(A1vs_Ai) %>% distinct() %>%
-            mutate(actual_ratio_val = case_when(grepl(comparisons[1],A1vs_Ai) ~actual_ratio[1],
-                                                grepl(comparisons[2],A1vs_Ai) ~actual_ratio[2],
-                                                grepl(comparisons[3],A1vs_Ai) ~actual_ratio[3],
-                                                grepl(comparisons[4],A1vs_Ai) ~actual_ratio[4]))
-        #separate(accession, into = c("uniprot_id","species"),sep = "_")
-        p9 <- ggplot(merge_stat_df_final,aes(x =log2(fold_change_values), y = -log10(merge_stat_df_final$P.Value))) +
-            geom_point(aes(color = new_col_coloring,shape=Pool_new), size = 2.5) +
-            geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red") +
+    ## Generation of df -> expected abundance ratio for volcano plot
+    actual_ratio_col <- merge_stat_df_final %>%
+        select(A1vs_Ai) %>% distinct() %>%
+        mutate(actual_ratio_val = case_when(grepl(comparisons[1],A1vs_Ai) ~actual_ratio[1],
+                                            grepl(comparisons[2],A1vs_Ai) ~actual_ratio[2],
+                                            grepl(comparisons[3],A1vs_Ai) ~actual_ratio[3],
+                                            grepl(comparisons[4],A1vs_Ai) ~actual_ratio[4]))
+    
+    point_count_y_axis <- merge_stat_df_final %>%
+        group_by(A1vs_Ai, new_col_coloring) %>%
+        filter(P.Value < 0.05) %>% 
+        count(new_col_coloring) %>% left_join(actual_ratio_col)
+    
+    
+    ymax <- max(-log10(merge_stat_df_final$P.Value)) + 0.5
+    y_decrement <- 0.15
+    
+    calculate_y_pos <- function(group) {
+        group_length <- length(group)
+        y_pos <- ymax - seq(0, by = y_decrement, length.out = group_length)
+        return(y_pos)
+    }
+    
+    # Apply the function to calculate y_pos within each group
+    point_count_y_axis$y_pos <- unlist(by(point_count_y_axis$A1vs_Ai, point_count_y_axis$A1vs_Ai, calculate_y_pos))
+    
+    
+    p9 <- ggplot(merge_stat_df_final,aes(x =log2(merge_stat_df_final$fold_change_values), y = -log10(merge_stat_df_final$P.Value))) +
+        geom_point(aes(color = new_col_coloring,shape=Pool_new), size = 2.5) +
+        #geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red") +
+        scale_fill_manual(values = c("ISO-REF" = "#000000",
+                                     "Unexpected_False Positive_A1/A2"="#999999",
+                                     "Unexpected_False Positive_A1/A3" ="#999999",
+                                     "Unexpected_False Positive_A1/A4"="#999999",
+                                     "Unexpected_False Positive_A1/A5"="#999999",
+                                     "Others_multi_A1/A2" = "#CC79A7",
+                                     "Others_mono_A1/A2" = "#CC79A7",
+                                     "Others_multi_A1/A3" = "#E69F00",
+                                     "Others_mono_A1/A3" = "#E69F00",
+                                     "Others_multi_A1/A4" = "#56B4E9",
+                                     "Others_mono_A1/A4" = "#56B4E9",
+                                     "Others_multi_A1/A5" = "#009E73",
+                                     "Others_mono_A1/A5" = "#009E73")) + 
         #geom_line(aes(color = new_col_coloring), size = 1) +  # Add color aesthetic to geom_line()
         scale_color_manual(values = c("ISO-REF" = "#000000",
                                       "Unexpected_False Positive_A1/A2"="#999999",
@@ -892,34 +870,36 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                                       'Variant isomeric A1 vs A3',
                                       'Variant isomeric A1 vs A4',
                                       'Variant isomeric A1 vs A5',
-                                      "Unexpected_False Positive_A1/A2",
-                                      "Unexpected_False Positive_A1/A3",
-                                      "Unexpected_False Positive_A1/A4",
-                                      "Unexpected_False Positive_A1/A5")) +
-            # scale_shape_manual(values = c(16, 15, 12, 17),
-            # labels = c('Non-variant', 'Variant isomeric', 'Variant non-isomeric', 'Unexpected')) +
-            #scale_y_continuous(limits = c(0, max(-log10(merge_stat_df_final$adj.P.Val))), breaks = seq(0, max(-log10(merge_stat_df_final$adj.P.Val)), by = 0.8)) +
-            #scale_x_continuous(limits = c(min(log2(merge_stat_df_final$fold_change_values)),max(log2(merge_stat_df_final$fold_change_values)))) +#facet_wrap(~ratio) +
-            scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=1)) +
-            scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=1)) +
-            #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
-            theme_bw() +
-            theme(legend.text = element_text(size = 15),
-                  axis.title.x = element_text(size = 15),
-                  axis.title.y = element_text(size = 15),
-                  plot.title = element_text(size = 30),
-                  legend.title = element_text(size = 15),
-                  axis.text.x = element_text(size = 15),
-                  axis.title = element_text(size = 15),
-                  axis.text.y = element_text(size = 15)) +
-            labs(title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = "Limma was used \n",subtitle) +
-            geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"),size=1) + 
-            geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=1)
-        
-        
-    }else{
-        print("Statistical test could not be assessed. Check the input files!")
-    }
+                                      "Unexpected_False Positive A1/A2",
+                                      "Unexpected_False Positive A1/A3",
+                                      "Unexpected_False Positive A1/A4",
+                                      "Unexpected_False Positive A1/A5")) +
+        scale_shape_manual(values = c(16, 15, 12, 17),
+                           labels = c('Non-variant', 'Variant non-isomeric', 'Variant isomeric', 'Unexpected')) +
+        #scale_y_continuous(limits = c(0, max(-log10(merge_stat_df_final$adj.P.Val))), breaks = seq(0, max(-log10(merge_stat_df_final$adj.P.Val)), by = 0.8)) +
+        #scale_x_continuous(limits = c(min(log2(merge_stat_df_final$fold_change_values)),max(log2(merge_stat_df_final$fold_change_values)))) +#facet_wrap(~ratio) +
+        scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=1)) +
+        scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=1)) +
+        #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
+        theme_bw() +
+        theme(legend.text = element_text(size = 15),
+              axis.title.x = element_text(size = 15),
+              axis.title.y = element_text(size = 15),
+              plot.title = element_text(size = 30),
+              legend.title = element_text(size = 15),
+              axis.text.x = element_text(size = 15),
+              axis.title = element_text(size = 15),
+              axis.text.y = element_text(size = 15),
+              plot.subtitle = element_text(size = 15)) +
+        labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = "Limma was used \n",subtitle) +
+        geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"),size=1) +
+        geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=1) + 
+        geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos,fill=new_col_coloring, label = n),size=6, colour="white",show.legend = FALSE) 
+    
+    
+    
+    
+    
     
     #### ROC Analysis
     df_roc <- merge_stat_df_final %>%
