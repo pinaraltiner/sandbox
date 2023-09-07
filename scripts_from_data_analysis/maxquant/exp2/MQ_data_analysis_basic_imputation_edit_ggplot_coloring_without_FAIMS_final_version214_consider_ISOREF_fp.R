@@ -152,7 +152,31 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
         ungroup()
     
     
+    ####### ADDITIONAL PLOT TO DISPLAY MISSING and UNEXPECTED PEPTIDES ########
+    df_merge_syn <- barplt_df %>%
+      select(pep_with_pos,Experiment,Intensity, Proteins) %>% 
+      pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
+      full_join(pep_list_w_theo_quant_new,by="pep_with_pos") %>% 
+      mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
+      mutate(Pool= ifelse(is.na(Proteins),"missing",Pool)) %>%
+      select(pep_with_pos,starts_with(exp_design),Pool) %>%
+      mutate(soft_name=software_name, ion_mobility=acquisiton_type)
     
+    p11 <- gg_barplt_id_pep_count(data_set = df_merge_syn,
+                                  x_df = df_merge_syn$Pool,
+                                  fill_df = df_merge_syn$Pool,
+                                  ymax = 20000,
+                                  header = "Total number of quantified phospho-site across each sample",
+                                  caption_lab = "NA values are removed.",
+                                  x_lab = "Sample id",
+                                  fill_lab =  "Sample id",
+                                  y_lab = "Number of identified peptides",
+                                  subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
+    
+    write.table(df_merge_syn,file = paste0(file_path,"Count_of_missing_unexpected_correct_phospho-sites_",
+                                           software_name,"_Experiment",exp_id,".txt"),
+                sep = "\t",row.names = F)
+    #############################################################################
 ### COMPARED TO pd AND proline, MQ DOES NOT HAVE ANY QUERY THAT CONTAINS BACKGROUND SPECIES.
     ## THUS, WE FILTERED ECOLI DATA USING NOT SELECTING HUMAN AND CONTAMINANTS
     ## EXAMPLE ID WAS CONFRIMED ON UNIPROT = P0AAX3 -> YBIJ_ECOLI
@@ -176,7 +200,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                                  x_lab = "Sample id",
                                  fill_lab =  "Sample id",
                                  y_lab = "Number of identified peptides",
-                                 subtitle_txt = "")
+                                 subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
     
     
     p2 <- gg_barplt_id_pep_count(data_set = barplt_df_ecoli,
@@ -188,7 +212,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                                  x_lab = "Sample id",
                                  fill_lab =  "Sample id",
                                  y_lab = "Number of identified peptides",
-                                 subtitle_txt = "")
+                                 subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
     
     ## THIS RESHAPING IS ONLY FOR ELIMINATION OF MULTIPLE PHOSPHO-SITES and ECOLI PEPTIDES
     ## ELIMINATION STEP IS NOT NECESSARY FOR ECOLI, 1st STRATEGY can be used only (this will decrease lines of code)
@@ -731,7 +755,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
               axis.title = element_text(size = 15),
               axis.text.y = element_text(size = 15),
               plot.subtitle = element_text(size = 15)) +
-        labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = "Limma was used \n",subtitle) +
+        labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n", subtitle)) +
         geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"),size=1) +
         geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=1) + 
         geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos,fill=new_col_coloring, label = n),size=6, colour="white",show.legend = FALSE) 
@@ -767,14 +791,14 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     p10 <- roc_plot_df %>% group_by(Pool_type) %>% 
         ggplot( aes(y=as.numeric(sensitivity), x = as.numeric(specificity), color=Pool_type)) +
         geom_path(size=1.5) +  scale_x_reverse() + theme_bw() +
-        theme(legend.text = element_text(size = 15),
-              axis.title.x = element_text(size = 15),
-              axis.title.y = element_text(size = 15),
-              plot.title = element_text(size = 30),
-              legend.title = element_text(size = 15),
-              axis.text.x = element_text(size = 15),
-              axis.title = element_text(size = 15),
-              axis.text.y = element_text(size = 15)) +
+        theme(legend.text = element_text(size = 20),
+              axis.title.x = element_text(size = 20),
+              axis.title.y = element_text(size = 20),
+              plot.title = element_text(size = 25),
+              legend.title = element_text(size = 20),
+              axis.text.x = element_text(size = 20),
+              axis.title = element_text(size = 20),
+              axis.text.y = element_text(size = 20)) +
         scale_color_brewer(palette = "Dark2") +
         labs(y="True Positive Rate \n (Sensitivity)", x="False Positive Rate \n (Specificity)",
              title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), 
@@ -782,8 +806,8 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     
     write.table(roc_plot_df, file = paste0(file_path,"Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F) #acquisiton_type ## IT WAS TOO LONG-> GIVES AN ERROR
     
-    sapply(1:10,function(x) ggsave(filename = paste0("p",x,".tiff"),
-                                   width = 50, height = 40, 
+    sapply(1:11,function(x) ggsave(filename = paste0("p",x,".tiff"),
+                                   width = 50, height = 45, 
                                    path = paste0(file_path,"/outputs_with_new_script/"),
                                    units = "cm",
                                    get(paste0("p",x)),
