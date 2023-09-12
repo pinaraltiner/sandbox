@@ -202,6 +202,23 @@ final_pd_pep_quant_analysis <- function(file_path,
       slice(which.max(intensity)) %>% ## ELIMINATE MULTIPLE CHARGES
       ungroup()
   
+  barplt_phospho_seq <- filtered_abundances %>%  select(Sequence,Modifications, starts_with(exp_design),Marked.as) %>%
+    pivot_longer(cols = starts_with("E2"), 
+                 values_to = "intensity",
+                 names_to = "sample_ids",
+                 values_drop_na = T) %>%
+    separate(sample_ids, into = c("Exp_id","Sample_id", "Rep_id"), sep = "_",remove = F) %>%
+    mutate(sample_rep_id_seq = paste(Sequence, Sample_id,Rep_id, sep = "_")) %>%
+    group_by(sample_rep_id_seq,sample_ids) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
+    slice(which.max(intensity)) %>% ## ELIMINATE MULTIPLE CHARGES
+    ungroup() %>% mutate(Software_name=software_name) %>%
+    mutate(Acquisition_type=acquisiton_type)
+    
+  write.table(barplt_phospho_seq, file = paste0(file_path,"Number_of_human_phospho_sequences_",
+                                                software_name,"_Experiment",exp_id,".txt"),
+              sep = "\t",row.names = F)
+  
+  
   ####### ADDITIONAL PLOT TO DISPLAY MISSING and UNEXPECTED PEPTIDES ########
   df_merge_syn <- barplt_df %>%
     select(pep_with_pos,sample_ids,intensity, Marked.as) %>% 
@@ -211,6 +228,29 @@ final_pd_pep_quant_analysis <- function(file_path,
     mutate(Pool= ifelse(is.na(Marked.as),"missing",Pool)) %>%
     select(pep_with_pos,starts_with(exp_design),Pool) %>%
     mutate(soft_name=software_name,ion_mobility=acquisiton_type)
+  
+  ##############################################################################
+  ####### GATHERING ALL COLUMNS OF MAIN OUTPUT FROM PROLINE WITH THE CORRECT RESULTS ########
+  ### This is necessary only for Proline and PD additionally to compare 
+  ## the missing peptides with their scan number.
+  
+  merge_phospho_peptides <- quant_peptides %>% 
+    filter(grepl("Homo sapiens",Master.Protein.Descriptions) & 
+             grepl("Phospho",Modifications)) %>%
+    rowwise() %>%
+    mutate(results = list(extract_phospho_numbers(Modifications)),
+           phospho_pos = results[[1]],
+           phospho_score = results[[2]]) %>%
+    select(!results) %>%
+    mutate(pep_with_pos = paste0(Sequence,"_",phospho_pos))
+ 
+  df_merge_all_col <- merge_phospho_peptides %>% tibble() %>%
+    full_join(pep_list_w_theo_quant_new,by="pep_with_pos") %>%
+    mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
+    mutate(Pool= ifelse(is.na(Protein.Accessions),"missing",Pool)) %>%
+    #select(pep_with_pos,starts_with(exp_design),Pool) %>%
+    mutate(soft_name=software_name,ion_mobility=acquisiton_type)
+  
   
   p11 <- gg_barplt_id_pep_count(data_set = df_merge_syn,
                                 x_df = df_merge_syn$Pool,
@@ -223,7 +263,7 @@ final_pd_pep_quant_analysis <- function(file_path,
                                 y_lab = "Number of identified peptides",
                                 subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
   
-  write.table(df_merge_syn,file = paste0(file_path,"Count_of_missing_unexpected_correct_phospho-sites_",
+  write.table(df_merge_all_col,file = paste0(file_path,"Count_of_missing_unexpected_correct_phospho-sites_with_all_col_",
                                          software_name,"_Experiment",exp_id,".txt"),
               sep = "\t",row.names = F)
   #############################################################################
@@ -250,6 +290,20 @@ final_pd_pep_quant_analysis <- function(file_path,
                                fill_lab =  "Sample id",
                                y_lab = "Number of identified peptides",
                                subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name, subtitle))
+  
+  
+  
+  p12 <- gg_barplt_id_pep_count(data_set = barplt_phospho_seq,
+                               x_df = barplt_phospho_seq$Sample_id,
+                               fill_df = barplt_phospho_seq$Rep_id,
+                               ymax = 20000,
+                               header = "Total number of quantified phospho-sequence across each sample",
+                               caption_lab = "NA values and multiple sequences are removed.",
+                               x_lab = "Sample id",
+                               fill_lab =  "Sample id",
+                               y_lab = "Number of identified peptides",
+                               subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name, subtitle))
+  
   
   
   ## Since Multiple Charges were eliminated, number of rows are not the same as before applying pivot_longer()

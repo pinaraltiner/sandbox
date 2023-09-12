@@ -87,5 +87,58 @@ assign(paste0("p",i,"_",software_names[i]),
 }
     
 
+acquisiton_types2<- c("DDA Exploris no FAIMS@target decoy",
+                      "DDA Exploris with FAIMS@target decoy",
+                      "DDA TIMS-TOF@target decoy",
+                      "DDA Exploris no FAIMS@target decoy",
+                      "DDA Exploris no FAIMS@percolator",
+                      "DDA Exploris with FAIMS@target decoy",
+                      "DDA Exploris with FAIMS@percolator",
+                      "DDA Exploris no FAIMS@target decoy",
+                      "DDA Exploris with FAIMS@target decoy",
+                      "DDA TIMS-TOF@target decoy")
 
+all_results1 <- NULL
+for( i in 1:length(acquisiton_types2)){
+    assign(paste0(software_names[i],"_",acquisiton_types[i]), get(paste0(software_names[i],"_",acquisiton_types[i])) %>% mutate(new_col=acquisiton_types2[i]))
+    all_results1 <- bind_rows(all_results1,get(paste0(software_names[i],"_",acquisiton_types2[i])))
+}
 
+for (i in 1:3){
+    
+    all_results2 <- all_results %>% filter(grepl("Variant",Pool_type)) %>% 
+        #filter(grepl(acquisiton_types[i],new_col)) %>%
+        separate(new_col,into = c("instrument_mod","validation_mod"),sep = "@") %>%
+        mutate(soft_val_type=paste(Software_name,validation_mod,sep = "_")) %>%
+        filter(grepl(unique(instrument_mod)[i],instrument_mod))
+    
+    instrument_mod_tit <- unique(all_results2$instrument_mod)
+    
+    assign(paste0("p",i), ggplot(all_results2, aes(y=as.numeric(sensitivity), x = as.numeric(specificity), color=soft_val_type ,linetype=Software_name)) +
+               geom_path(size=1.5) +scale_x_reverse() + theme_bw() +
+               #scale_linetype_manual(values = c("solid" = "solid", "dashed" = "dashed")) +
+               theme(legend.text = element_text(size = 20),
+                     axis.title.x = element_text(size = 20),
+                     axis.title.y = element_text(size = 20),
+                     plot.title = element_text(size = 25),
+                     legend.title = element_text(size = 20),
+                     axis.text.x = element_text(size = 20),
+                     axis.title = element_text(size = 20),
+                     axis.text.y = element_text(size = 20)) +
+               scale_color_brewer(palette = "Dark2") +
+               labs(y="True Positive Rate \n (Sensitivity)", x="False Positive Rate \n (Specificity)",
+                    title =  paste("Experiment - ", 2, " data obtained from ", instrument_mod_tit), 
+                    subtitle = paste(subtitle), color="Software Names"))
+    
+    
+    
+    ggsave(filename = paste0("p",i,"_",instrument_mod_tit,".tiff"),
+           width = 50, height = 45, 
+           path = paste0("D:/dev/Pinar/PHD/wet_lab_experiments/DDA_data_analysis/experiment_2/roc_analysis"),
+           units = "cm",
+           get(paste0("p",i)),
+           device = "tiff", #".svg"
+    )
+    rm(all_results2,instrument_mod_tit)
+    
+}
