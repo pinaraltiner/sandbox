@@ -52,12 +52,34 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     }
     comparisons <- comparisons[-1]
     
+    
+    proline_phospho_pos_extraction <- function(df){
+      # Extraction of phospho positions from quant peptides object
+      phospho_ptm_pos <- lapply(df, function(each_ptm_protein_positions) {
+        
+        ptm_list <- as.list(strsplit(each_ptm_protein_positions,"; ", fixed=TRUE)[[1]]) # Split ptm_protein_position depending on ";"
+        ptm_list <- ptm_list[grepl("Phospho", ptm_list, fixed = TRUE)] # Extract only which contains "Phospho"
+        phospho_positions <- lapply(ptm_list, function(ptm) { 
+          #sub('Phospho \\(([A-Z]\\d+)\\)', "\\d+", ptm) #then, remove "Phospho" and remain only positions
+          as.character(str_extract(ptm, "\\d+"))
+          
+        })
+        
+        phospho_positions_as_str <- paste(phospho_positions, collapse="&") #combine each position with "|"
+        
+      })
+      # Data conversion 
+      phospho_ptm_pos_df <- t(as.data.frame(phospho_ptm_pos))
+      rownames(phospho_ptm_pos_df) <- 1:length(phospho_ptm_pos_df)
+      
+      return(phospho_ptm_pos_df)
+      
+    }
+    
     quant_peptides <- read.xlsx(paste0(file_path,file_name), sheet = sheet_name)
     
     pep_list_w_theo_quant <- read.xlsx(paste0(theo_file_path, theo_file_name), sheet = sheet_theo_name)
     pep_list_w_theo_quant <- pep_list_w_theo_quant[,-1]
-    
-    
     
     #rechecking_df <- exp2_noFAIMS_DDA_proline %>% filter(grepl("HUMAN",accession)) %>% filter(grepl("Phospho",modifications))
     #write.table(rechecking_df,file="exp2_no_faims_Proline_output_filtered_human_phospho.tsv",sep="\t",row.names = FALSE)
@@ -78,7 +100,34 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     
     quant_peptides_cor_abun <- quant_peptides %>% 
         rename_with(~exp_design,matches("^abundance"))
+#################################################  
+    ecoli_seq <- quant_peptides_cor_abun %>% 
+      select(sequence, modifications, accession) %>%
+      filter(grepl(background_species,accession)) %>%
+      distinct(sequence,.keep_all = T)
     
+    all_seq <- quant_peptides_cor_abun %>% 
+      select(sequence, modifications, accession) %>%
+      filter(grepl("Phospho",modifications) & grepl(selected_spcies,accession)) %>%
+      distinct(sequence, .keep_all = T) %>%
+      bind_rows(ecoli_seq) %>% 
+      separate(accession, into = c("protein","species"),sep="_") %>%
+      mutate(acq_type=acquisiton_type) %>%
+      mutate(soft_name=software_name)
+    
+    p13 <- gg_barplt_id_pep_count(data_set = all_seq,
+                           x_df = all_seq$species,
+                           fill_df = all_seq$species,
+                           ymax = 20000,
+                           header = paste("Total number of identified phosphorylated", selected_spcies,"and", background_species,"across each sample",sep=" "),
+                           caption_lab = "NA values are removed.",
+                           x_lab = "Sample id",
+                           fill_lab =  "Sample id",
+                           y_lab = "Number of identified peptides",
+                           subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
+
+    write.table(all_seq, file=paste0(file_path,"Experiment2",software_name,"_number_of_unique_sequence_for_each_species.txt"),sep = "\t",col.names = T,row.names = F)
+    #################################################
     quant_phospho_peptides <- quant_peptides_cor_abun %>% 
         filter(grepl(selected_spcies,accession)) %>% 
         filter(grepl("Phospho",modifications)) %>%
@@ -91,31 +140,18 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                starts_with(exp_design))
     
     quant_peptides_ECOLI <- quant_peptides_cor_abun %>% 
-        filter(grepl(background_species,accession)) %>% 
-        select(sequence,
-               modifications,
-               accession,
-               spectrum_title,
-               starts_with(exp_design))
+      filter(grepl(background_species,accession)) %>% 
+      select(sequence,
+             modifications,
+             accession,
+             spectrum_title,
+             starts_with(exp_design))
     
     # Extraction of phospho positions from quant peptides object
-    phospho_ptm_pos <- lapply(quant_phospho_peptides$ptm_protein_positions, function(each_ptm_protein_positions) {
-        
-        ptm_list <- as.list(strsplit(each_ptm_protein_positions,"; ", fixed=TRUE)[[1]]) # Split ptm_protein_position depending on ";"
-        ptm_list <- ptm_list[grepl("Phospho", ptm_list, fixed = TRUE)] # Extract only which contains "Phospho"
-        phospho_positions <- lapply(ptm_list, function(ptm) { 
-            #sub('Phospho \\(([A-Z]\\d+)\\)', "\\d+", ptm) #then, remove "Phospho" and remain only positions
-            as.character(str_extract(ptm, "\\d+"))
-            
-        })
-        
-        phospho_positions_as_str <- paste(phospho_positions, collapse="&") #combine each position with "|"
-        
-    })
+    phospho_ptm_pos <- proline_phospho_pos_extraction(quant_phospho_peptides$ptm_protein_positions)
     # Data conversion 
-    phospho_ptm_pos_df <- t(as.data.frame(phospho_ptm_pos))
-    rownames(phospho_ptm_pos_df) <- 1:length(phospho_ptm_pos_df)
-    
+    #phospho_ptm_pos_df <- t(as.data.frame(phospho_ptm_pos))
+    #rownames(phospho_ptm_pos_df) <- 1:length(phospho_ptm_pos_df)
     
     # Creation of common column merging peptide sequence and phospho positions -> experimental data
     common_col_exp_quant <- as.data.frame(paste(quant_phospho_peptides$sequence, phospho_ptm_pos_df, sep = "_"))
@@ -201,6 +237,29 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
       select(pep_with_pos,starts_with(exp_design),Pool) %>%
       mutate(soft_name=software_name,ion_mobility=acquisiton_type)
     
+    ##############################################################################
+    ####### GATHERING ALL COLUMNS OF MAIN OUTPUT FROM PROLINE WITH THE CORRECT RESULTS ########
+     ### This is necessary only for Proline and PD additionally to compare 
+      ## the missing peptides with their scan number.
+    
+    merge_phospho_peptides <- quant_peptides_cor_abun %>% 
+      filter(grepl(selected_spcies,accession)) %>% 
+      filter(grepl("Phospho",modifications)) 
+    
+    merge_phospho_pos <- proline_phospho_pos_extraction(merge_phospho_peptides[,"ptm_protein_positions"])
+    
+    pep_with_pos_merge <- cbind(merge_phospho_peptides, paste(merge_phospho_peptides$sequence,merge_phospho_pos,sep = "_"))
+    colnames(pep_with_pos_merge)[dim(pep_with_pos_merge)[2]] <- "pep_with_pos"
+    
+    df_merge_all_col <- pep_with_pos_merge %>% tibble() %>%
+      full_join(pep_list_w_theo_quant_new,by="pep_with_pos") %>%
+      mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
+      mutate(Pool= ifelse(is.na(accession),"missing",Pool)) %>%
+      #select(pep_with_pos,starts_with(exp_design),Pool) %>%
+      mutate(soft_name=software_name,ion_mobility=acquisiton_type)
+    
+    ################################################################################ 
+    
     p11 <- gg_barplt_id_pep_count(data_set = df_merge_syn,
                                   x_df = df_merge_syn$Pool,
                                   fill_df = df_merge_syn$Pool,
@@ -212,7 +271,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                                   y_lab = "Number of identified peptides",
                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
     
-    write.table(df_merge_syn,file = paste0(file_path,"Count_of_missing_unexpected_correct_phospho-sites_",
+    write.table(df_merge_all_col,file = paste0(file_path,"Count_of_missing_unexpected_correct_phospho-sites_with_all_col_",
                                            software_name,"_Experiment",exp_id,".txt"),
                 sep = "\t",row.names = F)
     #############################################################################
@@ -230,6 +289,24 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
         group_by(sample_rep_id_seq,sample_ids) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
         slice(which.max(intensity)) %>%
         ungroup()
+    
+    
+    barplt_phospho_seq <- filtered_abundances %>%   
+      select(sequence,modifications, sequence, starts_with(exp_design),accession) %>%
+      pivot_longer(cols = starts_with("E2"), 
+                   values_to = "intensity",
+                   names_to = "sample_ids",
+                   values_drop_na = T) %>%
+      separate(sample_ids, into = c("Exp_id","Sample_id", "Rep_id"), sep = "_",remove = F) %>%
+      mutate(sample_rep_id_seq = paste(sequence, Sample_id,Rep_id, sep = "@")) %>%
+      group_by(sample_rep_id_seq,sample_ids) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
+      slice(which.max(intensity)) %>%
+      ungroup() %>% mutate(Software_name=software_name) %>%
+      mutate(Acquisition_type=acquisiton_type)
+    
+    write.table(barplt_phospho_seq, file = paste0(file_path,"Number_of_human_phospho_sequences_",
+                                                  software_name,"_Experiment",exp_id,".txt"),
+                sep = "\t",row.names = F)
     
     #colnames(abundances_for_impute) <- experiment_name
     
@@ -280,6 +357,18 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                                  fill_lab =  "Sample id",
                                  y_lab = "Number of identified peptides",
                                  subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
+    
+    p12 <- gg_barplt_id_pep_count(data_set = barplt_phospho_seq,
+                                  x_df = barplt_phospho_seq$Sample_id,
+                                  fill_df = barplt_phospho_seq$Rep_id,
+                                  ymax = 20000,
+                                  header = "Total number of quantified phospho-sequence across each sample",
+                                  caption_lab = "NA values and multiple sequences are removed.",
+                                  x_lab = "Sample id",
+                                  fill_lab =  "Sample id",
+                                  y_lab = "Number of identified peptides",
+                                  subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
+    
     
     ## THIS RESHAPING IS ONLY FOR ELIMINATION OF MULTIPLE PHOSPHO-SITES and ECOLI PEPTIDES
     ## ELIMINATION STEP IS NOT NECESSARY FOR ECOLI, 1st STRATEGY can be used only (this will decrease lines of code)
@@ -973,7 +1062,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     
     write.table(roc_plot_df, file = paste0(file_path,"Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F) #acquisiton_type ## IT WAS TOO LONG-> GIVES AN ERROR
     
-    sapply(1:11,function(x) ggsave(filename = paste0("p",x,".tiff"),
+    sapply(1:13,function(x) ggsave(filename = paste0("p",x,".tiff"),
                                    width = 50, height = 45, 
                                    path = paste0(file_path,"/outputs_with_new_script/"),
                                    units = "cm",
