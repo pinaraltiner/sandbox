@@ -81,6 +81,35 @@ final_pd_pep_quant_analysis <- function(file_path,
   
   setwd(file_path)
   quant_peptides <- read.table(file_name, sep = "\t", header = T)
+  #################################################
+  ecoli_seq <- quant_peptides %>% 
+    select(Sequence, Modifications, Master.Protein.Descriptions) %>%
+    filter(grepl(background_species,Master.Protein.Descriptions)) %>%
+    distinct(Sequence,.keep_all = T) %>% mutate(species=background_species) 
+  
+  all_seq <- quant_peptides %>% 
+    select(Sequence, Modifications, Master.Protein.Descriptions) %>%
+    filter(grepl("Homo sapiens",Master.Protein.Descriptions) & 
+             grepl("Phospho",Modifications)) %>%
+    distinct(Sequence, .keep_all = T) %>%
+    mutate(species=selected_spcies) %>%
+    bind_rows(ecoli_seq) %>% 
+    mutate(acq_type=acquisiton_type) %>%
+    mutate(soft_name=software_name)
+  
+  p13 <- gg_barplt_id_pep_count(data_set = all_seq,
+                                x_df = all_seq$species,
+                                fill_df = all_seq$species,
+                                ymax = 20000,
+                                header = paste("Total number of identified phosphorylated", selected_spcies,"and", background_species,"across each sample",sep=" "),
+                                caption_lab = "NA values are removed.",
+                                x_lab = "Sample id",
+                                fill_lab =  "Sample id",
+                                y_lab = "Number of identified peptides",
+                                subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
+  
+  write.table(all_seq, file=paste0(file_path,"Experiment2",software_name,"_number_of_unique_sequence_for_each_species.txt"),sep = "\t",col.names = T,row.names = F)
+  #################################################
   
   pep_list_w_theo_quant <- read.xlsx(paste0(theo_file_path, theo_file_name), sheet = sheet_theo_name)
   pep_list_w_theo_quant <- pep_list_w_theo_quant[,-1]
@@ -119,7 +148,7 @@ final_pd_pep_quant_analysis <- function(file_path,
   #quant_phospho_peptides$Marked.as <-"HUMAN"
   
   quant_peptides_ECOLI <- quant_peptides %>%
-      filter(grepl("Escherichia coli",Master.Protein.Descriptions)) %>%
+      filter(grepl(background_species,Master.Protein.Descriptions)) %>%
       #!grepl("positions not distinguishable", Modification.Pattern)) 
       select(Sequence,
              Modifications,Number.of.PSMs,
