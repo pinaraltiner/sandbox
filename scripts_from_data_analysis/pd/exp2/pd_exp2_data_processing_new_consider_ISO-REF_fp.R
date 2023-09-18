@@ -81,11 +81,26 @@ final_pd_pep_quant_analysis <- function(file_path,
   
   setwd(file_path)
   quant_peptides <- read.table(file_name, sep = "\t", header = T)
+  
+  
+  pep_list_w_theo <- read.xlsx(paste0(theo_file_path, theo_file_name), sheet = sheet_theo_name)
+  pep_list_w_theo_quant <- pep_list_w_theo[,-1]
+  
+  common_col_theo_quant <- as.data.frame(paste(pep_list_w_theo_quant$Phosphopeptide.sequence,
+                                               pep_list_w_theo_quant$modified.position.in.peptide, sep = "_"))
+  colnames(common_col_theo_quant) <- "pep_with_pos"
+  pep_list_w_theo_quant_new <- cbind(common_col_theo_quant,pep_list_w_theo_quant)
+  
   #################################################
+  pep_list_w_theo_unique <- pep_list_w_theo %>% 
+    distinct(Phospopeptide.sequence,.keep_all = TRUE) %>%
+    rename(Sequence = Phospopeptide.sequence)
+  
   ecoli_seq <- quant_peptides %>% 
     select(Sequence, Modifications, Master.Protein.Descriptions) %>%
     filter(grepl(background_species,Master.Protein.Descriptions)) %>%
-    distinct(Sequence,.keep_all = T) %>% mutate(species=background_species) 
+    distinct(Sequence,.keep_all = T) %>%
+    mutate(species=background_species) 
   
   all_seq <- quant_peptides %>% 
     select(Sequence, Modifications, Master.Protein.Descriptions) %>%
@@ -93,13 +108,17 @@ final_pd_pep_quant_analysis <- function(file_path,
              grepl("Phospho",Modifications)) %>%
     distinct(Sequence, .keep_all = T) %>%
     mutate(species=selected_spcies) %>%
+    full_join(pep_list_w_theo_unique,by="Sequence") %>%
+    mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
+    mutate(Pool= ifelse(is.na(species),"missing",Pool)) %>%
     bind_rows(ecoli_seq) %>% 
+    mutate(Pool= ifelse(is.na(Pool),background_species,Pool)) %>%
     mutate(acq_type=acquisiton_type) %>%
     mutate(soft_name=software_name)
   
   p13 <- gg_barplt_id_pep_count(data_set = all_seq,
-                                x_df = all_seq$species,
-                                fill_df = all_seq$species,
+                                x_df = all_seq$Pool,
+                                fill_df = all_seq$Pool,
                                 ymax = 20000,
                                 header = paste("Total number of identified phosphorylated", selected_spcies,"and", background_species,"across each sample",sep=" "),
                                 caption_lab = "NA values are removed.",
@@ -110,15 +129,6 @@ final_pd_pep_quant_analysis <- function(file_path,
   
   write.table(all_seq, file=paste0(file_path,"Experiment2",software_name,"_number_of_unique_sequence_for_each_species.txt"),sep = "\t",col.names = T,row.names = F)
   #################################################
-  
-  pep_list_w_theo_quant <- read.xlsx(paste0(theo_file_path, theo_file_name), sheet = sheet_theo_name)
-  pep_list_w_theo_quant <- pep_list_w_theo_quant[,-1]
-  
-  common_col_theo_quant <- as.data.frame(paste(pep_list_w_theo_quant$Phosphopeptide.sequence,
-                                               pep_list_w_theo_quant$modified.position.in.peptide, sep = "_"))
-  colnames(common_col_theo_quant) <- "pep_with_pos"
-  pep_list_w_theo_quant_new <- cbind(common_col_theo_quant,pep_list_w_theo_quant)
-  
   
   abundances_for_impute <- quant_peptides %>% 
       select(starts_with("Abundances.Normalized")) %>% #### BEFORE RENAME IT BE SURED THAT COLUMNS ARE THE SAME ORDER AS EXP_DESIGN
@@ -294,6 +304,10 @@ final_pd_pep_quant_analysis <- function(file_path,
   
   write.table(df_merge_all_col,file = paste0(file_path,"Count_of_missing_unexpected_correct_phospho-sites_with_all_col_",
                                          software_name,"_Experiment",exp_id,".txt"),
+              sep = "\t",row.names = F)
+   
+  write.table(df_merge_syn,file = paste0(file_path,"Count_of_missing_unexpected_correct_phospho-sites_",
+                                             software_name,"_Experiment",exp_id,".txt"),
               sep = "\t",row.names = F)
   #############################################################################
   
@@ -582,7 +596,7 @@ final_pd_pep_quant_analysis <- function(file_path,
                             x_df = df_FC_ratio_after_impt$exp_FC,
                             y_df = df_FC_ratio_after_impt$values,
                             fill_df = df_FC_ratio_after_impt$Pool,
-                            header="Experimental Quantity Ratio of T-cell Phospho Peptides",
+                            header="Experimental Quantity Ratio of Phospho Peptides",
                             x_lab="Sample Names",
                             y_lab="Abundance Ratios",
                             fill_lab = "Sample Names",
@@ -596,7 +610,7 @@ final_pd_pep_quant_analysis <- function(file_path,
                                  x_df = df_FC_ratio_after_impt$exp_FC,
                                  y_df = df_FC_ratio_after_impt$values,
                                  fill_df = df_FC_ratio_after_impt$Pool,
-                                 header="Experimental Quantity Ratio of T-cell Phospho Peptides with Background",
+                                 header="Experimental Quantity Ratio of Phospho Peptides with Background",
                                  x_lab="Sample Names",
                                  y_lab="Abundance Ratios",
                                  fill_lab = "Sample Names",
@@ -609,7 +623,7 @@ final_pd_pep_quant_analysis <- function(file_path,
                             x_df = df_FC_ratio_after_impt$exp_FC,
                             y_df = df_FC_ratio_after_impt$values,
                             fill_df = df_FC_ratio_after_impt$Pool,
-                            header="Experimental Quantity Ratio of T-cell Phospho Peptides with Background",
+                            header="Experimental Quantity Ratio of Phospho Peptides with Background",
                             x_lab="Sample Names",
                             y_lab="Abundance Ratios",
                             fill_lab = "Sample Names",
@@ -889,12 +903,44 @@ final_pd_pep_quant_analysis <- function(file_path,
       geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=1) + 
       geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos,fill=new_col_coloring, label = n),size=6, colour="white",show.legend = FALSE) 
   
-  #### ROC Analysis
+  
+  merge_stat_df_final_text <- merge_stat_df_final %>% mutate(soft_name=paste0(software_name)) %>% mutate(acq_type=paste0(acquisiton_type))
+  
+  write.table(merge_stat_df_final_text,file = paste0(file_path,"volcano_plot_",software_name,"_",acquisiton_type,".txt"),sep = 
+                "\t",col.names = T,row.names = F)
+  
+  
   df_roc <- merge_stat_df_final %>%
-      select(pep_with_pos, Pool,P.Value)
+    select(pep_with_pos, Pool,P.Value)
+  #filter(!grepl("Unexpected",Pool))
+  
+  ### ROC analysis custom func
+  df_roc <- df_roc[order(df_roc$P.Value),]
+  
+  df_roc_func <- compute_roc_curve(df=df_roc, flag = "Others",expected = (4*144))
+  
+  p14 <- ggplot(df_roc_func, aes(y=as.numeric(tpr), x = as.numeric(fdp))) +
+    geom_path(size=1.5) +  #scale_x_reverse() + 
+    theme_bw() +
+    theme(legend.text = element_text(size = 20),
+          axis.title.x = element_text(size = 20),
+          axis.title.y = element_text(size = 20),
+          plot.title = element_text(size = 25),
+          legend.title = element_text(size = 20),
+          axis.text.x = element_text(size = 20),
+          axis.title = element_text(size = 20),
+          axis.text.y = element_text(size = 20)) +
+    scale_color_brewer(palette = "Dark2") +
+    labs(y="True Positive Rate \n (Sensitivity)", x="False Positive Rate \n (Specificity)",
+         title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), 
+         subtitle = paste(subtitle,"including unexpected"), color="Pool Type")
+  
+  write.table(df_roc_func, file = paste0(file_path,"outputs_with_new_script/custom_Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
 
+  #### ROC Analysis using pROC 
+  
   df_roc$variant <- ifelse(df_roc$Pool == "Others", TRUE, FALSE)
-  df_roc$non_var <- ifelse(df_roc$Pool == "ISO-REF", TRUE, FALSE)
+  #df_roc$non_var <- ifelse(df_roc$Pool == "ISO-REF", TRUE, FALSE)
   
   library(pROC)
   # Calculate ROC curve for raw p-values
@@ -904,18 +950,18 @@ final_pd_pep_quant_analysis <- function(file_path,
                                 "Variant Pool")
 
   
-  roc_raw_non_var <- roc(df_roc$non_var, df_roc$P.Value)
-  tpr_and_fpr_non_var  <- cbind(roc_raw_non_var$sensitivities,
-                                roc_raw_non_var$specificities,
-                                "Non-variant Pool")
+  #roc_raw_non_var <- roc(df_roc$non_var, df_roc$P.Value)
+  #tpr_and_fpr_non_var  <- cbind(roc_raw_non_var$sensitivities,
+                                #roc_raw_non_var$specificities,
+                                #"Non-variant Pool")
   
   roc_plot_df <- as.data.frame(tpr_and_fpr_variant) %>% 
-      bind_rows(as.data.frame(tpr_and_fpr_non_var)) %>% bind_cols(software_name)
+      #bind_rows(as.data.frame(tpr_and_fpr_non_var)) 
+    bind_cols(software_name)
   
-  colnames(roc_plot_df) <-    c("sensitivity", "specificity","Pool_type","Software_name")
+  colnames(roc_plot_df) <- c("sensitivity", "specificity","Pool_type","Software_name")
   
-  
-  p10 <- roc_plot_df %>% group_by(Pool_type) %>% 
+  p10 <- roc_plot_df %>% #group_by(Pool_type) %>% 
       ggplot( aes(y=as.numeric(sensitivity), x = as.numeric(specificity), color=Pool_type)) +
       geom_path(size=1.5) +  scale_x_reverse() + theme_bw() +
       theme(legend.text = element_text(size = 20),
@@ -931,9 +977,9 @@ final_pd_pep_quant_analysis <- function(file_path,
            title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), 
            subtitle = paste(subtitle), color="Pool Type")
       
-  write.table(roc_plot_df, file = paste0(file_path,"Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
+  write.table(roc_plot_df, file = paste0(file_path,"outputs_with_new_script/pRoc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
   
-  sapply(1:11,function(x) ggsave(filename = paste0("p",x,".tiff"),
+  sapply(1:14,function(x) ggsave(filename = paste0("p",x,".tiff"),
                                 width = 50, height = 45, 
                                 path = paste0(file_path,"/outputs_with_new_script/"),
                                 units = "cm",
