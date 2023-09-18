@@ -7,7 +7,7 @@ library(tidyr)
 library(ggplot2)
 ###############################################
 source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/ggplot/ggplot_functions.R")
-#source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/roc_curve/roc_curve_generation_proline_edit.R")
+source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/roc_curve/roc_curve_generation_proline_edit.R")
 # Experiment 2
  #file_path <- "D:/dev/Pinar/PHD/wet_lab_experiments/DDA_data_analysis/experiment_2/Proline_data_analysis/exp2_re_injection/"
  #file_name <- "PAL _Phosphopeptides exp2 ( 5 conc 3reps) DDA_230117 with Design_2023-06-07_1003.xlsx"
@@ -78,8 +78,8 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     
     quant_peptides <- read.xlsx(paste0(file_path,file_name), sheet = sheet_name)
     
-    pep_list_w_theo_quant <- read.xlsx(paste0(theo_file_path, theo_file_name), sheet = sheet_theo_name)
-    pep_list_w_theo_quant <- pep_list_w_theo_quant[,-1]
+    pep_list_w_theo <- read.xlsx(paste0(theo_file_path, theo_file_name), sheet = sheet_theo_name)
+    pep_list_w_theo_quant <- pep_list_w_theo[,-1]
     
     #rechecking_df <- exp2_noFAIMS_DDA_proline %>% filter(grepl("HUMAN",accession)) %>% filter(grepl("Phospho",modifications))
     #write.table(rechecking_df,file="exp2_no_faims_Proline_output_filtered_human_phospho.tsv",sep="\t",row.names = FALSE)
@@ -100,24 +100,34 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     
     quant_peptides_cor_abun <- quant_peptides %>% 
         rename_with(~exp_design,matches("^abundance"))
+    
 #################################################  
+    pep_list_w_theo_unique <- pep_list_w_theo %>% 
+      distinct(Phospopeptide.sequence,.keep_all = TRUE) %>%
+      rename(sequence = Phospopeptide.sequence)
+    
     ecoli_seq <- quant_peptides_cor_abun %>% 
       select(sequence, modifications, accession) %>%
       filter(grepl(background_species,accession)) %>%
-      distinct(sequence,.keep_all = T)
+      distinct(sequence,.keep_all = T) %>%
+      mutate(species=background_species) 
     
     all_seq <- quant_peptides_cor_abun %>% 
       select(sequence, modifications, accession) %>%
       filter(grepl("Phospho",modifications) & grepl(selected_spcies,accession)) %>%
       distinct(sequence, .keep_all = T) %>%
-      bind_rows(ecoli_seq) %>% 
       separate(accession, into = c("protein","species"),sep="_") %>%
+      full_join(pep_list_w_theo_unique,by="sequence") %>%
+      mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
+      mutate(Pool= ifelse(is.na(species),"missing",Pool)) %>%
+      bind_rows(ecoli_seq) %>% 
+      mutate(Pool= ifelse(is.na(Pool),background_species,Pool)) %>%
       mutate(acq_type=acquisiton_type) %>%
       mutate(soft_name=software_name)
     
     p13 <- gg_barplt_id_pep_count(data_set = all_seq,
-                           x_df = all_seq$species,
-                           fill_df = all_seq$species,
+                           x_df = all_seq$Pool,
+                           fill_df = all_seq$Pool,
                            ymax = 20000,
                            header = paste("Total number of identified phosphorylated", selected_spcies,"and", background_species,"across each sample",sep=" "),
                            caption_lab = "NA values are removed.",
@@ -148,13 +158,13 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
              starts_with(exp_design))
     
     # Extraction of phospho positions from quant peptides object
-    phospho_ptm_pos <- proline_phospho_pos_extraction(quant_phospho_peptides$ptm_protein_positions)
+    phospho_ptm_pos <- proline_phospho_pos_extraction(quant_phospho_peptides$modifications)
     # Data conversion 
     #phospho_ptm_pos_df <- t(as.data.frame(phospho_ptm_pos))
     #rownames(phospho_ptm_pos_df) <- 1:length(phospho_ptm_pos_df)
     
     # Creation of common column merging peptide sequence and phospho positions -> experimental data
-    common_col_exp_quant <- as.data.frame(paste(quant_phospho_peptides$sequence, phospho_ptm_pos_df, sep = "_"))
+    common_col_exp_quant <- as.data.frame(paste(quant_phospho_peptides$sequence, phospho_ptm_pos, sep = "_"))
     colnames(common_col_exp_quant) <- "pep_with_pos"
     
     # Bind it to the quant data
@@ -252,11 +262,13 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     colnames(pep_with_pos_merge)[dim(pep_with_pos_merge)[2]] <- "pep_with_pos"
     
     df_merge_all_col <- pep_with_pos_merge %>% tibble() %>%
+      distinct(pep_with_pos,.keep_all = T) %>%
       full_join(pep_list_w_theo_quant_new,by="pep_with_pos") %>%
       mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
       mutate(Pool= ifelse(is.na(accession),"missing",Pool)) %>%
-      #select(pep_with_pos,starts_with(exp_design),Pool) %>%
-      mutate(soft_name=software_name,ion_mobility=acquisiton_type)
+      select(pep_with_pos,starts_with(exp_design),Pool) %>%
+      mutate(soft_name=software_name,ion_mobility=acquisiton_type) 
+      
     
     ################################################################################ 
     
@@ -272,7 +284,11 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
     
     write.table(df_merge_all_col,file = paste0(file_path,"Count_of_missing_unexpected_correct_phospho-sites_with_all_col_",
-                                           software_name,"_Experiment",exp_id,".txt"),
+                                               software_name,"_Experiment",exp_id,".txt"),
+                sep = "\t",row.names = F)
+    
+    write.table(df_merge_syn,file = paste0(file_path,"Count_of_missing_unexpected_correct_phospho-sites_",
+                                               software_name,"_Experiment",exp_id,".txt"),
                 sep = "\t",row.names = F)
     #############################################################################
     
@@ -625,7 +641,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                               x_df = df_FC_ratio_after_impt$exp_FC,
                               y_df = df_FC_ratio_after_impt$values,
                               fill_df = df_FC_ratio_after_impt$Pool,
-                              header="Experimental Quantity Ratio of T-cell Phospho Peptides",
+                              header="Experimental Quantity Ratio of Phospho Peptides",
                               x_lab="Sample Names",
                               y_lab="Abundance Ratios",
                               fill_lab = "Sample Names",
@@ -639,7 +655,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                                    x_df = df_FC_ratio_after_impt$exp_FC,
                                    y_df = df_FC_ratio_after_impt$values,
                                    fill_df = df_FC_ratio_after_impt$Pool,
-                                   header="Experimental Quantity Ratio of T-cell Phospho Peptides with Background",
+                                   header="Experimental Quantity Ratio of Phospho Peptides with Background",
                                    x_lab="Sample Names",
                                    y_lab="Abundance Ratios",
                                    fill_lab = "Sample Names",
@@ -652,7 +668,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                               x_df = df_FC_ratio_after_impt$exp_FC,
                               y_df = df_FC_ratio_after_impt$values,
                               fill_df = df_FC_ratio_after_impt$Pool,
-                              header="Experimental Quantity Ratio of T-cell Phospho Peptides with Background",
+                              header="Experimental Quantity Ratio of Phospho Peptides with Background",
                               x_lab="Sample Names",
                               y_lab="Abundance Ratios",
                               fill_lab = "Sample Names",
@@ -1014,14 +1030,36 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
         geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos,fill=new_col_coloring, label = n),size=6, colour="white",show.legend = FALSE) 
     
     
+    write.table(merge_stat_df_final,file = "volcano_plot_",software_name,"_",acquisiton_type,".txt",sep = 
+            "\t",col.names = T,row.names = F)
     
-    
-    
-    
-    #### ROC Analysis
     df_roc <- merge_stat_df_final %>%
-        select(pep_with_pos, Pool,P.Value)
+      select(pep_with_pos, Pool,P.Value) %>%
+      #filter(!grepl("Unexpected",Pool))
     
+    ### ROC analysis custom func
+    df_roc <- df_roc[order(df_roc$P.Value),]
+    
+    df_roc_func <- compute_roc_curve(df=df_roc, flag = "Others",expected = (4*144))
+    
+    p14 <- ggplot(df_roc_func, aes(y=as.numeric(tpr), x = as.numeric(fdp))) +
+      geom_path(size=1.5) +  #scale_x_reverse() + 
+      theme_bw() +
+      theme(legend.text = element_text(size = 20),
+            axis.title.x = element_text(size = 20),
+            axis.title.y = element_text(size = 20),
+            plot.title = element_text(size = 25),
+            legend.title = element_text(size = 20),
+            axis.text.x = element_text(size = 20),
+            axis.title = element_text(size = 20),
+            axis.text.y = element_text(size = 20)) +
+      scale_color_brewer(palette = "Dark2") +
+      labs(y="True Positive Rate \n (Sensitivity)", x="False Positive Rate \n (Specificity)",
+           title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), 
+           subtitle = paste(subtitle,"including unexpected"), color="Pool Type")
+    
+    
+    #### ROC Analysis using pROC 
     df_roc$variant <- ifelse(df_roc$Pool == "Others", TRUE, FALSE)
     df_roc$non_var <- ifelse(df_roc$Pool == "ISO-REF", TRUE, FALSE)
     
@@ -1062,7 +1100,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     
     write.table(roc_plot_df, file = paste0(file_path,"Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F) #acquisiton_type ## IT WAS TOO LONG-> GIVES AN ERROR
     
-    sapply(1:13,function(x) ggsave(filename = paste0("p",x,".tiff"),
+    sapply(1:14,function(x) ggsave(filename = paste0("p",x,".tiff"),
                                    width = 50, height = 45, 
                                    path = paste0(file_path,"/outputs_with_new_script/"),
                                    units = "cm",
