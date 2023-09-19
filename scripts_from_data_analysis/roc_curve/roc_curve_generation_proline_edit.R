@@ -12,19 +12,20 @@
 
 compute_roc_curve = function(df, flag, expected) {
   data <- df %>% 
-    arrange_at(vars(starts_with("p_val"))) %>%
-    rename(pvalue = starts_with("p_val")) %>%
+    rename(pvalue=contains("Value")) %>%
+    #arrange_at(vars(starts_with("p_val"))) %>%
+    #rename(pvalue = starts_with("p_val")) %>%
     rename(flag=contains("Pool")) %>% drop_na(flag)
   result = data.frame(fdp=double(nrow(data)-1),tpr=double(nrow(data)-1),pvalue = double(nrow(data)-1), stringsAsFactors = F)
   
   
   tp = nrow(data[data$flag == flag,])
-  fp = nrow(data[data$flag == "ISO-REF",])
+  fp = nrow(data[data$flag != flag,])
   for (k in nrow(data):2) {
     if (data$flag[k] == flag) {
       tp = tp - 1
       #print(tp)
-    } else if (data$flag[k] == "ISO-REF") {
+    } else if (data$flag[k] != flag) {
       fp = fp - 1
       #print(fp)
     }

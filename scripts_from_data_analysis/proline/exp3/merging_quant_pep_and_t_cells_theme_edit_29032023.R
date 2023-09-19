@@ -519,7 +519,7 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
     # }else{
     #   
     # }
-    t.test(x, y,alternative = c("two.sided"))$p.value
+    t.test(x, y,var.equal=TRUE,alternative = c("two.sided"))$p.value
   }
   
   wilcox_func <- function(x, y) {
@@ -535,43 +535,78 @@ final_proline_pep_quant_analysis_bio <- function(file_path,
     select(pep_with_pos,accession, starts_with("log10_") | starts_with("mean_log10_") | starts_with("exp_FC")) #spectrum_title
   
   rownames(stat_analysis) <- paste0(stat_analysis$common_col_for_merging,"@",stat_analysis$Pool,"@",(1:nrow(stat_analysis))) #stat_analysis$spectrum_title,"@"
-  if(test_type== "t.test" | test_type== "wilcoxon"){
-    all_pvalues <- NULL
-    all_adjust_pval <- NULL
-    for (i in 2:sample_size){
-      p_values_tmp <- NULL
-      
-      for(j in 1:dim(stat_analysis)[1]){
+  # if(test_type== "t.test" | test_type== "wilcoxon"){
+  #     library(multtest)
+  #   all_pvalues <- NULL
+  #   all_adjust_pval <- NULL
+    # for (i in 2:sample_size){
+    #   p_values_tmp <- NULL
+    #   
+    #   for(j in 1:dim(stat_analysis)[1]){
+    #     
+    #     if(test_type=="t.test"){
+    #       p_values_tmp[j] <- ttest_func(select(stat_analysis,contains("A1_") & contains("log10_"))[j,],     ### FOR DIFFERENT KIND OF EXP SETUP, 
+    #                                     select(stat_analysis,contains(paste0("A",i,"_")) & contains("log10_"))[j,] ) ## It should be defined as an input.
+    #       
+    #     }else if(test_type=="wilcoxon"){
+    #       p_values_tmp[j] <- wilcox.test(select(stat_analysis,contains("A1_") & contains("log10_"))[j,],     ### FOR DIFFERENT KIND OF EXP SETUP, 
+    #                                      select(stat_analysis,contains(paste0("A",i,"_")) & contains("log10_"))[j,])
+    #       ## It should be defined as an input.
+    #     }
+    #     
+    #   }
+    #   p_values_tmp <- as.data.frame(p_values_tmp)
+    #   colnames(p_values_tmp) <- paste0("pvalues_A1","/","A",i)
+    #   all_pvalues <- bind_cols(all_pvalues,p_values_tmp)
+    #   rownames(all_pvalues) <- row.names(stat_analysis)
+    #   rm(p_values_tmp)
+    #   
+    #   #### p-value adjust at a given FDR ####
+    #   #procs<-c("Bonferroni","Holm","Hochberg","SidakSS","SidakSD","BH","BY","ABH","TSBH")
+    #   adjust_pval_tmp <-  mt.rawp2adjp(all_pvalues[,paste0("pvalues_A1","/","A",i)],
+    #                                    proc="BH", alpha=0.05)
+    #   qval <- data.frame(adjust_pval_tmp$adjp,adjust_pval_tmp$index)[order(adjust_pval_tmp$index),2]
+    #   qval <- as.data.frame(qval)
+    #   colnames(qval) <- paste0("adjust_pval_A1","/","A",i)
+    #   all_adjust_pval <- bind_cols(all_adjust_pval,qval)
+    #   rownames(all_adjust_pval) <- row.names(stat_analysis)
+    #   rm(adjust_pval_tmp,qval)
+    #   
+    # }
+    if (test_type == "t.test" || test_type == "wilcoxon") {
+        all_pvalues <- matrix(NA, nrow = nrow(stat_analysis), ncol = sample_size - 1)
+        all_adjust_pval <- matrix(NA, nrow = nrow(stat_analysis), ncol = sample_size - 1)
         
-        if(test_type=="t.test"){
-          p_values_tmp[j] <- ttest_func(select(stat_analysis,contains("A1_") & contains("log10_"))[j,],     ### FOR DIFFERENT KIND OF EXP SETUP, 
-                                        select(stat_analysis,contains(paste0("A",i,"_")) & contains("log10_"))[j,] ) ## It should be defined as an input.
-          
-        }else if(test_type=="wilcoxon"){
-          p_values_tmp[j] <- wilcox.test(select(stat_analysis,contains("A1_") & contains("log10_"))[j,],     ### FOR DIFFERENT KIND OF EXP SETUP, 
-                                         select(stat_analysis,contains(paste0("A",i,"_")) & contains("log10_"))[j,])
-          ## It should be defined as an input.
+        for (i in 2:sample_size) {
+            col_A1 <- select(stat_analysis, contains("A1-") & contains("log10_"))
+            col_Ai <- select(stat_analysis, contains(paste0("A", i, "-")) & contains("log10_"))
+            
+            p_values_tmp <- vector("numeric", length = nrow(stat_analysis))
+            
+            for (j in seq_along(p_values_tmp)) {
+                if (test_type == "t.test") {
+                    p_values_tmp[j] <- ttest_func(col_A1[j,], col_Ai[j,])
+                } else if (test_type == "wilcoxon") {
+                    p_values_tmp[j] <- wilcox.test(col_A1[j,], col_Ai[j,])
+                }
+            }
+            
+            all_pvalues[, i - 1] <- p_values_tmp
+            
+            adjust_pval_tmp <- mt.rawp2adjp(all_pvalues[, i - 1], proc = "BH", alpha = 0.05)
+            qval <- data.frame(adjust_pval_tmp$adjp, adjust_pval_tmp$index)[order(adjust_pval_tmp$index), 2]
+            all_adjust_pval[, i - 1] <- qval
         }
         
-      }
-      p_values_tmp <- as.data.frame(p_values_tmp)
-      colnames(p_values_tmp) <- paste0("pvalues_A1","/","A",i)
-      all_pvalues <- bind_cols(all_pvalues,p_values_tmp)
-      rownames(all_pvalues) <- row.names(stat_analysis)
-      rm(p_values_tmp)
-      
-      #### p-value adjust at a given FDR ####
-      #procs<-c("Bonferroni","Holm","Hochberg","SidakSS","SidakSD","BH","BY","ABH","TSBH")
-      adjust_pval_tmp <-  mt.rawp2adjp(all_pvalues[,paste0("pvalues_A1","/","A",i)],
-                                       proc="BH", alpha=0.05)
-      qval <- data.frame(adjust_pval_tmp$adjp,adjust_pval_tmp$index)[order(adjust_pval_tmp$index),2]
-      qval <- as.data.frame(qval)
-      colnames(qval) <- paste0("adjust_pval_A1","/","A",i)
-      all_adjust_pval <- bind_cols(all_adjust_pval,qval)
-      rownames(all_adjust_pval) <- row.names(stat_analysis)
-      rm(adjust_pval_tmp,qval)
-      
-    }
+        all_pvalues <- as.data.frame(all_pvalues)
+        all_adjust_pval <- as.data.frame(all_adjust_pval)
+        
+        colnames(all_pvalues) <- paste0("pvalues_A1/A", 2:sample_size)
+        colnames(all_adjust_pval) <- paste0("adjust_pval_A1/A", 2:sample_size)
+        
+        rownames(all_pvalues) <- row.names(stat_analysis)
+        rownames(all_adjust_pval) <- row.names(stat_analysis)
+    
     all_pvalues_common_col <- stat_analysis %>% 
       select(pep_with_pos, accession) %>% #spectrum_title
       bind_cols(all_pvalues) %>% 

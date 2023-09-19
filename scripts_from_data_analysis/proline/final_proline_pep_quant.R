@@ -96,7 +96,7 @@ for (i in 4:length(file_paths)){
                                          acquisiton_type= acquisiton_types[i],
                                          software_name = "Proline",
                                          test_type="limma",
-                                         selected_spcies = "_HUMAN",
+                                         selected_spcies = "HUMAN",
                                          background_species = "ECOLI",
                                          exp_id=2,
                                          num_reps=3,
