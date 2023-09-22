@@ -73,8 +73,9 @@ final_pd_pep_quant_analysis <- function(file_path,
       
       extracted_values <- gsub("\\(|\\)", "", extracted_values)  # Remove parentheses
       extracted_letters <- gsub("[A-Z]", "", extracted_letters)  # Remove letters
-      
-      combined_results <- list(paste(extracted_letters, collapse = "&"), paste(extracted_values, collapse = "&"))
+                                                                                ## Selecting the max is necessary for applying 
+                                                                                  ##           filtering at localization score
+      combined_results <- list(paste(extracted_letters, collapse = "&"), paste(max(extracted_values), collapse = "&"))
       return(combined_results)
   }
   ######################
@@ -94,7 +95,7 @@ final_pd_pep_quant_analysis <- function(file_path,
   #################################################
   pep_list_w_theo_unique <- pep_list_w_theo %>% 
     distinct(Phospopeptide.sequence,.keep_all = TRUE) %>%
-    rename(Sequence = Phospopeptide.sequence)
+    rename(Sequence = Phosphopeptide.sequence)
   
   ecoli_seq <- quant_peptides %>% 
     select(Sequence, Modifications, Master.Protein.Descriptions) %>%
@@ -111,6 +112,7 @@ final_pd_pep_quant_analysis <- function(file_path,
     full_join(pep_list_w_theo_unique,by="Sequence") %>%
     mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
     mutate(Pool= ifelse(is.na(species),"missing",Pool)) %>%
+    filter(!grepl("missing",Pool)) %>%
     bind_rows(ecoli_seq) %>% 
     mutate(Pool= ifelse(is.na(Pool),background_species,Pool)) %>%
     mutate(acq_type=acquisiton_type) %>%
@@ -152,7 +154,9 @@ final_pd_pep_quant_analysis <- function(file_path,
       mutate(results = list(extract_phospho_numbers(Modifications)),
              phospho_pos = results[[1]],
              phospho_score = results[[2]]) %>%
-      select(!results) %>%    #### BEFORE RENAME IT BE SURED THAT COLUMNS ARE THE SAME ORDER AS EXP_DESIGN
+      select(!results) %>% 
+      filter(as.numeric(phospho_score) >= 75)  %>%  
+    #### BEFORE RENAME IT BE SURED THAT COLUMNS ARE THE SAME ORDER AS EXP_DESIGN
       rename_with(~ exp_design, starts_with("Abundances.Normalized"))
   
   #quant_phospho_peptides$Marked.as <-"HUMAN"
@@ -171,7 +175,6 @@ final_pd_pep_quant_analysis <- function(file_path,
   
   filtered_abundances<-quant_phospho_peptides[rowSums(!is.na(select(quant_phospho_peptides,starts_with(exp_design))))>0,]
   filtered_abundances_ecoli <-quant_peptides_ECOLI[rowSums(!is.na(select(quant_peptides_ECOLI,starts_with(exp_design))))>0,]
-  
   
   # 
   # # Calculate 1 percent quantile of each sample
@@ -889,19 +892,19 @@ final_pd_pep_quant_analysis <- function(file_path,
       scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=1)) +
       #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
       theme_bw() +
-      theme(legend.text = element_text(size = 15),
-            axis.title.x = element_text(size = 15),
-            axis.title.y = element_text(size = 15),
-            plot.title = element_text(size = 30),
-            legend.title = element_text(size = 15),
-            axis.text.x = element_text(size = 15),
-            axis.title = element_text(size = 15),
-            axis.text.y = element_text(size = 15),
-            plot.subtitle = element_text(size = 15)) +
+      theme(legend.text = element_text(size = 30),
+            axis.title.x = element_text(size = 30),
+            axis.title.y = element_text(size = 30),
+            plot.title = element_text(size = 35),
+            legend.title = element_text(size = 30),
+            axis.text.x = element_text(size = 30),
+            axis.title = element_text(size = 30),
+            axis.text.y = element_text(size = 30),
+            plot.subtitle = element_text(size = 30)) +
       labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n",subtitle)) +
-      geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"),size=1) +
-      geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=1) + 
-      geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos,fill=new_col_coloring, label = n),size=6, colour="white",show.legend = FALSE) 
+      geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"),size=2) +
+      geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=2) + 
+      geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos,fill=new_col_coloring, label = n),size=15, colour="white",show.legend = FALSE) 
   
   
   merge_stat_df_final_text <- merge_stat_df_final %>% mutate(soft_name=paste0(software_name)) %>% mutate(acq_type=paste0(acquisiton_type))
