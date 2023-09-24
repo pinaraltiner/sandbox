@@ -5,15 +5,15 @@
 source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/Spectronaut/exp2_spectronaut_DIA_data_analysis.R")
 
 file_paths <- c(paste0("D:/dev/Pinar/PHD/wet_lab_experiments/DIA_data_analysis/experiment_2/Spectronaut/",
-                       c("trypsinP/",
+                       c("correct_norm/",
                          "TIMS-TOF")),
                 paste0("D:/dev/Pinar/PHD/wet_lab_experiments/DIA_data_analysis/experiment_3/Spectronaut/",
                        c("",
                          "TIMS-TOF"))
                 )
 
-
-file_names <- c("20230704_162303_OXPAL230118_Exp2woFAIMS_DIA_trypsinP_Report.tsv",
+#"20230704_162303_OXPAL230118_Exp2woFAIMS_DIA_trypsinP_Report.tsv"
+file_names <- c("20230915_Exp2_DIA_noFAIMS_ptm_workflow_correct_norm_output_ptm_peptide_quantification_Report.tsv",
                 "20230705_125301_OXPAL230127_Exp3_woFAIMS_DIA_Report.tsv","","")
 
 
@@ -80,6 +80,8 @@ for (i in 1:(length(file_paths)-3)){
                               exp_design=experiment_name,
                               acquisiton_type=acquisiton_types[i],
                               exp_id=2,
+                              loc_filter_opt=TRUE,
+                              loc_filter=0.75,
                               software_name= "Spectronaut",
                               num_reps=3,
                               test_type="limma",
