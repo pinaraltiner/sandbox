@@ -20,6 +20,8 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
                                                  exp_id,
                                                  exp_design,
                                                  fdr_threshold,
+                                                 loc_filter_opt,
+                                                 loc_filter,
                                                  acquisiton_type,
                                                  software_name,
                                                  test_type,
@@ -57,7 +59,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
         highest_dim <- sorted_prob_values[1:dim_count]
         
         #for (i in 1:length(highest_dim)){
-        result["prob"] <- paste(sorted_prob_values[1:length(highest_dim)],collapse ="&")
+        result["prob"] <- max(sorted_prob_values)#paste(sorted_prob_values[1:length(highest_dim)],collapse ="&")
         result["pos"] <- paste(sorted_pos_values[1:length(highest_dim)],collapse ="&")
         result$mod <- "two_phospho"
         #result<-list.append(paste(max_prob, max_pos, sep = "_"))
@@ -110,10 +112,6 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     
     imputed_values_vec <- as.vector(imputed_values$first_quantile)
     
-    ## PHOSPHO-FILTERING
-    quant_phospho <- quant_peptides_with_cond %>% filter(grepl("HUMAN", PG.ProteinLabel)) %>%
-      filter(grepl("Phospho",EG.PrecursorId))
-    
     ## THEORETICAL PEPTIDE LIST
     pep_list_w_theo <- read.xlsx(paste0(theo_file_path, theo_file_name), sheet = sheet_theo_name)
     pep_list_w_theo_quant <- pep_list_w_theo[,-1]
@@ -124,34 +122,47 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     pep_list_w_theo_quant_new <- cbind(common_col_theo_quant,pep_list_w_theo_quant)
     
     #################################################
-    pep_list_w_theo_unique <- pep_list_w_theo %>% 
+    pep_list_w_theo_unique <- pep_list_w_theo %>% select(Phospopeptide.sequence, Pool) %>%
       distinct(Phospopeptide.sequence,.keep_all = TRUE) %>%
-      rename(PEP.GroupingKey = Phospopeptide.sequence)
+      rename(PEP.GroupingKey = Phospopeptide.sequence) %>%
+      rename(Pool_for_seq_merge=Pool)
     
     ecoli_seq <- quant_peptides %>% 
       select(PEP.GroupingKey, EG.PrecursorId, PG.ProteinLabel) %>%
       filter(grepl(background_species,PG.ProteinLabel)) %>%
-      distinct(PEP.GroupingKey,.keep_all = T) %>%
       mutate(species=background_species) 
     
-    all_seq <- quant_peptides %>% 
+    ecoli_seq_dist <-  quant_peptides %>% 
       select(PEP.GroupingKey, EG.PrecursorId, PG.ProteinLabel) %>%
+      filter(grepl(background_species,PG.ProteinLabel)) %>%
+      distinct(PEP.GroupingKey,.keep_all = T) %>%
+      mutate(species=background_species)
+    
+    
+    all_seq <- quant_peptides_with_cond %>% 
       filter(grepl(selected_spcies,PG.ProteinLabel) & 
                grepl("Phospho",EG.PrecursorId)) %>%
-      distinct(PEP.GroupingKey, .keep_all = T) %>%
       mutate(species=selected_spcies) %>%
       full_join(pep_list_w_theo_unique,by="PEP.GroupingKey") %>%
-      mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
-      mutate(Pool= ifelse(is.na(species),"missing",Pool)) %>%
-      filter(!grepl("missing",Pool)) %>%
+      mutate_at("Pool_for_seq_merge", ~replace_na(.,"Unexpected")) %>%
+      mutate(Pool_for_seq_merge= ifelse(is.na(species),"missing",Pool_for_seq_merge)) %>%
+      filter(!grepl("Unexpected",Pool_for_seq_merge)) %>%
       bind_rows(ecoli_seq) %>% 
-      mutate(Pool= ifelse(is.na(Pool),background_species,Pool)) %>%
+      mutate(Pool_for_seq_merge= ifelse(is.na(Pool_for_seq_merge),background_species,Pool_for_seq_merge))
+    
+    
+    all_seq_syn <- all_seq %>% 
+      select(PEP.GroupingKey, EG.PrecursorId, PG.ProteinLabel,Pool_for_seq_merge) %>% 
+      distinct(PEP.GroupingKey, .keep_all = T) %>%
+      bind_rows(ecoli_seq_dist) %>%
+      mutate(Pool_for_seq_merge= ifelse(is.na(Pool_for_seq_merge),background_species,Pool_for_seq_merge)) %>%
       mutate(acq_type=acquisiton_type) %>%
       mutate(soft_name=software_name)
+      
     ## This is the same as p13 in DDA data analysis
-    p12 <- gg_barplt_id_pep_count(data_set = all_seq,
-                                  x_df = all_seq$Pool,
-                                  fill_df = all_seq$Pool,
+    p12 <- gg_barplt_id_pep_count(data_set = all_seq_syn,
+                                  x_df = all_seq_syn$Pool_for_seq_merge,
+                                  fill_df = all_seq_syn$Pool_for_seq_merge,
                                   ymax = 20000,
                                   header = paste("Total number of identified phosphorylated", selected_spcies,"and", background_species,"across each sample",sep=" "),
                                   caption_lab = "NA values are removed. (p13)",
@@ -160,9 +171,11 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
                                   y_lab = "Number of identified peptides",
                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
     
-    write.table(all_seq, file=paste0(file_path,"Experiment2",software_name,"_number_of_unique_sequence_for_each_species.txt"),sep = "\t",col.names = T,row.names = F)
+    write.table(all_seq_syn, file=paste0(file_path,"Experiment2",software_name,"_number_of_unique_sequence_for_each_species.txt"),sep = "\t",col.names = T,row.names = F)
     #################################################
-    
+    ## PHOSPHO-FILTERING
+    quant_phospho <- all_seq %>% filter(grepl("HUMAN", PG.ProteinLabel)) %>%
+      filter(grepl("Phospho",EG.PrecursorId))
  
     # Apply the function to each row
     max_prob_and_pos <- apply(quant_phospho, 1, function(row) {
@@ -186,21 +199,20 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     # Rename the columns as needed
     colnames(df) <- c("ptm_score","ptm_position","ptm_type")
     
-    quant_phospho_filtered <- quant_phospho %>% 
+    quant_phospho_combined <- quant_phospho %>% 
         bind_cols(df) %>% 
         #filter(!grepl("undistinguishable",undistinguishable)) %>%
         #separate(position1, into = c("phospho_score","phospho_pos"),sep = "_") %>%
         mutate(pep_with_pos=paste(PEP.GroupingKey,ptm_position,sep = "_"))
     
-    
-    barplt_df <- quant_phospho_filtered %>%
-      select(PEP.GroupingKey,Experiment,Intensity,pep_with_pos,PG.ProteinLabel) %>%
+    barplt_df <- quant_phospho_combined %>%
+      select(PEP.GroupingKey,Experiment,Intensity,pep_with_pos,PG.ProteinLabel,ptm_score) %>%
       separate(Experiment, into = c("Exp_id","Sample_id","Rep_id"),sep = "-",remove = F) %>%
       #mutate(sample_rep_id_seq = paste(pep_with_pos, Sample_id,Rep_id, sep = "_")) %>%
       group_by(pep_with_pos,Experiment) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
       slice(which.max(Intensity)) %>%
       ungroup()
-    
+
     
     ####### ADDITIONAL PLOT TO DISPLAY MISSING and UNEXPECTED PEPTIDES ########
     df_merge_syn <- barplt_df %>%
@@ -260,12 +272,34 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
                                  y_lab = "Number of identified peptides",
                                  subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
     
-    
-    barplt_df_wide <- barplt_df %>%  ## If you select "charge" column, it will bring multiple rows for one seq
-      select(PEP.GroupingKey,Experiment,Intensity,pep_with_pos,PG.ProteinLabel) %>%
-      pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
-      mutate(species=selected_spcies) %>% relocate(exp_design,.after = "pep_with_pos")
-    
+    if(loc_filter_opt == TRUE){
+      site_prob <- barplt_df %>% 
+        select(ptm_score, pep_with_pos,Experiment) %>% 
+        pivot_wider(names_from = "Experiment",
+                    values_from = "ptm_score") %>% 
+        rowwise() %>%
+        mutate(max_value = max(c_across(all_of(exp_design)), na.rm = TRUE)) %>%
+        select(!exp_design)
+      
+      barplt_df_wide <- barplt_df %>%  ## If you select "charge" column, it will bring multiple rows for one seq
+        select(PEP.GroupingKey,Experiment,Intensity,pep_with_pos,PG.ProteinLabel) %>%
+        pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
+        left_join(site_prob, by="pep_with_pos") %>%
+        mutate(species=selected_spcies) %>%
+        filter(max_value >= loc_filter) #%>%
+        #select(!PEP.GroupingKey) #%>%
+        #relocate(pep_with_pos, .after = Sequence) 
+        #relocate(exp_design,.after = "pep_with_pos")
+      
+    }else{
+      barplt_df_wide <- barplt_df %>%  ## If you select "charge" column, it will bring multiple rows for one seq
+        select(PEP.GroupingKey,Experiment,Intensity,pep_with_pos,PG.ProteinLabel) %>%
+        pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
+        mutate(species=selected_spcies) %>% 
+        #relocate(pep_with_pos, .after = Sequence)
+       relocate(exp_design,.after = "pep_with_pos")
+    }
+   
     barplt_df_ecoli_wide <- barplt_df_ecoli %>%
       select(PEP.GroupingKey,Experiment,Intensity,PG.ProteinLabel)%>%
       pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
@@ -294,6 +328,8 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
                footnote_as_chunk = T, title_format = c("italic", "underline")) %>%
       #as_image(width = 8) %>%
       save_kable(paste0(file_path,"outputs_with_new_script/table1.png"))
+    
+    filtered_abundances <- filtered_abundances %>% select(!`PEP.GroupingKey`)
     
     abundances_rowMeans <- NULL
     abundances_ecoli_rowMeans <- NULL
@@ -793,8 +829,9 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     library(pROC)
     # Calculate ROC curve for raw p-values
     roc_raw_variant <- roc(df_roc$variant, df_roc$P.Value)
+    fpr <- as.data.frame(1 - roc_raw_variant$specificities)
     tpr_and_fpr_variant  <- cbind(roc_raw_variant$sensitivities,
-                                  roc_raw_variant$specificities,
+                                  fpr,#roc_raw_variant$specificities,
                                   "Variant Pool")
     
     
@@ -807,11 +844,11 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
       #bind_rows(as.data.frame(tpr_and_fpr_non_var)) 
       bind_cols(software_name)
     
-    colnames(roc_plot_df) <- c("sensitivity", "specificity","Pool_type","Software_name")
+    colnames(roc_plot_df) <- c("sensitivity", "fpr","Pool_type","Software_name")
     
     p10 <- roc_plot_df %>% #group_by(Pool_type) %>% 
-      ggplot( aes(y=as.numeric(sensitivity), x = as.numeric(specificity), color=Pool_type)) +
-      geom_path(size=1.5) +  scale_x_reverse() + theme_bw() +
+      ggplot( aes(y=as.numeric(sensitivity), x = as.numeric(fpr), color=Pool_type)) +
+      geom_path(size=1.5) + theme_bw() +# scale_x_reverse() +  +
       theme(legend.text = element_text(size = 20),
             axis.title.x = element_text(size = 20),
             axis.title.y = element_text(size = 20),
