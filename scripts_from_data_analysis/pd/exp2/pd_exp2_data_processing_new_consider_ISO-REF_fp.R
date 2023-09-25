@@ -37,6 +37,8 @@ final_pd_pep_quant_analysis <- function(file_path,
                                              background_species,
                                              acquisiton_type,
                                              exp_id,
+                                             loc_filter_opt,
+                                             loc_filter,
                                              software_name,
                                              test_type,
                                              exp_design,
@@ -95,32 +97,44 @@ final_pd_pep_quant_analysis <- function(file_path,
   #################################################
   pep_list_w_theo_unique <- pep_list_w_theo %>% 
     distinct(Phospopeptide.sequence,.keep_all = TRUE) %>%
-    rename(Sequence = Phosphopeptide.sequence)
+    rename(Sequence = Phosphopeptide.sequence) %>%
+    rename(Pool_for_seq_merge=Pool)
   
   ecoli_seq <- quant_peptides %>% 
+    select(Sequence, Modifications, Master.Protein.Descriptions) %>%
+    filter(grepl(background_species,Master.Protein.Descriptions)) %>%
+    #distinct(Sequence,.keep_all = T) %>%
+    mutate(species=background_species) 
+  
+  ecoli_seq_dist <- quant_peptides %>% 
     select(Sequence, Modifications, Master.Protein.Descriptions) %>%
     filter(grepl(background_species,Master.Protein.Descriptions)) %>%
     distinct(Sequence,.keep_all = T) %>%
     mutate(species=background_species) 
   
   all_seq <- quant_peptides %>% 
-    select(Sequence, Modifications, Master.Protein.Descriptions) %>%
     filter(grepl("Homo sapiens",Master.Protein.Descriptions) & 
              grepl("Phospho",Modifications)) %>%
-    distinct(Sequence, .keep_all = T) %>%
     mutate(species=selected_spcies) %>%
     full_join(pep_list_w_theo_unique,by="Sequence") %>%
-    mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
-    mutate(Pool= ifelse(is.na(species),"missing",Pool)) %>%
-    filter(!grepl("missing",Pool)) %>%
+    mutate_at("Pool_for_seq_merge", ~replace_na(.,"Unexpected")) %>%
+    mutate(Pool_for_seq_merge= ifelse(is.na(species),"missing",Pool_for_seq_merge)) %>%
+    filter(!grepl("Unexpected",Pool_for_seq_merge)) %>%
     bind_rows(ecoli_seq) %>% 
-    mutate(Pool= ifelse(is.na(Pool),background_species,Pool)) %>%
+    mutate(Pool_for_seq_merge= ifelse(is.na(Pool_for_seq_merge),background_species,Pool_for_seq_merge)) 
+  
+  all_seq_syn <- all_seq %>% 
+    select(Sequence, Modifications, Master.Protein.Descriptions, Pool_for_seq_merge) %>% 
+    distinct(Sequence,.keep_all = T) %>% 
+    bind_rows(ecoli_seq_dist) %>%
+    mutate(Pool_for_seq_merge= ifelse(is.na(Pool_for_seq_merge),background_species,Pool_for_seq_merge)) %>%
     mutate(acq_type=acquisiton_type) %>%
     mutate(soft_name=software_name)
+    
   
-  p13 <- gg_barplt_id_pep_count(data_set = all_seq,
-                                x_df = all_seq$Pool,
-                                fill_df = all_seq$Pool,
+  p13 <- gg_barplt_id_pep_count(data_set = all_seq_syn,
+                                x_df = all_seq_syn$Pool_for_seq_merge,
+                                fill_df = all_seq_syn$Pool_for_seq_merge,
                                 ymax = 20000,
                                 header = paste("Total number of identified phosphorylated", selected_spcies,"and", background_species,"across each sample",sep=" "),
                                 caption_lab = "NA values are removed.",
@@ -129,18 +143,18 @@ final_pd_pep_quant_analysis <- function(file_path,
                                 y_lab = "Number of identified peptides",
                                 subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
   
-  write.table(all_seq, file=paste0(file_path,"Experiment2",software_name,"_number_of_unique_sequence_for_each_species.txt"),sep = "\t",col.names = T,row.names = F)
+  write.table(all_seq_syn, file=paste0(file_path,"Experiment2",software_name,"_number_of_unique_sequence_for_each_species.txt"),sep = "\t",col.names = T,row.names = F)
   #################################################
   
   abundances_for_impute <- quant_peptides %>% 
       select(starts_with("Abundances.Normalized")) %>% #### BEFORE RENAME IT BE SURED THAT COLUMNS ARE THE SAME ORDER AS EXP_DESIGN
       rename_with(~ exp_design, starts_with("Abundances.Normalized"))
   
-  
-  quant_phospho_peptides <-quant_peptides %>%
+  if(loc_filter_opt == TRUE){
+    quant_phospho_peptides <-all_seq %>%
       filter(grepl("Homo sapiens",Master.Protein.Descriptions) & 
-                 grepl("Phospho",Modifications) & 
-                 !grepl("positions not distinguishable", Modification.Pattern)) %>%
+               grepl("Phospho",Modifications) & 
+               !grepl("positions not distinguishable", Modification.Pattern)) %>%
       select(Sequence,
              Modifications,
              Modification.Pattern,
@@ -155,9 +169,33 @@ final_pd_pep_quant_analysis <- function(file_path,
              phospho_pos = results[[1]],
              phospho_score = results[[2]]) %>%
       select(!results) %>% 
-      filter(as.numeric(phospho_score) >= 75)  %>%  
-    #### BEFORE RENAME IT BE SURED THAT COLUMNS ARE THE SAME ORDER AS EXP_DESIGN
+      filter(as.numeric(phospho_score) >= loc_filter)  %>%  
+      #### BEFORE RENAME IT BE SURED THAT COLUMNS ARE THE SAME ORDER AS EXP_DESIGN
       rename_with(~ exp_design, starts_with("Abundances.Normalized"))
+  }else{
+    quant_phospho_peptides <-all_seq %>%
+      filter(grepl("Homo sapiens",Master.Protein.Descriptions) & 
+               grepl("Phospho",Modifications) & 
+               !grepl("positions not distinguishable", Modification.Pattern)) %>%
+      select(Sequence,
+             Modifications,
+             Modification.Pattern,
+             Number.of.PSMs,
+             Master.Protein.Descriptions,
+             Protein.Accessions,
+             Marked.as, starts_with("Abundances.Normalized"),
+             starts_with("Abundance.Ratio.P.Value"),
+             starts_with("Abundance.Ratio.log2")) %>%
+      rowwise() %>%
+      mutate(results = list(extract_phospho_numbers(Modifications)),
+             phospho_pos = results[[1]],
+             phospho_score = results[[2]]) %>%
+      select(!results) %>% 
+      #filter(as.numeric(phospho_score) >= 75)  %>%  
+      #### BEFORE RENAME IT BE SURED THAT COLUMNS ARE THE SAME ORDER AS EXP_DESIGN
+      rename_with(~ exp_design, starts_with("Abundances.Normalized"))
+  }
+ 
   
   #quant_phospho_peptides$Marked.as <-"HUMAN"
   
@@ -829,7 +867,7 @@ final_pd_pep_quant_analysis <- function(file_path,
   
   
   ymax <- max(-log10(merge_stat_df_final$P.Value)) + 0.5
-  y_decrement <- 0.15
+  y_decrement <- 0.45
   
   calculate_y_pos <- function(group) {
       group_length <- length(group)
@@ -920,7 +958,7 @@ final_pd_pep_quant_analysis <- function(file_path,
   ### ROC analysis custom func
   df_roc <- df_roc[order(df_roc$P.Value),]
   
-  df_roc_func <- compute_roc_curve(df=df_roc, flag = "Others",expected = (4*144))
+  df_roc_func <- compute_roc_curve(df=df_roc, flag = "Others",expected = (4*141))
   
   p14 <- ggplot(df_roc_func, aes(y=as.numeric(tpr), x = as.numeric(fdp))) +
     geom_path(size=1.5) +  #scale_x_reverse() + 
@@ -948,10 +986,15 @@ final_pd_pep_quant_analysis <- function(file_path,
   library(pROC)
   # Calculate ROC curve for raw p-values
   roc_raw_variant <- roc(df_roc$variant, df_roc$P.Value)
-  tpr_and_fpr_variant  <- cbind(roc_raw_variant$sensitivities,
-                                roc_raw_variant$specificities,
-                                "Variant Pool")
+  #tpr_and_fpr_variant  <- cbind(roc_raw_variant$sensitivities,
+  #                              roc_raw_variant$specificities,
+  #                              "Variant Pool")
 
+  fpr <- as.data.frame(1 - roc_raw_variant$specificities)
+  tpr_and_fpr_variant  <- cbind(roc_raw_variant$sensitivities,
+                                fpr,#roc_raw_variant$specificities,
+                                "Variant Pool")
+  
   
   #roc_raw_non_var <- roc(df_roc$non_var, df_roc$P.Value)
   #tpr_and_fpr_non_var  <- cbind(roc_raw_non_var$sensitivities,
@@ -962,11 +1005,11 @@ final_pd_pep_quant_analysis <- function(file_path,
       #bind_rows(as.data.frame(tpr_and_fpr_non_var)) 
     bind_cols(software_name)
   
-  colnames(roc_plot_df) <- c("sensitivity", "specificity","Pool_type","Software_name")
+  colnames(roc_plot_df) <- c("sensitivity", "fpr","Pool_type","Software_name")
   
   p10 <- roc_plot_df %>% #group_by(Pool_type) %>% 
-      ggplot( aes(y=as.numeric(sensitivity), x = as.numeric(specificity), color=Pool_type)) +
-      geom_path(size=1.5) +  scale_x_reverse() + theme_bw() +
+      ggplot( aes(y=as.numeric(sensitivity), x = as.numeric(fpr), color=Pool_type)) +
+      geom_path(size=1.5) + theme_bw() + # +  scale_x_reverse()
       theme(legend.text = element_text(size = 20),
             axis.title.x = element_text(size = 20),
             axis.title.y = element_text(size = 20),
