@@ -22,6 +22,8 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                                                  background_species,
                                                  selected_spcies,
                                                  exp_id,
+                                                 loc_filter_opt,
+                                                 loc_filter,
                                                  exp_design,
                                                  fdr_threshold,
                                                  acquisiton_type,
@@ -61,10 +63,20 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     
     #################################################
     pep_list_w_theo_unique <- pep_list_w_theo %>% 
+      select(Phospopeptide.sequence,Pool) %>%
       distinct(Phospopeptide.sequence,.keep_all = TRUE) %>%
-      rename(Sequence = Phospopeptide.sequence)
+      rename(Sequence = Phospopeptide.sequence) %>%
+      rename(Pool_for_seq_merge=Pool)
 
     ecoli_seq <- quant_peptides %>% 
+      select(Sequence,Modifications,Proteins) %>%
+      filter(!grepl(selected_spcies, Proteins) & !grepl("CON__", Proteins)) %>%
+      #pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
+      #filter(grepl(background_species,Proteins)) %>%
+      #distinct(Sequence,.keep_all = T) %>%
+      mutate(species=background_species) 
+    
+    ecoli_seq_dist <- quant_peptides %>% 
       select(Sequence,Modifications,Proteins) %>%
       filter(!grepl(selected_spcies, Proteins) & !grepl("CON__", Proteins)) %>%
       #pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
@@ -72,23 +84,29 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
       distinct(Sequence,.keep_all = T) %>%
       mutate(species=background_species) 
     
+    
     all_seq <- quant_peptides %>% 
-      select(Sequence,Modifications,Proteins) %>%
       filter(grepl(selected_spcies,Proteins) & 
                grepl("Phospho",Modifications)) %>%
-      distinct(Sequence, .keep_all = T) %>%
       mutate(species=selected_spcies) %>%
       full_join(pep_list_w_theo_unique,by="Sequence") %>%
-      mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
-      mutate(Pool= ifelse(is.na(species),"missing",Pool)) %>%
+      mutate_at("Pool_for_seq_merge", ~replace_na(.,"Unexpected")) %>%
+      mutate(Pool_for_seq_merge= ifelse(is.na(species),"missing",Pool_for_seq_merge)) %>%
+      filter(!grepl("Unexpected",Pool_for_seq_merge)) %>%
       bind_rows(ecoli_seq) %>% 
-      mutate(Pool= ifelse(is.na(Pool),background_species,Pool)) %>%
+      mutate(Pool_for_seq_merge= ifelse(is.na(Pool_for_seq_merge),background_species,Pool_for_seq_merge))
+    
+    all_seq_syn <- all_seq %>%
+      select(Sequence,Modifications,Proteins,Pool_for_seq_merge) %>% 
+      distinct(Sequence, .keep_all = T) %>%
+      bind_rows(ecoli_seq_dist) %>%
+      mutate(Pool_for_seq_merge= ifelse(is.na(Pool_for_seq_merge),background_species,Pool_for_seq_merge)) %>%
       mutate(acq_type=acquisiton_type) %>%
       mutate(soft_name=software_name)
     
-    p13 <- gg_barplt_id_pep_count(data_set = all_seq,
-                                  x_df = all_seq$Pool,
-                                  fill_df = all_seq$Pool,
+    p13 <- gg_barplt_id_pep_count(data_set = all_seq_syn,
+                                  x_df = all_seq_syn$Pool_for_seq_merge,
+                                  fill_df = all_seq_syn$Pool_for_seq_merge,
                                   ymax = 20000,
                                   header = paste("Total number of identified phosphorylated", selected_spcies,"and", background_species,"across each sample",sep=" "),
                                   caption_lab = "NA values are removed.",
@@ -97,7 +115,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                                   y_lab = "Number of identified peptides",
                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
     
-    write.table(all_seq, file=paste0(file_path,"Experiment2",software_name,"_number_of_unique_sequence_for_each_species.txt"),sep = "\t",col.names = T,row.names = F)
+    write.table(all_seq_syn, file=paste0(file_path,"outputs_with_new_script/Experiment2",software_name,"_number_of_unique_sequence_for_each_species.txt"),sep = "\t",col.names = T,row.names = F)
     #################################################
     
     
@@ -131,15 +149,33 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     #                                        grepl("A5-R3",Experiment) ~imputed_values_vec[15],
     #                                        TRUE ~ Intensity))
     # 
-    
-    quant_phospho <- quant_peptides %>%
-        #select(-Experiment,Intensity) %>% 
-        #mutate(abundances_for_impute) %>% 
-        #filter(grepl(9606,`Taxonomy IDs`))%>%
-        filter(grepl(selected_spcies,Proteins)) %>% 
-        filter(grepl("Phospho",Modifications)) %>% drop_na(`Modified sequence`)
-    
-    
+    ### LOCALIZATION THRESHOLD ###
+    # quant_phospho <- quant_peptides %>%
+    #   #select(-Experiment,Intensity) %>% 
+    #   #mutate(abundances_for_impute) %>% 
+    #   #filter(grepl(9606,`Taxonomy IDs`))%>%
+    #   filter(grepl(selected_spcies,Proteins)) %>% 
+    #   filter(grepl("Phospho",Modifications)) %>% drop_na(`Modified sequence`)
+    # 
+    quant_phospho <- all_seq %>% 
+      mutate(
+        extracted_values = sapply(str_extract_all(`Phospho (STY) Probabilities`, "\\(\\d+(\\.\\d+)?\\)"), function(x) {
+          values <- as.numeric(str_extract_all(x, "\\d+(\\.\\d+)?"))
+          if (length(values) == 0 || all(is.na(values))) NA else max(values)
+        })
+        
+        #select(Sequence,Modifications,`Modified sequence`,Proteins,`Phospho (STY) Probabilities`) %>%
+        #drop_na(`Phospho (STY) Probabilities`) %>%
+        # mutate(
+        #   extracted_values = sapply(str_extract_all(`Phospho (STY) Probabilities`, "\\(\\d+\\.\\d+\\)"), function(x) {
+        #     values <- as.numeric(str_extract_all(x, "\\d+")) #.\\d+
+        #     if (length(values) == 0) NA else max(values)
+        #   })
+      )%>% relocate(extracted_values,.after = Sequence) %>% #drop_na(extracted_values) %>%
+      filter(grepl(selected_spcies,Proteins) & grepl("Phospho",Modifications)) %>%
+      drop_na(`Modified sequence`)
+   
+
     df2 <- apply(X = as.data.frame(quant_phospho[,"Modified sequence"]),1,function(x){getModificationPosition_general(mod_seq = x,software_name = "MQ_214")})
     
     results1 <- map_dfr(df2, ~ enframe(.x)) %>%
@@ -187,7 +223,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     
     
     barplt_df <- final_results_with_common_col %>%
-        select(Sequence,Experiment,Intensity,pep_with_pos,Proteins) %>%
+        select(Sequence,Experiment,Intensity,pep_with_pos,Proteins,extracted_values) %>%
         separate(Experiment, into = c("Exp_id","Sample_id","Rep_id"),sep = "-",remove = F) %>%
         #mutate(sample_rep_id_seq = paste(pep_with_pos, Sample_id,Rep_id, sep = "_")) %>%
         group_by(pep_with_pos,Experiment) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
@@ -195,7 +231,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
         ungroup()
     
     barplt_phospho_seq <- final_results_with_common_col %>%
-      select(Sequence,Experiment,Intensity,Proteins) %>%
+      select(Sequence,Experiment,Intensity,Proteins,extracted_values) %>%
       separate(Experiment, into = c("Exp_id","Sample_id", "Rep_id"), sep = "-",remove = F) %>%
       mutate(sample_rep_id_seq = paste(Sequence, Sample_id,Rep_id, sep = "_")) %>%
       group_by(sample_rep_id_seq,Experiment) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
@@ -209,9 +245,22 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                 sep = "\t",row.names = F)
     
     ####### ADDITIONAL PLOT TO DISPLAY MISSING and UNEXPECTED PEPTIDES ########
-    df_merge_syn <- barplt_df %>%
+    site_prob <- barplt_df %>% 
+      select(extracted_values, pep_with_pos,Experiment) %>% 
+      pivot_wider(names_from = "Experiment",
+                  values_from = "extracted_values") %>% 
+      relocate(exp_design) %>%
+      rowwise() %>%
+      mutate(max_value = max(c_across(all_of(exp_design)), na.rm = TRUE)) %>%
+      select(!exp_design)
+    #mutate(max_value=ifelse(!is.numeric(max_value),NA,max_value))
+    #filter(!grepl(-Inf,max_value))
+    
+     df_merge_syn <- barplt_df %>%
       select(pep_with_pos,Experiment,Intensity, Proteins) %>% 
       pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
+      relocate(exp_design) %>%
+      full_join(site_prob, by="pep_with_pos") %>%
       full_join(pep_list_w_theo_quant_new,by="pep_with_pos") %>% 
       mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
       mutate(Pool= ifelse(is.na(Proteins),"missing",Pool)) %>%
@@ -223,13 +272,13 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                                   fill_df = df_merge_syn$Pool,
                                   ymax = 20000,
                                   header = "Total number of quantified phospho-site across each sample",
-                                  caption_lab = "NA values are removed.",
+                                  caption_lab = "NA values are removed. \n No filtering based on localization",
                                   x_lab = "Sample id",
                                   fill_lab =  "Sample id",
                                   y_lab = "Number of identified peptides",
                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
     
-    write.table(df_merge_syn,file = paste0(file_path,"Count_of_missing_unexpected_correct_phospho-sites_",
+    write.table(df_merge_syn,file = paste0(file_path,"outputs_with_new_script/Count_of_missing_unexpected_correct_phospho-sites_",
                                            software_name,"_Experiment",exp_id,".txt"),
                 sep = "\t",row.names = F)
     #############################################################################
@@ -284,17 +333,35 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     
     ## THIS RESHAPING IS ONLY FOR ELIMINATION OF MULTIPLE PHOSPHO-SITES and ECOLI PEPTIDES
     ## ELIMINATION STEP IS NOT NECESSARY FOR ECOLI, 1st STRATEGY can be used only (this will decrease lines of code)
-    
-    barplt_df_wide <- barplt_df %>%  ## If you select "charge" column, it will bring multiple rows for one seq
+   
+    if(loc_filter_opt == TRUE){
+      
+      barplt_df_wide <- barplt_df %>%  ## If you select "charge" column, it will bring multiple rows for one seq
         select(Sequence,Experiment,Intensity,pep_with_pos,Proteins) %>%
         pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
-        mutate(species=selected_spcies) %>% relocate(exp_design,.after = "pep_with_pos")
-    
+        relocate(exp_design,.after = where(is.character)) %>%
+        left_join(site_prob, by="pep_with_pos") %>%
+        mutate(species=selected_spcies) %>%
+        filter(max_value >= loc_filter) %>%
+        relocate(pep_with_pos, .after = Sequence) 
+      #relocate(exp_design,.after = "Proteins")
+    }else{
+      barplt_df_wide <- barplt_df %>%  ## If you select "charge" column, it will bring multiple rows for one seq
+        select(Sequence,Experiment,Intensity,pep_with_pos,Proteins) %>%
+        pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
+        left_join(site_prob, by="pep_with_pos") %>%
+        mutate(species=selected_spcies) %>%
+        #filter(max_value >= loc_filter) %>%
+        relocate(pep_with_pos, .after = Sequence) 
+    }
+   
     barplt_df_ecoli_wide <- barplt_df_ecoli %>% 
         select(Sequence,Experiment, Proteins,Intensity) %>%
         pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
         mutate(species=background_species) %>% relocate(exp_design,.after = "Proteins")
+    extract_df <- barplt_df_wide %>% full_join(pep_list_w_theo_quant_new,by="pep_with_pos")
     
+    write.table(extract_df,file=paste0(file_path,"outputs_with_new_script/Maxquant_transposed_data_merge_with_correct_pep_list.txt"),sep = "\t",col.names = T,row.names = F)
     
     # Nothing is changed
     filtered_abundances<-barplt_df_wide[rowSums(!is.na(select(barplt_df_wide,starts_with(exp_design))))>0,]
@@ -323,7 +390,8 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
         #as_image(width = 8) %>%
         save_kable(paste0(file_path,"outputs_with_new_script/table1.png"))
     
-    
+    ## REMOVE SEQUENCE COLUMN AFTER NA TABLE
+    filtered_abundances <- filtered_abundances %>% select(!Sequence)
     
     abundances_rowMeans <- NULL
     abundances_ecoli_rowMeans <- NULL
@@ -751,7 +819,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     
     
     ymax <- max(-log10(merge_stat_df_final$P.Value)) + 0.5
-    y_decrement <- 0.15
+    y_decrement <- 0.45
     
     calculate_y_pos <- function(group) {
         group_length <- length(group)
@@ -814,19 +882,19 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
         scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=1)) +
         #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
         theme_bw() +
-        theme(legend.text = element_text(size = 15),
-              axis.title.x = element_text(size = 15),
-              axis.title.y = element_text(size = 15),
-              plot.title = element_text(size = 30),
-              legend.title = element_text(size = 15),
-              axis.text.x = element_text(size = 15),
-              axis.title = element_text(size = 15),
-              axis.text.y = element_text(size = 15),
-              plot.subtitle = element_text(size = 15)) +
+      theme(legend.text = element_text(size = 30),
+            axis.title.x = element_text(size = 30),
+            axis.title.y = element_text(size = 30),
+            plot.title = element_text(size = 35),
+            legend.title = element_text(size = 30),
+            axis.text.x = element_text(size = 30),
+            axis.title = element_text(size = 30),
+            axis.text.y = element_text(size = 30),
+            plot.subtitle = element_text(size = 30)) +
         labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n", subtitle)) +
-        geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"),size=1) +
-        geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=1) + 
-        geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos,fill=new_col_coloring, label = n),size=6, colour="white",show.legend = FALSE) 
+        geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"),size=2) +
+        geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=2) + 
+        geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos,fill=new_col_coloring, label = n),size=10, colour="white",show.legend = FALSE) 
     
     merge_stat_df_final_text <- merge_stat_df_final %>% mutate(soft_name=paste0(software_name)) %>% mutate(acq_type=paste0(acquisiton_type))
     
@@ -839,7 +907,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     ### ROC analysis custom func
     df_roc <- df_roc[order(df_roc$P.Value),]
     
-    df_roc_func <- compute_roc_curve(df=df_roc, flag = "Others",expected = (4*144))
+    df_roc_func <- compute_roc_curve(df=df_roc, flag = "Others",expected = (4*141))
     
     p14 <- ggplot(df_roc_func, aes(y=as.numeric(tpr), x = as.numeric(fdp))) +
       geom_path(size=1.5) +  #scale_x_reverse() + 
@@ -855,7 +923,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
       scale_color_brewer(palette = "Dark2") +
       labs(y="True Positive Rate \n (Sensitivity)", x="False Positive Rate \n (Specificity)",
            title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), 
-           subtitle = paste(subtitle,"including unexpected"), color="Pool Type")
+           subtitle = paste(subtitle,"including unexpected"), color="Pool Type") + xlim(c(0,100)) + ylim(c(0,100))
     
     write.table(df_roc_func, file = paste0(file_path,"outputs_with_new_script/custom_Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
     
@@ -867,9 +935,15 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     library(pROC)
     # Calculate ROC curve for raw p-values
     roc_raw_variant <- roc(df_roc$variant, df_roc$P.Value)
+    #tpr_and_fpr_variant  <- cbind(roc_raw_variant$sensitivities,
+     #                             roc_raw_variant$specificities,
+    #                              "Variant Pool")
+    
+    fpr <- as.data.frame(1 - roc_raw_variant$specificities)
     tpr_and_fpr_variant  <- cbind(roc_raw_variant$sensitivities,
-                                  roc_raw_variant$specificities,
+                                  fpr,#roc_raw_variant$specificities,
                                   "Variant Pool")
+    
     
     
     #roc_raw_non_var <- roc(df_roc$non_var, df_roc$P.Value)
@@ -881,11 +955,11 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
       #bind_rows(as.data.frame(tpr_and_fpr_non_var)) 
       bind_cols(software_name)
     
-    colnames(roc_plot_df) <- c("sensitivity", "specificity","Pool_type","Software_name")
+    colnames(roc_plot_df) <- c("sensitivity", "fpr","Pool_type","Software_name")
     
     p10 <- roc_plot_df %>% #group_by(Pool_type) %>% 
-      ggplot( aes(y=as.numeric(sensitivity), x = as.numeric(specificity), color=Pool_type)) +
-      geom_path(size=1.5) +  scale_x_reverse() + theme_bw() +
+      ggplot( aes(y=as.numeric(sensitivity), x = as.numeric(fpr), color=Pool_type)) +
+      geom_path(size=1.5)  + theme_bw() + #+  scale_x_reverse()
       theme(legend.text = element_text(size = 20),
             axis.title.x = element_text(size = 20),
             axis.title.y = element_text(size = 20),
