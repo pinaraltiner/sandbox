@@ -55,7 +55,7 @@ getModificationPosition_general <- function( mod_seq, software_name){
       current_mod_sequence <- gsub( gsub("\\)", "\\\\)", gsub("\\(", "\\\\(", mods_to_remove_from_sequence )), "", mod_seq1 )
     }
     ## In case of 3 PTMs allowed (should be max value by default)
-    if (length(mods_to_remove_from_sequence) == 2) {
+    else if (length(mods_to_remove_from_sequence) == 2) {
       mid_mod_sequence <- gsub(gsub("\\)", "\\\\)", gsub("\\(", "\\\\(", mods_to_remove_from_sequence[1])), "", mod_seq1)
       current_mod_sequence <- gsub(gsub("\\)", "\\\\)", gsub("\\(", "\\\\(", mods_to_remove_from_sequence[2])), "", mid_mod_sequence)
     }
