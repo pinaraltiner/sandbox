@@ -12,7 +12,9 @@ library(tidyr)
 library(openxlsx)
 ###############################################
 source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/ggplot/ggplot_functions.R")
-source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/roc_curve/roc_curve_generation_proline_edit.R")
+#source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/roc_curve/roc_curve_generation_proline_edit.R")
+source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/roc_curve/new_roc_curve_generation_with_custom_threshold.R")
+
 # Experiment 2
 
 # 
@@ -880,7 +882,7 @@ final_pd_pep_quant_analysis <- function(file_path,
   
   
   p9 <- ggplot(merge_stat_df_final,aes(x =log2(merge_stat_df_final$fold_change_values), y = -log10(merge_stat_df_final$P.Value))) +
-      geom_point(aes(color = new_col_coloring,shape=Pool_new), size = 2.5) +
+      geom_point(aes(color = new_col_coloring,shape=Pool_new), size = 4) +
       #geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red") +
       scale_fill_manual(values = c("ISO-REF" = "#000000",
                                    "Unexpected_False Positive_A1/A2"="#999999",
@@ -942,7 +944,7 @@ final_pd_pep_quant_analysis <- function(file_path,
       labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n",subtitle)) +
       geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"),size=2) +
       geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=2) + 
-      geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos,fill=new_col_coloring, label = n),size=15, colour="white",show.legend = FALSE) 
+      geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos,fill=new_col_coloring, label = n),size=14, colour="white",show.legend = FALSE) 
   
   
   merge_stat_df_final_text <- merge_stat_df_final %>% mutate(soft_name=paste0(software_name)) %>% mutate(acq_type=paste0(acquisiton_type))
@@ -956,12 +958,15 @@ final_pd_pep_quant_analysis <- function(file_path,
   #filter(!grepl("Unexpected",Pool))
   
   ### ROC analysis custom func
-  df_roc <- df_roc[order(df_roc$P.Value),]
+  df_roc_order <- df_roc[order(df_roc$P.Value),]
   
-  df_roc_func <- compute_roc_curve(df=df_roc, flag = "Others",expected = (4*141))
+  df_roc_func <- compute_roc_curve(df=df_roc_order, flag = "Others",expected = (4*141))
   
-  p14 <- ggplot(df_roc_func, aes(y=as.numeric(tpr), x = as.numeric(fdp))) +
-    geom_path(size=1.5) +  #scale_x_reverse() + 
+  p14 <- ggplot(df_roc_func, aes(y=tpr, x = fdr)) +
+    geom_path(size=1.5) +
+    #geom_vline(aes(xintercept=fdr)) +
+    #geom_text(data=as.data.frame(result),aes(label=fdr)) +
+    #scale_x_reverse() + 
     theme_bw() +
     theme(legend.text = element_text(size = 20),
           axis.title.x = element_text(size = 20),
@@ -976,7 +981,7 @@ final_pd_pep_quant_analysis <- function(file_path,
          title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), 
          subtitle = paste(subtitle,"including unexpected"), color="Pool Type")
   
-  write.table(df_roc_func, file = paste0(file_path,"outputs_with_new_script/custom_Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
+  write.table(df_roc_func, file = paste0(file_path,"outputs_with_new_script/new_custom_Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
 
   #### ROC Analysis using pROC 
   
