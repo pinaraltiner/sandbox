@@ -7,7 +7,8 @@ library(tidyr)
 library(ggplot2)
 ###############################################
 source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/ggplot/ggplot_functions.R")
-source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/roc_curve/roc_curve_generation_proline_edit.R")
+source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/roc_curve/new_roc_curve_generation_with_custom_threshold.R")
+       #roc_curve_generation_proline_edit.R
 # Experiment 2
  #file_path <- "D:/dev/Pinar/PHD/wet_lab_experiments/DDA_data_analysis/experiment_2/Proline_data_analysis/exp2_re_injection/"
  #file_name <- "PAL _Phosphopeptides exp2 ( 5 conc 3reps) DDA_230117 with Design_2023-06-07_1003.xlsx"
@@ -980,7 +981,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     
     
     p9 <- ggplot(merge_stat_df_final,aes(x =log2(merge_stat_df_final$fold_change_values), y = -log10(merge_stat_df_final$P.Value))) +
-        geom_point(aes(color = new_col_coloring,shape=Pool_new), size = 2.5) +
+        geom_point(aes(color = new_col_coloring,shape=Pool_new), size = 4) +
         #geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red") +
         scale_fill_manual(values = c("ISO-REF" = "#000000",
                                      "Unexpected_False Positive_A1/A2"="#999999",
@@ -1042,7 +1043,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
         labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n",subtitle)) +
         geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"),size=2) +
         geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=2) + 
-        geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos,fill=new_col_coloring, label = n),size=10, colour="white",show.legend = FALSE) 
+        geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos,fill=new_col_coloring, label = n),size=14, colour="white",show.legend = FALSE) 
     
     merge_stat_df_final_text <- merge_stat_df_final %>% mutate(soft_name=paste0(software_name)) %>% mutate(acq_type=paste0(acquisiton_type))
     
@@ -1054,12 +1055,17 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
       #filter(!grepl("Unexpected",Pool))
     
     ### ROC analysis custom func
-    df_roc <- df_roc[order(df_roc$P.Value),]
+    df_roc_order <- df_roc[order(df_roc$P.Value),]
     
-    df_roc_func <- compute_roc_curve(df=df_roc, flag = "Others",expected = (4*144))
-    
-    p14 <- ggplot(df_roc_func, aes(y=as.numeric(tpr), x = as.numeric(fdp))) +
-      geom_path(size=1.5) +  #scale_x_reverse() + 
+   
+ 
+    df_roc_func <- compute_roc_curve(df=df_roc_order, flag = "Others",expected = (4*141))
+   
+    p14 <- ggplot(df_roc_func, aes(y=tpr, x = fdr)) +
+      geom_path(size=1.5) +
+      #geom_vline(aes(xintercept=fdr)) +
+      #geom_text(data=as.data.frame(result),aes(label=fdr)) +
+      #scale_x_reverse() + 
       theme_bw() +
       theme(legend.text = element_text(size = 20),
             axis.title.x = element_text(size = 20),
@@ -1074,7 +1080,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
            title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), 
            subtitle = paste(subtitle,"including unexpected"), color="Pool Type")
     
-    write.table(df_roc_func, file = paste0(file_path,"outputs_with_new_script/custom_Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
+    write.table(df_roc_func, file = paste0(file_path,"outputs_with_new_script/new_custom_Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
     
     #### ROC Analysis using pROC 
     
@@ -1093,11 +1099,6 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                                   fpr,#roc_raw_variant$specificities,
                                   "Variant Pool")
     
-    
-    #roc_raw_non_var <- roc(df_roc$non_var, df_roc$P.Value)
-    #tpr_and_fpr_non_var  <- cbind(roc_raw_non_var$sensitivities,
-                                 # roc_raw_non_var$specificities,
-                                  #"Non-variant Pool")
     
     roc_plot_df <- as.data.frame(tpr_and_fpr_variant) %>% 
         #bind_rows(as.data.frame(tpr_and_fpr_non_var)) %>% 
@@ -1118,7 +1119,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
               axis.title = element_text(size = 20),
               axis.text.y = element_text(size = 20)) +
         scale_color_brewer(palette = "Dark2") +
-        labs(y="True Positive Rate \n (Sensitivity)", x="False Positive Rate \n (Specificity)",
+        labs(y="True Positive Rate \n (Sensitivity)", x="False Discovery Rate",
              title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), 
              subtitle = paste(subtitle), color="Pool Type")
     
