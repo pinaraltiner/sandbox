@@ -868,7 +868,7 @@ final_pd_pep_quant_analysis <- function(file_path,
       count(new_col_coloring) %>% left_join(actual_ratio_col)
   
   
-  ymax <- max(-log10(merge_stat_df_final$P.Value)) + 0.5
+  ymax <- 9 + 0.5 #max(-log10(merge_stat_df_final$P.Value))
   y_decrement <- 0.45
   
   calculate_y_pos <- function(group) {
@@ -928,10 +928,13 @@ final_pd_pep_quant_analysis <- function(file_path,
                          labels = c('Non-variant', 'Variant non-isomeric', 'Variant isomeric', 'Unexpected')) +
       #scale_y_continuous(limits = c(0, max(-log10(merge_stat_df_final$adj.P.Val))), breaks = seq(0, max(-log10(merge_stat_df_final$adj.P.Val)), by = 0.8)) +
       #scale_x_continuous(limits = c(min(log2(merge_stat_df_final$fold_change_values)),max(log2(merge_stat_df_final$fold_change_values)))) +#facet_wrap(~ratio) +
-      scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=1)) +
-      scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=1)) +
+      #scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=1)) +
+      #scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=1)) +
       #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
-      theme_bw() +
+    scale_x_continuous(limits = c(-8, 10),breaks = seq(from = -8, to = 10, by = 2)) +  # Set the ticks for the x-axis
+    scale_y_continuous(limits = c(0, 10),breaks = seq(from = 0, to = 10, by = 2))+  # Set the ticks for the y-axis
+    
+    theme_bw() +
       theme(legend.text = element_text(size = 30),
             axis.title.x = element_text(size = 30),
             axis.title.y = element_text(size = 30),
@@ -1031,7 +1034,7 @@ final_pd_pep_quant_analysis <- function(file_path,
   write.table(roc_plot_df, file = paste0(file_path,"outputs_with_new_script/pRoc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
   
   sapply(1:14,function(x) ggsave(filename = paste0("p",x,".tiff"),
-                                width = 50, height = 45, 
+                                width = 60, height = 45, 
                                 path = paste0(file_path,"/outputs_with_new_script/"),
                                 units = "cm",
                                 get(paste0("p",x)),
