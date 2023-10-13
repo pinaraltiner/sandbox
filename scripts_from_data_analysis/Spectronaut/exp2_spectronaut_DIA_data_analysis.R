@@ -8,7 +8,9 @@ library(ggplot2)
 library(tidyverse)
 ###############################################
 source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/ggplot/ggplot_functions.R")
-source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/roc_curve/roc_curve_generation_proline_edit.R")
+#source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/roc_curve/roc_curve_generation_proline_edit.R")
+source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/roc_curve/new_roc_curve_generation_with_custom_threshold.R")
+
 final_spectronaut_pep_quant_analysis_syn <- function(file_path,
                                                  file_name,
                                                  sheet_name,
@@ -716,7 +718,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
       count(new_col_coloring) %>% left_join(actual_ratio_col)
     
     
-    ymax <- max(-log10(merge_stat_df_final$P.Value)) + 0.5
+    ymax <- 9 + 0.5 #max(-log10(merge_stat_df_final$P.Value))
     y_decrement <- 0.50
     
     calculate_y_pos <- function(group) {
@@ -730,7 +732,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     
     
     p9 <- ggplot(merge_stat_df_final,aes(x =log2(merge_stat_df_final$fold_change_values), y = -log10(merge_stat_df_final$P.Value))) +
-      geom_point(aes(color = new_col_coloring,shape=Pool_new), size = 2.5) +
+      geom_point(aes(color = new_col_coloring,shape=Pool_new), size = 4) +
       #geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red") +
       scale_fill_manual(values = c("ISO-REF" = "#000000",
                                    "Unexpected_False Positive_A1/A2"="#999999",
@@ -776,9 +778,12 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
                          labels = c('Non-variant', 'Variant non-isomeric', 'Variant isomeric', 'Unexpected')) +
       #scale_y_continuous(limits = c(0, max(-log10(merge_stat_df_final$adj.P.Val))), breaks = seq(0, max(-log10(merge_stat_df_final$adj.P.Val)), by = 0.8)) +
       #scale_x_continuous(limits = c(min(log2(merge_stat_df_final$fold_change_values)),max(log2(merge_stat_df_final$fold_change_values)))) +#facet_wrap(~ratio) +
-      scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=1)) +
-      scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=1)) +
+      #scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=1)) +
+      #scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=1)) +
       #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
+      scale_x_continuous(limits = c(-8, 10),breaks = seq(from = -8, to = 10, by = 2)) +  # Set the ticks for the x-axis
+      scale_y_continuous(limits = c(0, 10),breaks = seq(from = 0, to = 10, by = 2))+  # Set the ticks for the y-axis
+      
       theme_bw() +
       theme(legend.text = element_text(size = 30),
             axis.title.x = element_text(size = 30),
@@ -792,19 +797,28 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
       labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n", subtitle)) +
       geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"),size=2) +
       geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=2) + 
-      geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos,fill=new_col_coloring, label = n),size=10, colour="white",show.legend = FALSE) 
+      geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos,fill=new_col_coloring, label = n),size=14, colour="white",show.legend = FALSE) 
+    
+    
+    
+    merge_stat_df_final_text <- merge_stat_df_final %>% mutate(soft_name=paste0(software_name)) %>% mutate(acq_type=paste0(acquisiton_type))
+    write.table(merge_stat_df_final_text,file = paste0(file_path,"volcano_plot_",software_name,"_",acquisiton_type,".txt"),sep = 
+                  "\t",col.names = T,row.names = F)
     
     df_roc <- merge_stat_df_final %>%
       select(pep_with_pos, Pool,P.Value)
     #filter(!grepl("Unexpected",Pool))
     
     ### ROC analysis custom func
-    df_roc <- df_roc[order(df_roc$P.Value),]
+    df_roc_order <- df_roc[order(df_roc$P.Value),]
     
-    df_roc_func <- compute_roc_curve(df=df_roc, flag = "Others",expected = (4*141))
+    df_roc_func <- compute_roc_curve(df=df_roc_order, flag = "Others",expected = (4*141))
     
-    p13 <- ggplot(df_roc_func, aes(y=as.numeric(tpr), x = as.numeric(fdp))) +
-      geom_path(size=1.5) +  #scale_x_reverse() + 
+    p13 <- ggplot(df_roc_func, aes(y=tpr, x = fdr)) +
+      geom_path(size=1.5) +
+      #geom_vline(aes(xintercept=fdr)) +
+      #geom_text(data=as.data.frame(result),aes(label=fdr)) +
+      #scale_x_reverse() + 
       theme_bw() +
       theme(legend.text = element_text(size = 20),
             axis.title.x = element_text(size = 20),
@@ -819,7 +833,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
            title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), 
            subtitle = paste(subtitle,"including unexpected"), color="Pool Type")
     
-    write.table(df_roc_func, file = paste0(file_path,"outputs_with_new_script/custom_Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
+    write.table(df_roc_func, file = paste0(file_path,"outputs_with_new_script/new_custom_Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
     
     #### ROC Analysis using pROC 
     
@@ -865,7 +879,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     write.table(roc_plot_df, file = paste0(file_path,"outputs_with_new_script/pRoc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
     
     sapply(1:13,function(x) ggsave(filename = paste0("p",x,".tiff"),
-                                   width = 50, height = 45, 
+                                   width = 60, height = 45, 
                                    path = paste0(file_path,"/outputs_with_new_script/"),
                                    units = "cm",
                                    get(paste0("p",x)),
