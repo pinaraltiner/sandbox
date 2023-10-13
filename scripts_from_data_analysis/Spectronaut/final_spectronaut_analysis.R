@@ -73,7 +73,7 @@ for (i in 1:(length(file_paths)-3)){
                               file_name=file_names[i],
                               #sheet_name,
                               theo_file_path= "D:/dev/Pinar/PHD/wet_lab_experiments/Eyers_syn_peptides_experiment/",
-                              theo_file_name="Synthetic peptides list_theo_conc_corrected_pool_id_iso_count_final.xlsx",
+                              theo_file_name="Synthetic peptides list_theo_conc_corrected_isomericity.xlsx",
                               sheet_theo_name="ISO-ref and OTHER with FC",
                               background_species ="ECOLI",
                               selected_spcies ="HUMAN",
