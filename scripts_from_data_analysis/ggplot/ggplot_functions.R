@@ -24,14 +24,14 @@ gg_density <- function(data_set,
     scale_fill_brewer(palette = 2,direction=-1) +
     scale_linetype_manual(values=c("dashed", "dotted")) +
     theme_minimal() +
-    theme(legend.text = element_text(size=25), 
-          axis.title.x = element_text(size = 25),
-          axis.title.y = element_text(size = 25),
-          plot.title = element_text(size=30),
+    theme(legend.text = element_text(size=30), 
+          axis.title.x = element_text(size=30),
+          axis.title.y = element_text(size=30),
+          plot.title = element_text(size=35),
           plot.subtitle = element_text(size = 20),
-          legend.title=element_text(size=25),
-          axis.text=element_text(size=25),
-          axis.title=element_text(size=25),
+          legend.title=element_text(size=30),
+          axis.text=element_text(size=30),
+          axis.title=element_text(size=30),
           strip.text.x = element_text(
             size = 15
           )
@@ -63,8 +63,8 @@ gg_density <- function(data_set,
 #   geom_smooth(formula = y ~ x,method = "loess", colour = "green", fill = "green") +
 #   theme_minimal() +
 #   theme(legend.text = element_text(size=15), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
-#         axis.title.x = element_text(size = 25),axis.title.y = element_text(size = 25),
-#         plot.title = element_text(size=30),
+#         axis.title.x = element_text(size=30),axis.title.y = element_text(size=30),
+#         plot.title = element_text(size=35),
 #         legend.title=element_text(size=15),
 #         axis.text=element_text(size=15),
 #         axis.title=element_text(size=15)
@@ -85,14 +85,14 @@ gg_boxplt_exp_ratio <- function(data_set,
     geom_boxplot() +
     scale_y_continuous(breaks = seq(from =round(min(log2(y_df))), to=(round(max(log2(y_df)))+2),by=1)) +
     theme_minimal() +
-    theme(legend.text = element_text(size=25), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
-          axis.title.x = element_text(size = 25),
-          axis.title.y = element_text(size = 25),
-          plot.title = element_text(size=30),
+    theme(legend.text = element_text(size=30), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
+          axis.title.x = element_text(size=30),
+          axis.title.y = element_text(size=30),
+          plot.title = element_text(size=35),
           plot.subtitle = element_text(size = 20),
-          legend.title=element_text(size=25),
-          axis.text=element_text(size=25),
-          axis.title=element_text(size=25)
+          legend.title=element_text(size=30),
+          axis.text=element_text(size=30),
+          axis.title=element_text(size=30)
     ) +   stat_boxplot(geom = "errorbar") + 
     ggtitle(header) +
     labs(x=x_lab,y=y_lab,fill = fill_lab,subtitle = subtitle_txt) +
@@ -120,13 +120,13 @@ gg_half_boxplt_exp_ratio <- function(data_set,
     scale_y_continuous(breaks = seq(from =round(min(log2(y_df))), to=(round(max(log2(y_df)))+2),by=1)) +
     theme_minimal() +
     theme(legend.text = element_text(size=15),
-          axis.title.x = element_text(size = 25),
-          axis.title.y = element_text(size = 25),
-          plot.title = element_text(size=30),
+          axis.title.x = element_text(size=30),
+          axis.title.y = element_text(size=30),
+          plot.title = element_text(size=35),
           plot.subtitle = element_text(size = 20),
-          legend.title=element_text(size=25),
-          axis.text=element_text(size=25),
-          axis.title=element_text(size=25)
+          legend.title=element_text(size=30),
+          axis.text=element_text(size=30),
+          axis.title=element_text(size=30)
     ) + scale_fill_brewer(palette = "Dark2") +
         scale_color_brewer(palette = "Dark2")+ 
     labs(x=x_lab,y=y_lab,fill=fill_lab,subtitle = subtitle_txt) +
@@ -151,14 +151,14 @@ gg_violin_exp_ratio <- function(data_set,
     geom_violin(trim = trim) +
     scale_y_continuous(breaks = seq(from =round(min(log2(y_df))), to=(round(max(log2(y_df)))+2),by=1)) +
     theme_minimal() +
-    theme(legend.text = element_text(size=25),
-          axis.title.x = element_text(size = 25),
-          axis.title.y = element_text(size = 25),
-          plot.title = element_text(size=30),
+    theme(legend.text = element_text(size=30),
+          axis.title.x = element_text(size=30),
+          axis.title.y = element_text(size=30),
+          plot.title = element_text(size=35),
           plot.subtitle = element_text(size = 20),
-          legend.title=element_text(size=25),
-          axis.text=element_text(size=25),
-          axis.title=element_text(size=25)
+          legend.title=element_text(size=30),
+          axis.text=element_text(size=30),
+          axis.title=element_text(size=30)
     ) + scale_fill_brewer(palette="Dark2") +
     labs(x=x_lab,y=y_lab, fill= fill_lab,subtitle = subtitle_txt) +
     ggtitle(header)
@@ -181,18 +181,18 @@ gg_barplt_id_pep_count <- function(data_set,
 ggplot(data_set, aes(x=x_df, fill=fill_df)) + geom_bar(position = "dodge") +
   scale_fill_brewer(palette = 2,direction=-1) +
   theme_minimal() +
-  theme(legend.text = element_text(size=25), 
-        axis.title.x = element_text(size = 25),
-        axis.title.y = element_text(size = 25),
-        plot.title = element_text(size=30),
-        plot.subtitle = element_text(size = 20),
-        plot.caption = element_text(size = 20),
-        legend.title=element_text(size=25),
-        axis.text=element_text(size=25),
-        axis.title=element_text(size=25)) +
+  theme(legend.text = element_text(size=30), 
+        axis.title.x = element_text(size=30),
+        axis.title.y = element_text(size=30),
+        plot.title = element_text(size=35),
+        plot.subtitle = element_text(size = 25),
+        plot.caption = element_text(size = 25),
+        legend.title=element_text(size=30),
+        axis.text=element_text(size=30),
+        axis.title=element_text(size=30)) +
   ggtitle(header) + 
   scale_y_continuous(breaks = seq(from=0, to=ymax,by=500)) +
-  geom_text(aes(label=after_stat(count)),stat = "count", position=position_dodge(width=0.9), vjust=-0.25) +
+  geom_text(aes(label=after_stat(count)),stat = "count", position=position_dodge(width=0.9), vjust=-0.25,size=10) +
   labs(x=x_lab,y=y_lab, fill= fill_lab, caption = caption_lab,subtitle = subtitle_txt)
 }
   
@@ -225,14 +225,14 @@ gg_raincloud <- function(data_set,
                       justification= 1.1,
                       binwidth =.025) + 
     theme_light() + 
-    theme(legend.text = element_text(size=25), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
-          axis.title.x = element_text(size = 25),axis.title.y = element_text(size = 25),
-          plot.title = element_text(size=30),
-          plot.subtitle = element_text(size = 20),
-          plot.caption = element_text(size = 20),
-          legend.title=element_text(size=25),
-          axis.text=element_text(size=25),
-          axis.title=element_text(size=25)) + 
+    theme(legend.text = element_text(size=30), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
+          axis.title.x = element_text(size=30),axis.title.y = element_text(size=30),
+          plot.title = element_text(size=35),
+          plot.subtitle = element_text(size = 25),
+          plot.caption = element_text(size = 25),
+          legend.title=element_text(size=30),
+          axis.text=element_text(size=30),
+          axis.title=element_text(size=30)) + 
     ggtitle(header) + 
     labs(x=x_lab,y=y_lab, fill= fill_lab, caption = caption_lab,subtitle = subtitle_txt) +
     scale_fill_brewer(palette="Dark2")
@@ -261,14 +261,15 @@ gg_volcano <- function(data_set,
     scale_color_brewer(palette = "Dark2") +
     #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
     theme_bw() +
-    theme(legend.text = element_text(size = 15),
-          axis.title.x = element_text(size = 15),
-          axis.title.y = element_text(size = 15),
-          plot.title = element_text(size = 30),
-          legend.title = element_text(size = 15),
-          axis.text.x = element_text(size = 15),
-          axis.title = element_text(size = 15),
-          axis.text.y = element_text(size = 15)) +
+    theme(legend.text = element_text(size = 30),
+          axis.title.x = element_text(size = 30),
+          axis.title.y = element_text(size = 30),
+          plot.subtitle = element_text(size=25),
+          plot.title = element_text(size = 35),
+          legend.title = element_text(size = 30),
+          axis.text.x = element_text(size = 30),
+          axis.title = element_text(size = 30),
+          axis.text.y = element_text(size = 30)) +
     #expand_limits(x = 0, y = 0) +
     #geom_vline(data = actual_ratio, aes(xintercept = actual_ratio$X.1....log2.c.2..10..20..100..., size = 1, show.legend = FALSE)) + #color=c("#CC79A7","#E69F00","#56B4E9","#009E73")
     #geom_hline(data = log10_p_thresholds, aes(yintercept = log10_p_thresholds$X.log10.p_thresholds.),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"), size = 1, linetype = 2, show.legend = FALSE)+ 
