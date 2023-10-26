@@ -95,7 +95,7 @@ final_pd_pep_quant_analysis_exp1 <- function(file_path,
       separate(injs,into = c("tmp","expid","sample_id","Ecoli","inj"),sep = "-") %>%
       mutate(new_col=paste(expid,sample_id,Ecoli,sep = "_")) 
     
-    plot5 <- gg_barplt_id_pep_count(data_set = comb_ecoli,
+    plot6 <- gg_barplt_id_pep_count(data_set = comb_ecoli,
                            x_df = comb_ecoli$Spectrum.File,
                            fill_df = comb_ecoli$new_col,
                            ymax = 20000,
@@ -152,7 +152,9 @@ final_pd_pep_quant_analysis_exp1 <- function(file_path,
       select(!c(tmp,tmp2)) %>%
       separate(injs,into = c("tmp","expid","sample_id","Ecoli","inj"),sep = "-") %>%
       mutate(new_col=paste(expid,sample_id,Ecoli,sep = "_")) %>%
-      mutate(new_col_inj = paste(new_col,inj,sep = "_"))
+      mutate(new_col_inj = paste(new_col,inj,sep = "_")) %>%
+      mutate(new_col_inj= ifelse(is.na(new_col_inj),"missing",new_col_inj))
+      
     
     comb_result_seq_dist <- comb_result_seq %>% distinct(Sequence,.keep_all = TRUE)
     
@@ -174,13 +176,14 @@ final_pd_pep_quant_analysis_exp1 <- function(file_path,
                                     subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
     
     }else{
-    comb_result_seq <- comb_result %>%select(Sequence, pep_with_pos,ptmRS.Best.Site.Probabilities,
+    comb_result_seq <- comb_result %>% select(Sequence, pep_with_pos,ptmRS.Best.Site.Probabilities,
                                              Spectrum.File,`all_dirs[i]`, First.Scan,
                                              Confidence,Intensity, #Marked.as
                                              Protein.Accessions) %>%
       full_join(pep_list_w_theo_unique,by="Sequence") %>%
       mutate_at("Pool_for_seq_merge", ~replace_na(.,"Unexpected")) %>%
       mutate(Pool_for_seq_merge= ifelse(is.na(Spectrum.File),"missing",Pool_for_seq_merge)) %>%
+      mutate(Spectrum.File= ifelse(is.na(Spectrum.File),"missing",Spectrum.File)) %>%
       #filter(!grepl("Unexpected",Pool_for_seq_merge))
       mutate(acq_type=acquisiton_type) %>%
       mutate(soft_name=software_name)
@@ -202,37 +205,52 @@ final_pd_pep_quant_analysis_exp1 <- function(file_path,
                                     x_lab = "Sample id",
                                     fill_lab =  "Sample id",
                                     y_lab = "Number of identified Sequence",
-                                    subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
+                                    subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) + 
+      scale_fill_brewer(palette = "Paired")
     
     
   }
   
   comb_result_pep <- comb_result_seq %>% 
-    filter(!grepl("Unexpected",Pool_for_seq_merge)) %>%
+    filter(!grepl("Unexpected",Pool_for_seq_merge) & !grepl("missing",Pool_for_seq_merge)) %>%
     select(!Pool_for_seq_merge) %>%
-    left_join(pep_list_w_theo_quant_new,by="pep_with_pos") %>% ## IF FULL_JOIN IS USED, 
-    mutate(Pool_for_pep_merge=NA)%>%
+    full_join(pep_list_w_theo_quant_new,by="pep_with_pos") %>% ## IF FULL_JOIN IS USED, 
+    mutate(Pool_for_pep_merge=NA) %>%
     mutate(Pool_for_pep_merge=ifelse(is.na(Pool),"Wrong Localization","Correct")) %>%  ## MISSING PEPTIDE INFO COULD BE OBTAINED
     mutate(Pool_for_pep_merge= ifelse(is.na(Spectrum.File),"missing",Pool_for_pep_merge)) %>%
+    mutate(Pool=ifelse(is.na(Pool),"Unexpected",Pool)) %>%
+    mutate(Pool= ifelse(is.na(Spectrum.File),"missing",Pool)) %>%
+    mutate(isomericity=ifelse(is.na(isomericity),"Unexpected",isomericity)) %>%
+    mutate(isomericity=ifelse(is.na(Spectrum.File),"missing",isomericity)) %>%
     #drop_na(pool_id) ## ELIMINATION OF UNEXPECTED PEPTIDES
     mutate(acq_type=acquisiton_type) %>%
-    mutate(soft_name=software_name) %>%
+    mutate(soft_name=software_name)
+    
+  write.table(comb_result_pep ,file=paste(file_path, software_name,
+                                          "experiment",
+                                          exp_id,acquisiton_type,
+                                          "merge_theo_list_id_phospho_sites_based_exp2Pools.tsv",sep = "_"),
+              sep = "\t",col.names = T,row.names = F)
+  
+    comb_result_pep_max_int  <- comb_result_pep %>% 
     group_by(pep_with_pos,`all_dirs[i]`) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
     slice(which.max(Intensity)) %>% ## ELIMINATE MULTIPLE CHARGES
-    ungroup()
+    ungroup() 
     #distinct(pep_with_pos,.keep_all = T)
-  
+    
   # Apply the function to the dataframe and store the results in a new column
-  comb_result_pep$max_value_column <- apply(comb_result_pep, 1, function(row) get_max_value(row["ptmRS.Best.Site.Probabilities"]))
+  comb_result_pep_max_int$max_value_column <- apply(comb_result_pep_max_int,
+                                                    1,
+                                                    function(row) get_max_value(row["ptmRS.Best.Site.Probabilities"]))
   
-  comb_result_pep <- comb_result_pep %>% relocate(max_value_column,
+  comb_result_pep_max_int <- comb_result_pep_max_int %>% relocate(max_value_column,
                                                   .after =ptmRS.Best.Site.Probabilities )
     
   
-  write.table(comb_result_pep,file=paste(file_path, software_name,
+  write.table(comb_result_pep_max_int,file=paste(file_path, software_name,
                                       "experiment",
                                       exp_id,acquisiton_type,
-                                      "merge_theo_list_with_identified_phospho_sites.tsv",sep = "_"),
+                                      "merge_theo_list_id_phospho_sites_max_int.tsv",sep = "_"),
               sep = "\t",col.names = T,row.names = F)
   ## THIS IS FOR ORDERING ALL RAW FILES.
   # comb_result_pep$new_cat <- factor(comb_result_pep$Spectrum.File, levels = c("OXPAL221027_01.raw","OXPAL221030_02.raw",
@@ -253,9 +271,30 @@ final_pd_pep_quant_analysis_exp1 <- function(file_path,
   #                        subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) + 
   #   scale_fill_brewer(palette = "Dark2") + geom_bar(position = "dodge")
   # 
-  # 
+  plot5 <- comb_result_pep %>% distinct(pep_with_pos,.keep_all = T) %>%
+    ggplot( aes(x=Pool,fill=isomericity)) +
+    geom_bar() + theme_bw() +
+    geom_text(color="black",aes(label=after_stat(count)),
+              show.legend = F,stat = "count",size=8,
+              position = position_stack(vjust = 0.5)) + 
+    scale_fill_brewer(palette = "Dark2") +
+    labs(title=paste("Number of Identified phospho-sites based on pools of Experiment 2",
+                     acquisiton_type),x="Sample id",y="Number of identified Sequence") +
+    theme_minimal() +
+    theme(legend.text = element_text(size=30), 
+          axis.title.x = element_text(size=30),
+          axis.title.y = element_text(size=30),
+          plot.title = element_text(size=35),
+          plot.subtitle = element_text(size = 25),
+          plot.caption = element_text(size = 25),
+          legend.title=element_text(size=30),
+          axis.text.x = element_text(size=20,angle = 90),
+          axis.text.y = element_text(size = 30),
+          axis.title=element_text(size=30))
   
-  plot2 <- ggplot(comb_result_pep, aes(x=Spectrum.File,fill=Pool_for_pep_merge)) +
+  
+  
+  plot2 <- ggplot(comb_result_pep_max_int, aes(x=Spectrum.File,fill=Pool_for_pep_merge)) +
     geom_bar() + theme_bw() +
     geom_text(color="black",aes(label=after_stat(count)),
               show.legend = F,stat = "count",size=8,
@@ -331,7 +370,7 @@ final_pd_pep_quant_analysis_exp1 <- function(file_path,
     # assign(paste0("tmp",i), comb_result_pep %>% 
     #   filter(max_value_column > threshold[i]) %>%
     #   count(Pool_for_pep_merge,pool_id.x))
-    df <- comb_result_pep %>% 
+    df <- comb_result_pep_max_int %>% 
       
       filter(max_value_column > threshold[i]) %>%
       count(Pool_for_pep_merge) %>% mutate(threshold_val = threshold[i])
