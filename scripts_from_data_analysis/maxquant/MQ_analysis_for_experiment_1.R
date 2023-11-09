@@ -15,9 +15,138 @@ library(purrr)
 
 ### Source code was taken from here: https://rdrr.io/github/singjc/mstools/src/R/getModificationPosition.R
 ## The code was modified based on what I want and based on software input tyoe (DIANN-and MaxQuant)
-source("D:/dev/Desktop_copy/PHD/data_analysis/scripts/getModificationPositionMQ_func.R")
+#source("D:/dev/Desktop_copy/PHD/data_analysis/scripts/getModificationPositionMQ_func.R")
+#source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/get_modification_func/getModificationPositionMQ_func_edit.R")
+source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/get_modification_func/getModificationPosition_general_change_condition_current_mod_sequence_MQ_Spectronaut.R")
+source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/ggplot/ggplot_functions.R")
 
-setwd("D:/dev/Desktop_copy/PHD/wet_lab_experiments/DDA_data_analysis/experiment_1/MaxQuant/exp1_wo_FAIMS_wo_Ecoli_OXPAL230121/")
+file_path = "D:/dev/Pinar/PHD/wet_lab_experiments/DDA_data_analysis/experiment_1/MaxQuant/MQ_v2.1.4_default_params/"
+selected_species = "HUMAN"
+background_species ="ECOLI"
+all_dirs <- list.files(file_path)
+acquisiton_type <- c("DDA_with_FAIMS","DDA_with_FAIMS", "DDA_no_FAIMS","DDA_no_FAIMS")
+software_name <-"MaxQuant"
+exp_id<-1
+#all_files <- list.files(paste0(file_path,all_dirs[i],"/"),pattern = ".xlsx")
+
+#comb_result <- NULL
+#comb_ecoli <- NULL
+for(i in 1:length(all_dirs)){
+  
+  assign(paste0("tmp"), read.table(file=paste0(file_path,all_dirs[i],"/evidence.txt"),sep = "\t",header = T))
+  
+  phospho_tmp <- tmp %>% 
+    filter(grepl("Phospho",Modified.sequence) & grepl(selected_species,Proteins)) %>%
+    drop_na(Modified.sequence) %>%
+    mutate(all_dirs[i]) %>%
+    mutate(acq_type=acquisiton_type[i]) %>%
+    mutate(soft_name=software_name)
+    #mutate(phospho_pos = proline_phospho_pos_extraction(Modifications)) %>%
+    #mutate(pep_with_pos = paste(Sequence,phospho_pos,sep = "_")) %>%
+    #distinct(pep_with_pos,.keep_all = TRUE)
+  
+  #assign(paste0(all_dirs[i]), phospho_tmp)
+  #assign(paste0("comb_result"),bind_rows(comb_result, phospho_tmp))
+  
+  if(background_species == "Escherichia coli" |background_species == "ECOLI"){
+    
+    ecoli_tmp <- tmp %>% 
+      filter(!grepl(selected_species,Proteins) & !grepl("CON_", Proteins)) %>%
+      mutate(Experiment = ifelse(Raw.file == "OXPAL230421_08_-45","E1-M2-coli-inj1",Experiment)
+      ) %>%
+      mutate(all_dirs[i]) %>%
+      mutate(acq_type=acquisiton_type[i]) %>%
+      mutate(soft_name=software_name) %>%
+      group_by(Sequence,Experiment) %>%
+      slice(which.max(Intensity)) %>%
+      ungroup() %>%
+      #distinct(Sequence,.keep_all = TRUE) %>%
+      separate(Experiment,into =c("Exp_id","Sample_id","tmp","inj_id"),sep = "-",remove = F) %>%
+      mutate(new_col=paste(Exp_id,Sample_id,sep = "_"))
+      
+    ecoli_seq_dist <- quant_peptides %>% 
+      select(Sequence,Modifications,Proteins) %>%
+      filter(!grepl(selected_spcies, Proteins) & !grepl("CON__", Proteins)) %>%
+      
+      #filter(grepl(background_species,Proteins)) %>%
+      distinct(Sequence,.keep_all = T) %>%
+      mutate(species=background_species) 
+    
+    
+    
+    plot6 <- gg_barplt_id_pep_count(data_set = ecoli_tmp,
+                                    x_df = ecoli_tmp$Raw.file,
+                                    fill_df = ecoli_tmp$new_col,
+                                    ymax = 20000,
+                                    header = paste("Total number of identified synthetic phospho-sequences across each pool",sep=" "),
+                                    caption_lab = "Wrong Sequences were removed for the futher analysis.",
+                                    x_lab = "Sample id",
+                                    fill_lab =  "Sample id",
+                                    y_lab = "Number of identified Sequence",
+                                    subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) + 
+      scale_fill_brewer(palette = "Dark2") + theme(axis.text.x = element_text(angle = 90))
+    
+    write.table(comb_ecoli,file=paste(file_path, software_name,
+                                      "experiment",
+                                      exp_id,acquisiton_type,
+                                      "merge_identified_ecoli_sequences.tsv",sep = "_"),
+                sep = "\t",col.names = T,row.names = F)
+    
+    
+    #assign(paste0("comb_ecoli"), bind_rows(comb_ecoli,ecoli_tmp))
+  }else{
+    
+  }
+  
+  df2 <- apply(X = as.data.frame(phospho_tmp[,"Modified.sequence"]),1,function(x){getModificationPosition_general(mod_seq = x,software_name = "MQ_214")})
+  
+  results1 <- map_dfr(df2, ~ enframe(.x)) %>%
+    filter(grepl("modification_",name)| grepl("pep_seq", name)) %>%
+    mutate(value = map_chr(value, str_c, collapse="&")) %>%
+    mutate(mods=case_when(grepl("Phospho (STY)",fixed = T,name) ~ "phospho",
+                          grepl("Oxidation (M)",fixed = T,name) ~ "Oxidation",
+                          grepl("(Acetyl (Protein N-term))",fixed = T,name) ~ "N-term_Acetyl",
+                          TRUE ~ ""))
+  
+  ## Adding indeces to use as pep-seq info
+  results_with_index <- results1 %>%
+    mutate(id = cumsum(name == "pep_seq")) 
+  
+  ## Creating a new object to combine everything;
+  reshaped_results <- results1 %>% 
+    ## ADDING INDEX
+    mutate(id = cumsum(name == "pep_seq")) %>%
+    ## REMOE rows contains "PEP_SEQ"
+    filter(name != "pep_seq") %>%
+    ## GROUPING
+    group_by(id) %>%
+    ## MERGING ALL MODS, POSITIONS, and their unimod id 
+    ## ADDING "name" IS OPTIONAL 
+    mutate(mods = paste(value, mods, collapse = "__")) %>% #name
+    ## USING INITIAL INDECES, JOINING WILL BE DONE
+    left_join(filter(results_with_index, name == "pep_seq"), by = "id") %>% 
+    ungroup() %>%
+    ## SELECTING USEFUL COLUMNS
+    select(c(name.x,value.x,mods.x,value.y))
+  
+  
+  result_with_common_col <- reshaped_results %>%
+    filter(grepl("modification_(Phospho (STY))",fixed = T,name.x)) %>%
+    mutate(common_col_merging = paste(value.y,value.x, sep = "_")) %>%
+    select(!value.y) %>%
+    rename("mods_id" = "name.x",
+           "phospho_positions" ="value.x",
+           "all_mods_with_mod_type" = "mods.x")
+  
+  
+  #getModificationPosition_MQ(mod_seq = id_syn_pep$`Modified sequence`,F)
+  
+  final_results_with_common_col <- mutate(result_with_common_col,phospho_tmp)
+  
+  
+  rm(tmp,phospho_tmp,ecoli_tmp)
+  
+}
 exp1_wo_faims_wo_Ecoli <- read_tsv("evidence.txt")
 #exp1_wo_faims_with_Ecoli <- read_tsv("evidence.txt")
 
@@ -34,51 +163,6 @@ id_syn_phospho_pep <- exp1_wo_faims_wo_Ecoli %>%
   filter(grepl("Phospho",Modifications)) 
 
 
-
-df2 <- apply(id_syn_phospho_pep[,"Modified sequence"],1,getModificationPosition_MQ)
-
-results1 <- map_dfr(df2, ~ enframe(.x)) %>%
-  filter(grepl("modification_",name)| grepl("pep_seq", name)) %>%
-  mutate(value = map_chr(value, str_c, collapse="&")) %>%
-  mutate(mods=case_when(grepl("Phospho (STY)",fixed = T,name) ~ "phospho",
-                        grepl("Oxidation (M)",fixed = T,name) ~ "Oxidation",
-                        grepl("(Acetyl (Protein N-term))",fixed = T,name) ~ "N-term_Acetyl",
-                        TRUE ~ ""))
-
-## Adding indeces to use as pep-seq info
-results_with_index <- results1 %>%
-  mutate(id = cumsum(name == "pep_seq")) 
-
-## Creating a new object to combine everything;
-reshaped_results <- results1 %>% 
-  ## ADDING INDEX
-  mutate(id = cumsum(name == "pep_seq")) %>%
-  ## REMOE rows contains "PEP_SEQ"
-  filter(name != "pep_seq") %>%
-  ## GROUPING
-  group_by(id) %>%
-  ## MERGING ALL MODS, POSITIONS, and their unimod id 
-  ## ADDING "name" IS OPTIONAL 
-  mutate(mods = paste(value, mods, collapse = "__")) %>% #name
-  ## USING INITIAL INDECES, JOINING WILL BE DONE
-  left_join(filter(results_with_index, name == "pep_seq"), by = "id") %>% 
-  ungroup() %>%
-  ## SELECTING USEFUL COLUMNS
-  select(c(name.x,value.x,mods.x,value.y))
-
-
-result_with_common_col <- reshaped_results %>%
-  filter(grepl("modification_(Phospho (STY))",fixed = T,name.x)) %>%
-  mutate(common_col_merging = paste(value.y,value.x, sep = "_")) %>%
-  select(!value.y) %>%
-  rename("mods_id" = "name.x",
-         "phospho_positions" ="value.x",
-         "all_mods_with_mod_type" = "mods.x")
-
-
-#getModificationPosition_MQ(mod_seq = id_syn_pep$`Modified sequence`,F)
-
-final_results_with_common_col <- mutate(result_with_common_col,id_syn_phospho_pep)
 
 #filtered_abundances<-final_results_with_common_col[rowSums(!is.na(select(quant_peptides_with_all,starts_with("abundance_"))))>0,]
 
