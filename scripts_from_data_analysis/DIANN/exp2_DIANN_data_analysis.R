@@ -6,33 +6,40 @@ library(openxlsx)
 library(tidyr)
 library(ggplot2)
 library(tidyverse)
+library(purrr)
 ###############################################
 source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/ggplot/ggplot_functions.R")
 source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/get_modification_func/getModificationPosition_func_for_all_mods.R")
 
-file_path <- "D:/dev/Pinar/PHD/wet_lab_experiments/DIA_data_analysis/experiment_2/DIANN_software_with_monitor-mod_UniMod21/"
-file_name <- "exp2_unimod_report.tsv"
-mapping <- "D:/dev/Pinar/PHD/data_analysis/DIA_data_processing/mapping_files/exp2_mapping_btw_rawfile_exp_design.txt"
-
-
+file_path <- "D:/dev/Pinar/PHD/wet_lab_experiments/DIA_data_analysis/Experiment_2_redesign/DIANN/"
+file_name <- "report.tsv" #"exp2_unimod_report.tsv"
+mapping <- "D:/dev/Pinar/PHD/data_analysis/DIA_mapping/exp2_redesigned_mapping_btw_rawfile_exp_design.txt"
+#exp2_mapping_btw_rawfile_exp_design.txt
+#any_LC
+#mod_phospho_carb_only
 
 selected_spcies="HUMAN"
 background_species= "ECOLI"
-theo_file_path= "D:/dev/Pinar/PHD/wet_lab_experiments/Eyers_syn_peptides_experiment/"
-theo_file_name="Synthetic peptides list_theo_conc_corrected_pool_id_iso_count_final.xlsx"
-sheet_theo_name = "ISO-ref and OTHER with FC"
+#theo_file_path= "D:/dev/Pinar/PHD/wet_lab_experiments/Eyers_syn_peptides_experiment/"
+#theo_file_name="Synthetic peptides list_theo_conc_corrected_pool_id_iso_count_final.xlsx"
+#sheet_theo_name = "ISO-ref and OTHER with FC"
+theo_file_path="D:/dev/Pinar/PHD/wet_lab_experiments/Eyers_syn_peptides_experiment/"
+theo_file_name="Synthetic peptides list_theo_conc_corrected_isomericity_new_with_plates.xlsx"
+sheet_theo_name ="ISOREF_REF2_Others"#"ISO-refOTHER with FC_correct"
+
 acquisiton_type="DIA no FAIMS Exploris"
 subtitle = ""
 fdr_threshold = 0.05
-actual_ratio = c(2,10,20,100)
+actual_ratio=c(0.5,5,10,30,0)#actual_ratio = c(2,10,20,100)
+
 #exp_design=experiment_name
 exp_id=2
 software_name="DIANN"
 num_reps=3
 test_type="limma"
+numerator = 2
 
-
-final_spectronaut_pep_quant_analysis_syn <- function(file_path,
+final_diann_pep_quant_analysis_syn <- function(file_path,
                                                      file_name,
                                                      sheet_name,
                                                      theo_file_path,
@@ -41,6 +48,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
                                                      background_species,
                                                      selected_spcies,
                                                      exp_id,
+                                                     numerator, ## Which sample id was selected as numerator for quant process
                                                      mapping,
                                                      #exp_design,
                                                      fdr_threshold,
@@ -58,16 +66,18 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   sample_size <- length(exp_design) / num_reps
   sample_names <- paste0("A",1:sample_size)
   comparisons <- NULL
+  
   for (i in 1:sample_size){
-    tmp <- paste0(sample_names[1], "/",sample_names[i])
+    tmp <- paste0(sample_names[numerator], "/",sample_names[i])
     comparisons[i] <- tmp
     rm(tmp)
   }
-  comparisons <- comparisons[-1]
+  #comparisons <- comparisons[-1]
+  comparisons <- comparisons[-numerator]
+
+  exp_design <- str_sort(exp_design)
   
   quant_peptides <- read_tsv(paste0(file_path,file_name),col_names = T)
-  
-  
   
   quant_peptides_with_cond <- quant_peptides %>% 
     left_join(mapping_file,by="Run") %>%
@@ -81,18 +91,22 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   imputed_values_vec <- as.vector(imputed_values$first_quantile)
   
   ## PHOSPHO-FILTERING
-  quant_phospho <- quant_peptides_with_cond %>% filter(grepl("HUMAN", Protein.Names)) %>%
+  quant_phospho <- quant_peptides_with_cond %>% filter(grepl("HUMAN", Protein.Names) & !grepl("CON__",Protein.Names)) %>%
     filter(grepl("UniMod:21",Modified.Sequence))
   
   ## THEORETICAL PEPTIDE LIST
   pep_list_w_theo_quant <- read.xlsx(paste0(theo_file_path, theo_file_name), sheet = sheet_theo_name)
   pep_list_w_theo_quant <- pep_list_w_theo_quant[,-1]
   
-  common_col_theo_quant <- as.data.frame(paste(pep_list_w_theo_quant$Phosphopeptide.sequence,
-                                               pep_list_w_theo_quant$modified.position.in.peptide, sep = "_"))
-  colnames(common_col_theo_quant) <- "pep_with_pos"
-  pep_list_w_theo_quant_new <- cbind(common_col_theo_quant,pep_list_w_theo_quant)
+  #common_col_theo_quant <- as.data.frame(paste(pep_list_w_theo_quant$Phosphopeptide.sequence,
+                                               #pep_list_w_theo_quant$modified.position.in.peptide, sep = "_"))
+  #colnames(common_col_theo_quant) <- "pep_with_pos"
+  #pep_list_w_theo_quant_new <- cbind(common_col_theo_quant,pep_list_w_theo_quant)
   
+  pep_list_w_theo_unique <- pep_list_w_theo_quant_new %>% select(Phosphopeptide.sequence, Pool) %>%
+    distinct(Phosphopeptide.sequence,.keep_all = TRUE) %>%
+    rename(Sequence = Phosphopeptide.sequence) %>%
+    rename(Pool_for_seq_merge=Pool)
   
   ## input sequence will be like this: (UniMod:1)AGGKPS(UniMod:21)QS(UniMod:21)PSQEAAGEAVLGAK
   
@@ -100,7 +114,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   
   #apply(X = as.data.frame(quant_phospho[,"Modified.Sequence"]),1,function(x){getModificationPosition_general(mod_seq = x,software_name = )})
   
-  map_dfr(df2, enframe)
+  test <- map_dfr(df2, enframe)
   
   ## OUTPUT FORMAT DOES NOT SUITABLE FOR DISTINGUSING BTW MODS 
   results1 <- map_dfr(df2, ~ enframe(.x)) %>%
@@ -135,7 +149,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     ## ADDING "name" IS OPTIONAL 
     mutate(mods = paste(value, mods, collapse = "__")) %>% #name
     ## USING INITIAL INDECES, JOINING WILL BE DONE
-    left_join(filter(results_with_index, name == "pep_seq"), by = "id") %>% 
+    full_join(filter(results_with_index, name == "pep_seq"), by = "id") %>% 
     ungroup() %>%
     ## SELECTING USEFUL COLUMNS
     select(c(name.x,value.x,mods.x,value.y))
@@ -152,7 +166,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   final_results_with_common_col <- mutate(result_with_common_col,quant_phospho)
   
   barplt_df <- final_results_with_common_col %>%
-    select(Sequence,Experiment,Intensity,pep_with_pos,Protein.Names) %>%
+    select(Sequence,Experiment,Intensity,pep_with_pos,Protein.Names,Run) %>%
     separate(Experiment, into = c("Exp_id","Sample_id","Rep_id"),sep = "-",remove = F) %>%
     #mutate(sample_rep_id_seq = paste(pep_with_pos, Sample_id,Rep_id, sep = "_")) %>%
     group_by(pep_with_pos,Experiment) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
@@ -164,7 +178,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   df_merge_syn <- barplt_df %>%
     select(pep_with_pos,Experiment,Intensity, Protein.Names) %>% 
     pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
-    full_join(pep_list_w_theo_quant_new,by="pep_with_pos") %>% 
+    full_join(pep_list_w_theo_quant,by="pep_with_pos") %>% 
     mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
     mutate(Pool= ifelse(is.na(Protein.Names),"missing",Pool)) %>%
     select(pep_with_pos,starts_with(exp_design),Pool) %>%
@@ -184,6 +198,44 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   write.table(df_merge_syn,file = paste0(file_path,"Count_of_missing_unexpected_correct_phospho-sites_",
                                          software_name,"_Experiment",exp_id,".txt"),
               sep = "\t",row.names = F)
+  
+  
+  
+  ecoli_seq_dist <- quant_peptides_with_cond %>% 
+    select(Sequence,Modified.Sequence, Protein.Names) %>%
+    filter(grepl(background_species,Protein.Names)) %>%
+    mutate(species=background_species) %>%
+    distinct(Sequence,.keep_all = T)
+  
+
+  all_seq_syn <- quant_phospho %>% 
+    filter(grepl(selected_spcies,Protein.Names) & 
+             grepl("UniMod:21",Modified.Sequence)) %>%
+    mutate(species=selected_spcies) %>%
+    full_join(pep_list_w_theo_unique,by="Sequence") %>%
+    mutate_at("Pool_for_seq_merge", ~replace_na(.,"Unexpected")) %>%
+    mutate(Pool_for_seq_merge= ifelse(is.na(Run),"missing",Pool_for_seq_merge)) %>%
+    distinct(Sequence,.keep_all = TRUE)
+  
+  all_seq <- all_seq_syn %>%
+    filter(!grepl("Unexpected",Pool_for_seq_merge)) %>%
+    bind_rows(ecoli_seq_dist) %>% 
+    mutate(Pool_for_seq_merge= ifelse(is.na(Pool_for_seq_merge),background_species,Pool_for_seq_merge))
+  
+  ## This is the same as p13 in DDA data analysis
+  p12 <- gg_barplt_id_pep_count(data_set = all_seq,
+                                x_df = all_seq$Pool_for_seq_merge,
+                                fill_df = all_seq$Pool_for_seq_merge,
+                                ymax = 20000,
+                                header = paste("Total number of identified phosphorylated", selected_spcies,"and", background_species,"across each sample",sep=" "),
+                                caption_lab = "NA values are removed. (p13)",
+                                x_lab = "Sample id",
+                                fill_lab =  "Sample id",
+                                y_lab = "Number of identified peptides",
+                                subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
+  
+  write.table(all_seq_syn, file=paste0(file_path,"Experiment2",software_name,"_number_of_unique_sequence_for_each_species.txt"),sep = "\t",col.names = T,row.names = F)
+  #################################################
   
   barplt_df_ecoli <- quant_peptides_with_cond %>% 
     filter(grepl(background_species, Protein.Names)) %>%
@@ -223,12 +275,15 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   barplt_df_wide <- barplt_df %>%  ## If you select "charge" column, it will bring multiple rows for one seq
     select(Sequence,Experiment,Intensity,pep_with_pos,Protein.Names) %>%
     pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
-    mutate(species=selected_spcies) %>% relocate(exp_design,.after = "pep_with_pos")
+    mutate(species=selected_spcies) %>%
+    relocate(exp_design,.after = "pep_with_pos")
+
   
   barplt_df_ecoli_wide <- barplt_df_ecoli %>% 
     select(Sequence,Experiment, Protein.Names,Intensity) %>%
     pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
-    mutate(species=background_species) %>% relocate(exp_design,.after = "Protein.Names")
+    mutate(species=background_species) %>% 
+    relocate(exp_design,.after = c("Protein.Names","Sequence"))
   
   
   # Nothing is changed
@@ -281,7 +336,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     select(!starts_with("E")) %>%
     bind_cols(abundances_ecoli_rowMeans) %>%
     tibble() %>%
-    rename_with(~ paste0("mean abundance",1:5), matches("^row")) %>%
+    rename_with(~ paste0("mean abundance",1:sample_size), matches("^row")) %>%
     pivot_longer(cols = starts_with("mean"), 
                  values_to = "Intensity",
                  names_to = "sample_ids",
@@ -386,11 +441,13 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   
   # Calculate Fold Change by keeping A1 constant (mean(S1)/mean(S2), etc.)
   cols <- ncol(filtered_abundances_rowMeans)
-  for(An in 2:cols){
-    filtered_abundances_rowMeans[,paste0("exp_FC_A1/A",An)] <- filtered_abundances_rowMeans[,1]/filtered_abundances_rowMeans[,An]
+  for(An in 1:cols){
+    filtered_abundances_rowMeans[,paste0("exp_FC_A",numerator,"/A",An)] <- filtered_abundances_rowMeans[,numerator]/filtered_abundances_rowMeans[,An]
     
   }
-  
+  rmv_col <- paste0("exp_FC_A",numerator,"/A",numerator)
+  filtered_abundances_rowMeans <- filtered_abundances_rowMeans %>% select(!rmv_col)
+
   # To calculate all binary combination in the data frame
   #mat <- do.call(cbind, lapply(cols, function(xj) 
   #  sapply(cols, function(xi) (filtered_abundances_rowMeans[, xj]/(filtered_abundances_rowMeans[, xj])))))
@@ -403,7 +460,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   final_imputed_data_ecoli <- final_imputed_data  %>% filter(!grepl(selected_spcies, species))
   
   df_merge <- final_imputed_data_syn %>%
-    left_join(pep_list_w_theo_quant_new,by="pep_with_pos") %>% 
+    left_join(pep_list_w_theo_quant,by="pep_with_pos") %>% 
     mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
     bind_rows(final_imputed_data_ecoli) %>%
     mutate_at("Pool", ~replace_na(.,background_species)) 
@@ -608,24 +665,30 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     library(limma)
     design_matrix <- model.matrix(~factor(c(rep(2,num_reps),rep(1,num_reps))))
     merge_stat_df <-NULL
-    for ( i in 2:sample_size){
+    for ( i in 1:sample_size){
       # Change only the colname iteratively makes fit to every comparison
-      colnames(design_matrix) <- c("Intercept", paste0("A1-A",i))
+      colnames(design_matrix) <- c("Intercept", paste0("A",numerator,"-A",i))
       #print(colnames(design_matrix))
       # Col selection for each comparison
-      assign(paste0("df_A1vsA",i),stat_analysis %>% select(1:2 | contains("A1-") & contains("log10_") | contains(paste0("A",i,"-")) & contains("log10_")))
-      # First, linear model was built
-      assign(paste0("fit",i) ,lmFit(get(paste0("df_A1vsA",i))[,3:8], design_matrix))
-      assign(paste0("fit",i), eBayes(get(paste0("fit",i))))
-      # Readable dataframe format was generated 
-      assign(paste0("alllimma",i), topTable(get(paste0("fit",i)), coef=2,adjust.method="BH",p.value=1,"P"))
-      # Colnames were labeled in each comparison to make easier data merging
-      #assign(paste0("alllimma",i),get(paste0("alllimma",i)) %>% rename_with(~ paste0(colnames(design_matrix)[2],"_", .x), everything()))
+      if(numerator != i){
+        assign(paste0("df_A",numerator,"vsA",i),stat_analysis %>% 
+                 select(1:2 | contains(paste0("A",numerator,"-")) & contains("log10_") | contains(paste0("A",i,"-")) & contains("log10_")))
+        # First, linear model was built
+        assign(paste0("fit",i) ,lmFit(get(paste0("df_A",numerator,"vsA",i))[,3:8], design_matrix))
+        assign(paste0("fit",i), eBayes(get(paste0("fit",i))))
+        # Readable dataframe format was generated 
+        assign(paste0("alllimma",i), topTable(get(paste0("fit",i)), coef=2,adjust.method="BH",p.value=1,"P"))
+        # Colnames were labeled in each comparison to make easier data merging
+        #assign(paste0("alllimma",i),get(paste0("alllimma",i)) %>% rename_with(~ paste0(colnames(design_matrix)[2],"_", .x), everything()))
+        
+        assign(paste0("alllimma",i),get(paste0("alllimma",i)) %>% bind_cols(colnames(design_matrix)[2])) 
+        # Collect everything into one object
+        merge_stat_df <- bind_rows(merge_stat_df,get(paste0("alllimma",i)))
+      }else{}
       
-      assign(paste0("alllimma",i),get(paste0("alllimma",i)) %>% bind_cols(colnames(design_matrix)[2])) 
-      # Collect everything into one object
-      merge_stat_df <- bind_rows(merge_stat_df,get(paste0("alllimma",i)))
     }
+    
+    
     
     merge_stat_df <- bind_cols(rownames(merge_stat_df),merge_stat_df) 
     colnames(merge_stat_df)[1] <- "common_col"
@@ -633,10 +696,10 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     merge_stat_df1 <- merge_stat_df %>% 
       separate(common_col, into = c("pep_with_pos","Pool","tmp"),sep = "@") %>%
       select(!tmp) %>%
-      rename_with(.col=9, ~ "A1vs_Ai") %>%
-      separate(A1vs_Ai, into = c("first","second"),sep = "-") %>%
-      mutate(A1vs_Ai = paste(first,second,sep = "/")) %>%
-      mutate(common_col = paste(pep_with_pos,Pool,A1vs_Ai,sep = "@")) %>%
+      rename_with(.col=9, ~ "fold_change_comp") %>%
+      separate(fold_change_comp, into = c("first","second"),sep = "-") %>%
+      mutate(fold_change_comp = paste(first,second,sep = "/")) %>%
+      mutate(common_col = paste(pep_with_pos,Pool,fold_change_comp,sep = "@")) %>%
       select(!c(first,second))
     
     merge_stat_df_final <- stat_analysis %>%
@@ -658,6 +721,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
       unite(Pool_new, Pool.x, isomericity,sep = "_",remove = FALSE) %>%
       unite('new_col_coloring',Pool_new,ratio,sep = "_",remove = FALSE) %>%
       mutate(new_col_coloring = if_else(grepl("ISO-REF", new_col_coloring), "ISO-REF", new_col_coloring)) %>%
+      mutate(new_col_coloring = if_else(grepl("REF_mono", new_col_coloring), "REF_mono", new_col_coloring)) %>%
       mutate(new_col_coloring = if_else(grepl("unexpected", new_col_coloring), "unexpected", new_col_coloring)) %>%
       rename(pep_with_pos=pep_with_pos.x) %>% rename(Pool=Pool.x)
     
@@ -665,22 +729,36 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     print("Statistical test could not be assessed. Check the input files!")
   }
   
-  ## Generation of df -> expected abundance ratio for volcano plot
-  actual_ratio_col <- merge_stat_df_final %>%
-    select(A1vs_Ai) %>% distinct() %>%
-    mutate(actual_ratio_val = case_when(grepl(comparisons[1],A1vs_Ai) ~actual_ratio[1],
-                                        grepl(comparisons[2],A1vs_Ai) ~actual_ratio[2],
-                                        grepl(comparisons[3],A1vs_Ai) ~actual_ratio[3],
-                                        grepl(comparisons[4],A1vs_Ai) ~actual_ratio[4]))
+  ##TODO: Find more logical way to map these values!!!
+  
+  if(length(comparisons) == 4){
+    actual_ratio_col <- merge_stat_df_final %>%
+      select(fold_change_comp) %>% distinct() %>%
+      mutate(actual_ratio_val= case_when(grepl(comparisons[1],fold_change_comp) ~ actual_ratio[1],
+                                         grepl(comparisons[2],fold_change_comp) ~actual_ratio[2],
+                                         grepl(comparisons[3],fold_change_comp) ~actual_ratio[3],
+                                         grepl(comparisons[4],fold_change_comp) ~actual_ratio[4]))
+  }else if(length(comparisons) == 5){
+    actual_ratio_col <- merge_stat_df_final %>%
+      select(fold_change_comp) %>% distinct() %>%
+      mutate(actual_ratio_val= case_when(grepl(comparisons[1],fold_change_comp) ~ actual_ratio[1],
+                                         grepl(comparisons[2],fold_change_comp) ~actual_ratio[2],
+                                         grepl(comparisons[3],fold_change_comp) ~actual_ratio[3],
+                                         grepl(comparisons[4],fold_change_comp) ~actual_ratio[4],
+                                         grepl(comparisons[5],fold_change_comp) ~actual_ratio[5]))
+  }else{
+    print("Mapping between theoretical ratio and comparison cannot be done. Please make sure that you have either 4 or 5 comparisons overall.")
+  }
+  
   
   point_count_y_axis <- merge_stat_df_final %>%
-    group_by(A1vs_Ai, new_col_coloring) %>%
+    group_by(fold_change_comp, new_col_coloring) %>%
     filter(P.Value < 0.05) %>% 
     count(new_col_coloring) %>% left_join(actual_ratio_col)
   
   
   ymax <- max(-log10(merge_stat_df_final$P.Value)) + 0.5
-  y_decrement <- 0.15
+  y_decrement <- 0.25
   
   calculate_y_pos <- function(group) {
     group_length <- length(group)
@@ -689,13 +767,14 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   }
   
   # Apply the function to calculate y_pos within each group
-  point_count_y_axis$y_pos <- unlist(by(point_count_y_axis$A1vs_Ai, point_count_y_axis$A1vs_Ai, calculate_y_pos))
+  point_count_y_axis$y_pos <- unlist(by(point_count_y_axis$fold_change_comp, point_count_y_axis$fold_change_comp, calculate_y_pos))
   
   
   p9 <- ggplot(merge_stat_df_final,aes(x =log2(merge_stat_df_final$fold_change_values), y = -log10(merge_stat_df_final$P.Value))) +
     geom_point(aes(color = new_col_coloring,shape=Pool_new), size = 2.5) +
     #geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red") +
     scale_fill_manual(values = c("ISO-REF" = "#000000",
+                                 "REF_mono" = "#000000",
                                  "Unexpected_False Positive_A1/A2"="#999999",
                                  "Unexpected_False Positive_A1/A3" ="#999999",
                                  "Unexpected_False Positive_A1/A4"="#999999",
@@ -710,6 +789,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
                                  "Others_mono_A1/A5" = "#009E73")) + 
     #geom_line(aes(color = new_col_coloring), size = 1) +  # Add color aesthetic to geom_line()
     scale_color_manual(values = c("ISO-REF" = "#000000",
+                                  "REF_mono" = "#000000",
                                   "Unexpected_False Positive_A1/A2"="#999999",
                                   "Unexpected_False Positive_A1/A3" ="#999999",
                                   "Unexpected_False Positive_A1/A4"="#999999",
@@ -723,7 +803,8 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
                                   "Others_multi_A1/A5" = "#009E73",
                                   "Others_mono_A1/A5" = "#009E73"),
                        
-                       labels = c('Non-variant', 'Variant non-isomeric A1 vs A2',
+                       labels = c('Non-variant - isomeric', 'Non-variant - non-isomeric',
+                                  'Variant non-isomeric A1 vs A2',
                                   'Variant non-isomeric A1 vs A3',
                                   'Variant non-isomeric A1 vs A4',
                                   'Variant non-isomeric A1 vs A5',
@@ -735,25 +816,25 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
                                   "Unexpected_False Positive A1/A3",
                                   "Unexpected_False Positive A1/A4",
                                   "Unexpected_False Positive A1/A5")) +
-    scale_shape_manual(values = c(16, 15, 12, 17),
-                       labels = c('Non-variant', 'Variant non-isomeric', 'Variant isomeric', 'Unexpected')) +
+    scale_shape_manual(values = c(16, 16, 15, 12, 17),
+                       labels = c('Non-variant - isomeric', 'Non-variant - non-isomeric','Variant non-isomeric', 'Variant isomeric', 'Unexpected')) +
     #scale_y_continuous(limits = c(0, max(-log10(merge_stat_df_final$adj.P.Val))), breaks = seq(0, max(-log10(merge_stat_df_final$adj.P.Val)), by = 0.8)) +
     #scale_x_continuous(limits = c(min(log2(merge_stat_df_final$fold_change_values)),max(log2(merge_stat_df_final$fold_change_values)))) +#facet_wrap(~ratio) +
-    scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=1)) +
-    scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=1)) +
+    #scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=1)) +
+   # scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=1)) +
     #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
     theme_bw() +
-    theme(legend.text = element_text(size = 15),
-          axis.title.x = element_text(size = 15),
-          axis.title.y = element_text(size = 15),
-          plot.title = element_text(size = 30),
-          legend.title = element_text(size = 15),
-          axis.text.x = element_text(size = 15),
-          axis.title = element_text(size = 15),
-          axis.text.y = element_text(size = 15),
-          plot.subtitle = element_text(size = 15)) +
+    theme(legend.text = element_text(size = 30),
+          axis.title.x = element_text(size = 30),
+          axis.title.y = element_text(size = 30),
+          plot.title = element_text(size = 35),
+          legend.title = element_text(size = 30),
+          axis.text.x = element_text(size = 30),
+          axis.title = element_text(size = 30),
+          axis.text.y = element_text(size = 30),
+          plot.subtitle = element_text(size = 30)) +
     labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n", subtitle)) +
-    geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"),size=1) +
+    geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=c("#CC79A7","#E69F00","#56B4E9","#009E73","#000000"),size=1) +
     geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=1) + 
     geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos,fill=new_col_coloring, label = n),size=6, colour="white",show.legend = FALSE) 
   
@@ -805,7 +886,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   
   sapply(1:11,function(x) ggsave(filename = paste0("p",x,".tiff"),
                                  width = 50, height = 45, 
-                                 path = paste0(file_path,"/outputs_with_new_script/"),
+                                 path = paste0(file_path,"/wrong_outputs_with_new_script/"),
                                  units = "cm",
                                  get(paste0("p",x)),
                                  device = "tiff", #".svg"
