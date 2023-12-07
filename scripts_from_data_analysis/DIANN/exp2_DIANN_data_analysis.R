@@ -10,34 +10,7 @@ library(purrr)
 ###############################################
 source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/ggplot/ggplot_functions.R")
 source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/get_modification_func/getModificationPosition_func_for_all_mods.R")
-
-file_path <- "D:/dev/Pinar/PHD/wet_lab_experiments/DIA_data_analysis/Experiment_2_redesign/DIANN/"
-file_name <- "report.tsv" #"exp2_unimod_report.tsv"
-mapping <- "D:/dev/Pinar/PHD/data_analysis/DIA_mapping/exp2_redesigned_mapping_btw_rawfile_exp_design.txt"
-#exp2_mapping_btw_rawfile_exp_design.txt
-#any_LC
-#mod_phospho_carb_only
-
-selected_spcies="HUMAN"
-background_species= "ECOLI"
-#theo_file_path= "D:/dev/Pinar/PHD/wet_lab_experiments/Eyers_syn_peptides_experiment/"
-#theo_file_name="Synthetic peptides list_theo_conc_corrected_pool_id_iso_count_final.xlsx"
-#sheet_theo_name = "ISO-ref and OTHER with FC"
-theo_file_path="D:/dev/Pinar/PHD/wet_lab_experiments/Eyers_syn_peptides_experiment/"
-theo_file_name="Synthetic peptides list_theo_conc_corrected_isomericity_new_with_plates.xlsx"
-sheet_theo_name ="ISOREF_REF2_Others"#"ISO-refOTHER with FC_correct"
-
-acquisiton_type="DIA no FAIMS Exploris"
-subtitle = ""
-fdr_threshold = 0.05
-actual_ratio=c(0.5,5,10,30,0)#actual_ratio = c(2,10,20,100)
-
-#exp_design=experiment_name
-exp_id=2
-software_name="DIANN"
-num_reps=3
-test_type="limma"
-numerator = 2
+source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/roc_curve/new_roc_curve_generation_with_custom_threshold.R")
 
 final_diann_pep_quant_analysis_syn <- function(file_path,
                                                      file_name,
@@ -57,7 +30,8 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
                                                      test_type,
                                                      num_reps,
                                                      actual_ratio,
-                                                     subtitle){
+                                                     subtitle,
+                                               size_variying_pep){
   
   
   mapping_file <- read.table(mapping,sep = "\t",header = T)
@@ -103,7 +77,7 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
   #colnames(common_col_theo_quant) <- "pep_with_pos"
   #pep_list_w_theo_quant_new <- cbind(common_col_theo_quant,pep_list_w_theo_quant)
   
-  pep_list_w_theo_unique <- pep_list_w_theo_quant_new %>% select(Phosphopeptide.sequence, Pool) %>%
+  pep_list_w_theo_unique <- pep_list_w_theo_quant %>% select(Phosphopeptide.sequence, Pool) %>%
     distinct(Phosphopeptide.sequence,.keep_all = TRUE) %>%
     rename(Sequence = Phosphopeptide.sequence) %>%
     rename(Pool_for_seq_merge=Pool)
@@ -184,7 +158,7 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
     select(pep_with_pos,starts_with(exp_design),Pool) %>%
     mutate(soft_name=software_name, ion_mobility=acquisiton_type)
   
-  p11 <- gg_barplt_id_pep_count(data_set = df_merge_syn,
+  plot11 <- gg_barplt_id_pep_count(data_set = df_merge_syn,
                                 x_df = df_merge_syn$Pool,
                                 fill_df = df_merge_syn$Pool,
                                 ymax = 20000,
@@ -223,7 +197,7 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
     mutate(Pool_for_seq_merge= ifelse(is.na(Pool_for_seq_merge),background_species,Pool_for_seq_merge))
   
   ## This is the same as p13 in DDA data analysis
-  p12 <- gg_barplt_id_pep_count(data_set = all_seq,
+  plot12 <- gg_barplt_id_pep_count(data_set = all_seq,
                                 x_df = all_seq$Pool_for_seq_merge,
                                 fill_df = all_seq$Pool_for_seq_merge,
                                 ymax = 20000,
@@ -246,7 +220,7 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
     slice(which.max(Intensity)) %>%
     ungroup()
   
-  p1 <- gg_barplt_id_pep_count(data_set = barplt_df,
+  plot1 <- gg_barplt_id_pep_count(data_set = barplt_df,
                                x_df = barplt_df$Sample_id,
                                fill_df = barplt_df$Rep_id,
                                ymax = 20000,
@@ -258,7 +232,7 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
                                subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
   
   
-  p2 <- gg_barplt_id_pep_count(data_set = barplt_df_ecoli,
+  plot2 <- gg_barplt_id_pep_count(data_set = barplt_df_ecoli,
                                x_df = barplt_df_ecoli$Sample_id,
                                fill_df = barplt_df_ecoli$Rep_id,
                                ymax = 20500,
@@ -332,7 +306,7 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
     
   }
   
-  quant_peptides_ECOLI_density_plot <- filtered_abundances_ecoli %>%
+  quant_peptides_ECOLI_density_plt <- filtered_abundances_ecoli %>%
     select(!starts_with("E")) %>%
     bind_cols(abundances_ecoli_rowMeans) %>%
     tibble() %>%
@@ -343,7 +317,7 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
                  values_drop_na = T) %>%
     mutate(sample_id_seq = paste(Sequence, sample_ids, sep = "_"))
   
-  ecoli_density_plot<- quant_peptides_ECOLI_density_plot %>%
+  ecoli_density_plt<- quant_peptides_ECOLI_density_plt %>%
     select(contains(c("sample_ids","Intensity","species"))) 
   
   
@@ -351,7 +325,7 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
   
   #### MEAN ABUNDANCE RATIO WITH  DENSITY PLOT ####
   ### BEFORE IMPUTATION ###
-  quant_phospho_density_plot <- filtered_abundances %>%
+  quant_phospho_density_plt <- filtered_abundances %>%
     select(!starts_with("E")) %>%
     bind_cols(abundances_rowMeans) %>% 
     #rename_with(~ paste0("mean_abun",1:5), matches("^row")) %>%
@@ -362,12 +336,12 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
                  values_drop_na = T) %>%
     mutate(sample_id_seq = paste(pep_with_pos, sample_ids, sep = "_"))
   
-  density_df <-quant_phospho_density_plot %>%
+  density_df <-quant_phospho_density_plt %>%
     select(c(sample_ids,Intensity,species)) %>%
-    bind_rows(ecoli_density_plot) #%>%
+    bind_rows(ecoli_density_plt) #%>%
   
   #separate(accession, into = c("prot_id","species","position"),sep = "_",remove = F)
-  p3 <- gg_density(data_set = density_df, 
+  plot3 <- gg_density(data_set = density_df, 
                    x_df = density_df$Intensity,
                    fill_df = density_df$species,
                    color_df = NULL,
@@ -486,7 +460,7 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
                  values_to = "values")# %>%
   #mutate_at("Pool", ~replace_na(.,background_species))
   
-  p4 <- gg_density(data_set = df_mean_ab_after_impt, 
+  plot4 <- gg_density(data_set = df_mean_ab_after_impt, 
                    x_df = df_mean_ab_after_impt$values,
                    fill_df = df_mean_ab_after_impt$Mean_abundance,
                    color_df = df_mean_ab_after_impt$Pool,
@@ -508,7 +482,7 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
   #                    caption_lab = "",
   #                    subtitle_txt = "")
   
-  p5 <- gg_density(data_set = df_FC_ratio_after_impt,
+  plot5 <- gg_density(data_set = df_FC_ratio_after_impt,
                    x_df = df_FC_ratio_after_impt$values,
                    fill_df = df_FC_ratio_after_impt$exp_FC,
                    color_df = df_FC_ratio_after_impt$Pool,
@@ -522,7 +496,7 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
   
   ### BOX-PLOT: Experimental Quantity Ratio of Phospho Peptides  
   
-  p6 <- gg_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
+  plot6 <- gg_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
                             x_df = df_FC_ratio_after_impt$exp_FC,
                             y_df = df_FC_ratio_after_impt$values,
                             fill_df = df_FC_ratio_after_impt$Pool,
@@ -536,7 +510,7 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
   ### HALF-BOX-PLOT & HALF-SCATTER-PLOT: Experimental Quantity Ratio of Synthetic Peptides  
   library(gghalves)
   
-  p7 <- gg_half_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
+  plot7 <- gg_half_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
                                  x_df = df_FC_ratio_after_impt$exp_FC,
                                  y_df = df_FC_ratio_after_impt$values,
                                  fill_df = df_FC_ratio_after_impt$Pool,
@@ -549,7 +523,7 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
   ### VIOLIN-PLOT: Experimental Quantity Ratio of Synthetic Peptides   
   
   ### TODO: fix y scaling without trimming 
-  p8 <- gg_violin_exp_ratio(data_set = df_FC_ratio_after_impt, 
+  plot8 <- gg_violin_exp_ratio(data_set = df_FC_ratio_after_impt, 
                             x_df = df_FC_ratio_after_impt$exp_FC,
                             y_df = df_FC_ratio_after_impt$values,
                             fill_df = df_FC_ratio_after_impt$Pool,
@@ -688,8 +662,6 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
       
     }
     
-    
-    
     merge_stat_df <- bind_cols(rownames(merge_stat_df),merge_stat_df) 
     colnames(merge_stat_df)[1] <- "common_col"
     
@@ -717,13 +689,15 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
       
       #filter(!grepl("ECOLI",Pool))
       #separate(accession, into = c("prot_id","species"),sep = "_")
+      mutate(isomericity=ifelse(pep_with_pos.x=="YVLDDQYTSSSGAK_7","mono",isomericity)) %>%
       mutate(isomericity = ifelse(is.na(isomericity), "False Positive", isomericity)) %>%
       unite(Pool_new, Pool.x, isomericity,sep = "_",remove = FALSE) %>%
       unite('new_col_coloring',Pool_new,ratio,sep = "_",remove = FALSE) %>%
       mutate(new_col_coloring = if_else(grepl("ISO-REF", new_col_coloring), "ISO-REF", new_col_coloring)) %>%
       mutate(new_col_coloring = if_else(grepl("REF_mono", new_col_coloring), "REF_mono", new_col_coloring)) %>%
-      mutate(new_col_coloring = if_else(grepl("unexpected", new_col_coloring), "unexpected", new_col_coloring)) %>%
-      rename(pep_with_pos=pep_with_pos.x) %>% rename(Pool=Pool.x)
+      mutate(new_col_coloring = if_else(grepl("Unexpected", new_col_coloring), "Unexpected", new_col_coloring)) %>%
+      #mutate(new_col_coloring = if_else(grepl("Unexpected_False Positive", new_col_coloring), "Unexpected", new_col_coloring)) %>%
+      rename(pep_with_pos=pep_with_pos.x) %>% rename(Pool=Pool.x) 
     
   }else{
     print("Statistical test could not be assessed. Check the input files!")
@@ -758,70 +732,60 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
   
   
   ymax <- max(-log10(merge_stat_df_final$P.Value)) + 0.5
-  y_decrement <- 0.25
+  y_decrement <- 0.5
   
   calculate_y_pos <- function(group) {
     group_length <- length(group)
     y_pos <- ymax - seq(0, by = y_decrement, length.out = group_length)
     return(y_pos)
   }
-  
   # Apply the function to calculate y_pos within each group
-  point_count_y_axis$y_pos <- unlist(by(point_count_y_axis$fold_change_comp, point_count_y_axis$fold_change_comp, calculate_y_pos))
+  point_count_y_axis$y_pos <- unlist(by(point_count_y_axis$fold_change_comp, 
+                                        point_count_y_axis$fold_change_comp, calculate_y_pos))
   
   
-  p9 <- ggplot(merge_stat_df_final,aes(x =log2(merge_stat_df_final$fold_change_values), y = -log10(merge_stat_df_final$P.Value))) +
-    geom_point(aes(color = new_col_coloring,shape=Pool_new), size = 2.5) +
+  col <- RColorBrewer::brewer.pal(n=length(comparisons),name = "Dark2")
+  colors <- c(RColorBrewer::brewer.pal(n=length(comparisons),name = "Dark2"),"#2171b5","#999999")
+  labels <- unique(merge_stat_df_final$new_col_coloring)
+  new_comparisons <- c(comparisons,"Unexpected","REF_mono")
+  
+  mapped_coloring <- rep("#000000",length(labels))
+  
+  for (i in 1:length(labels)) {
+    # Check if the color_element contains any of the comparisons
+    if (any(new_comparisons %in% str_extract_all(labels[i], paste(new_comparisons, collapse = "|"))[[1]])) {
+      # Find the index of the matching comparison in the comparisons list
+      comp_index <- match(TRUE, sapply(new_comparisons, function(comp) comp %in% str_extract_all(labels[i], comp)))
+      
+      # Assign the corresponding color to the data frame
+      mapped_coloring[i]<- paste0(colors[comp_index])
+      #mapped_coloring[i]<- paste(paste0(labels[i],'"'),paste0('"',colors[comp_index]),sep = "=")
+    }
+  }
+  
+  
+  
+  actual_ratio_col <- actual_ratio_col %>% bind_cols(col)
+  
+  mapped_coloring_dat <- as.data.frame(mapped_coloring)
+  
+  point_count_y_axis <- mapped_coloring_dat %>% 
+    bind_cols(labels) %>%
+    rename(colors=1,new_col_coloring=2) %>%
+    right_join(point_count_y_axis,by="new_col_coloring")
+
+  
+  plot9 <- ggplot(merge_stat_df_final,aes(x =log2(merge_stat_df_final$fold_change_values), y = -log10(merge_stat_df_final$P.Value))) +
+    geom_point(size = 3, aes(color = new_col_coloring,shape=Pool_new)) + 
+    #scale_shape_identity() +
     #geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red") +
-    scale_fill_manual(values = c("ISO-REF" = "#000000",
-                                 "REF_mono" = "#000000",
-                                 "Unexpected_False Positive_A1/A2"="#999999",
-                                 "Unexpected_False Positive_A1/A3" ="#999999",
-                                 "Unexpected_False Positive_A1/A4"="#999999",
-                                 "Unexpected_False Positive_A1/A5"="#999999",
-                                 "Others_multi_A1/A2" = "#CC79A7",
-                                 "Others_mono_A1/A2" = "#CC79A7",
-                                 "Others_multi_A1/A3" = "#E69F00",
-                                 "Others_mono_A1/A3" = "#E69F00",
-                                 "Others_multi_A1/A4" = "#56B4E9",
-                                 "Others_mono_A1/A4" = "#56B4E9",
-                                 "Others_multi_A1/A5" = "#009E73",
-                                 "Others_mono_A1/A5" = "#009E73")) + 
-    #geom_line(aes(color = new_col_coloring), size = 1) +  # Add color aesthetic to geom_line()
-    scale_color_manual(values = c("ISO-REF" = "#000000",
-                                  "REF_mono" = "#000000",
-                                  "Unexpected_False Positive_A1/A2"="#999999",
-                                  "Unexpected_False Positive_A1/A3" ="#999999",
-                                  "Unexpected_False Positive_A1/A4"="#999999",
-                                  "Unexpected_False Positive_A1/A5"="#999999",
-                                  "Others_multi_A1/A2" = "#CC79A7",
-                                  "Others_mono_A1/A2" = "#CC79A7",
-                                  "Others_multi_A1/A3" = "#E69F00",
-                                  "Others_mono_A1/A3" = "#E69F00",
-                                  "Others_multi_A1/A4" = "#56B4E9",
-                                  "Others_mono_A1/A4" = "#56B4E9",
-                                  "Others_multi_A1/A5" = "#009E73",
-                                  "Others_mono_A1/A5" = "#009E73"),
-                       
-                       labels = c('Non-variant - isomeric', 'Non-variant - non-isomeric',
-                                  'Variant non-isomeric A1 vs A2',
-                                  'Variant non-isomeric A1 vs A3',
-                                  'Variant non-isomeric A1 vs A4',
-                                  'Variant non-isomeric A1 vs A5',
-                                  'Variant isomeric A1 vs A2',
-                                  'Variant isomeric A1 vs A3',
-                                  'Variant isomeric A1 vs A4',
-                                  'Variant isomeric A1 vs A5',
-                                  "Unexpected_False Positive A1/A2",
-                                  "Unexpected_False Positive A1/A3",
-                                  "Unexpected_False Positive A1/A4",
-                                  "Unexpected_False Positive A1/A5")) +
-    scale_shape_manual(values = c(16, 16, 15, 12, 17),
-                       labels = c('Non-variant - isomeric', 'Non-variant - non-isomeric','Variant non-isomeric', 'Variant isomeric', 'Unexpected')) +
+    #scale_fill_manual(values=setNames(mapped_coloring, labels)) + 
+    #geom_line(aes(color =setNames(mapped_coloring, labels)), size = 1) +  # Add color aesthetic to geom_line()
+    scale_color_manual(values =setNames(mapped_coloring, labels)) +
     #scale_y_continuous(limits = c(0, max(-log10(merge_stat_df_final$adj.P.Val))), breaks = seq(0, max(-log10(merge_stat_df_final$adj.P.Val)), by = 0.8)) +
     #scale_x_continuous(limits = c(min(log2(merge_stat_df_final$fold_change_values)),max(log2(merge_stat_df_final$fold_change_values)))) +#facet_wrap(~ratio) +
-    #scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=1)) +
-   # scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=1)) +
+    scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=1)) +
+    scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=1)) +
     #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
     theme_bw() +
     theme(legend.text = element_text(size = 30),
@@ -834,41 +798,26 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
           axis.text.y = element_text(size = 30),
           plot.subtitle = element_text(size = 30)) +
     labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n", subtitle)) +
-    geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=c("#CC79A7","#E69F00","#56B4E9","#009E73","#000000"),size=1) +
-    geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=1) + 
-    geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos,fill=new_col_coloring, label = n),size=6, colour="white",show.legend = FALSE) 
+    geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=col,size=1.5) +
+    geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=1.5) + 
+    geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos, fill=new_col_coloring,label = n),color="white",size=6,show.legend = FALSE) +
+    scale_fill_manual(values =setNames(mapped_coloring, labels))
   
-  
-  
-  #### ROC Analysis
   df_roc <- merge_stat_df_final %>%
     select(pep_with_pos, Pool,P.Value)
+  #filter(!grepl("Unexpected",Pool))
   
-  df_roc$variant <- ifelse(df_roc$Pool == "Others", TRUE, FALSE)
-  df_roc$non_var <- ifelse(df_roc$Pool == "ISO-REF", TRUE, FALSE)
+  ### ROC analysis custom func
+  df_roc_order <- df_roc[order(df_roc$P.Value),]
+
+  df_roc_func <- compute_roc_curve(df=df_roc_order, flag = "Others",expected = (length(comparisons)*size_variying_pep))
   
-  library(pROC)
-  # Calculate ROC curve for raw p-values
-  roc_raw_variant <- roc(df_roc$variant, df_roc$P.Value)
-  tpr_and_fpr_variant  <- cbind(roc_raw_variant$sensitivities,
-                                roc_raw_variant$specificities,
-                                "Variant Pool")
-  
-  
-  roc_raw_non_var <- roc(df_roc$non_var, df_roc$P.Value)
-  tpr_and_fpr_non_var  <- cbind(roc_raw_non_var$sensitivities,
-                                roc_raw_non_var$specificities,
-                                "Non-variant Pool")
-  
-  roc_plot_df <- as.data.frame(tpr_and_fpr_variant) %>% 
-    bind_rows(as.data.frame(tpr_and_fpr_non_var)) %>% bind_cols(software_name)
-  
-  colnames(roc_plot_df) <-    c("sensitivity", "specificity","Pool_type","Software_name")
-  
-  
-  p10 <- roc_plot_df %>% group_by(Pool_type) %>% 
-    ggplot( aes(y=as.numeric(sensitivity), x = as.numeric(specificity), color=Pool_type)) +
-    geom_path(size=1.5) +  scale_x_reverse() + theme_bw() +
+  plot10 <- ggplot(df_roc_func, aes(y=tpr, x = fdr)) +
+    geom_path(size=1.5) +
+    #geom_vline(aes(xintercept=fdr)) +
+    #geom_text(data=as.data.frame(result),aes(label=fdr)) +
+    #scale_x_reverse() + 
+    theme_bw() +
     theme(legend.text = element_text(size = 20),
           axis.title.x = element_text(size = 20),
           axis.title.y = element_text(size = 20),
@@ -880,16 +829,63 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
     scale_color_brewer(palette = "Dark2") +
     labs(y="True Positive Rate \n (Sensitivity)", x="False Positive Rate \n (Specificity)",
          title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), 
-         subtitle = paste(subtitle), color="Pool Type")
+         subtitle = paste(subtitle,"including unexpected"), color="Pool Type")
   
-  write.table(roc_plot_df, file = paste0(file_path,"Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F) #acquisiton_type ## IT WAS TOO LONG-> GIVES AN ERROR
+  write.table(df_roc_func, file = paste0(file_path,"outputs_with_new_script/new_custom_Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
   
-  sapply(1:11,function(x) ggsave(filename = paste0("p",x,".tiff"),
-                                 width = 50, height = 45, 
-                                 path = paste0(file_path,"/wrong_outputs_with_new_script/"),
-                                 units = "cm",
-                                 get(paste0("p",x)),
-                                 device = "tiff", #".svg"
+  # #### ROC Analysis by using pROC
+  # df_roc <- merge_stat_df_final %>%
+  #   select(pep_with_pos, Pool,P.Value)
+  # 
+  # df_roc$variant <- ifelse(df_roc$Pool == "Others", TRUE, FALSE)
+  # df_roc$non_var <- ifelse(df_roc$Pool == "ISO-REF", TRUE, FALSE)
+  # 
+  # library(pROC)
+  # # Calculate ROC curve for raw p-values
+  # roc_raw_variant <- roc(df_roc$variant, df_roc$P.Value)
+  # tpr_and_fpr_variant  <- cbind(roc_raw_variant$sensitivities,
+  #                               roc_raw_variant$specificities,
+  #                               "Variant Pool")
+  # 
+  # 
+  # roc_raw_non_var <- roc(df_roc$non_var, df_roc$P.Value)
+  # tpr_and_fpr_non_var  <- cbind(roc_raw_non_var$sensitivities,
+  #                               roc_raw_non_var$specificities,
+  #                               "Non-variant Pool")
+  # 
+  # roc_plot_df <- as.data.frame(tpr_and_fpr_variant) %>% 
+  #   bind_rows(as.data.frame(tpr_and_fpr_non_var)) %>% bind_cols(software_name)
+  # 
+  # colnames(roc_plot_df) <-    c("sensitivity", "specificity","Pool_type","Software_name")
+  # 
+  # 
+  # p10 <- roc_plot_df %>% group_by(Pool_type) %>% 
+  #   ggplot( aes(y=as.numeric(sensitivity), x = as.numeric(specificity), color=Pool_type)) +
+  #   geom_path(size=1.5) +  scale_x_reverse() + theme_bw() +
+  #   theme(legend.text = element_text(size = 20),
+  #         axis.title.x = element_text(size = 20),
+  #         axis.title.y = element_text(size = 20),
+  #         plot.title = element_text(size = 25),
+  #         legend.title = element_text(size = 20),
+  #         axis.text.x = element_text(size = 20),
+  #         axis.text.y = element_text(size = 20)) +
+  #   scale_color_brewer(palette = "Dark2") +
+  #   labs(y="True Positive Rate \n (Sensitivity)", x="False Positive Rate \n (Specificity)",
+  #        title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), 
+  #        subtitle = paste(subtitle), color="Pool Type")
+  # 
+  # write.table(roc_plot_df, file = paste0(file_path,"Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F) #acquisiton_type ## IT WAS TOO LONG-> GIVES AN ERROR
+  # 
+  
+  
+  plot_obj <- ls(pattern="plot")
+  plot_obj <- plot_obj[!is.na(plot_obj)]
+  sapply(1:length(plot_obj),function(x) ggsave(filename = paste0("p",x,".tiff"),
+                                               width = 60, height = 45, 
+                                               path = paste0(file_path,"/outputs_with_new_script/"),
+                                               units = "cm",
+                                               get(plot_obj[x]),
+                                               device = "tiff", #".svg"
   ))
   
   
