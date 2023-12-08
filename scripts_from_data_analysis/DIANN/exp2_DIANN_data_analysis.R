@@ -69,19 +69,27 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
     filter(grepl("UniMod:21",Modified.Sequence))
   
   ## THEORETICAL PEPTIDE LIST
-  pep_list_w_theo_quant <- read.xlsx(paste0(theo_file_path, theo_file_name), sheet = sheet_theo_name)
-  pep_list_w_theo_quant <- pep_list_w_theo_quant[,-1]
+  pep_list_w_theo <- read.xlsx(paste0(theo_file_path, theo_file_name), sheet = sheet_theo_name)
+  pep_list_w_theo_quant <- pep_list_w_theo[,-1]
   
-  #common_col_theo_quant <- as.data.frame(paste(pep_list_w_theo_quant$Phosphopeptide.sequence,
-                                               #pep_list_w_theo_quant$modified.position.in.peptide, sep = "_"))
-  #colnames(common_col_theo_quant) <- "pep_with_pos"
-  #pep_list_w_theo_quant_new <- cbind(common_col_theo_quant,pep_list_w_theo_quant)
+  if(sheet_theo_name == "ISO-refOTHER with FC_correct") {
+    common_col_theo_quant <- as.data.frame(paste(pep_list_w_theo_quant$Phosphopeptide.sequence,
+                                                 pep_list_w_theo_quant$modified.position.in.peptide, sep = "_"))
+    colnames(common_col_theo_quant) <- "pep_with_pos"
+    pep_list_w_theo_quant <- cbind(common_col_theo_quant,pep_list_w_theo_quant)
+    
+  } else if (sheet_theo_name == "ISOREF_REF2_Others"){
+    
+  }else{
+    print("Please check the sheet name of the theo. peptide list.")
+  }
   
-  pep_list_w_theo_unique <- pep_list_w_theo_quant %>% select(Phosphopeptide.sequence, Pool) %>%
+  pep_list_w_theo_unique <- pep_list_w_theo %>% select(Phosphopeptide.sequence, Pool) %>%
     distinct(Phosphopeptide.sequence,.keep_all = TRUE) %>%
     rename(Sequence = Phosphopeptide.sequence) %>%
     rename(Pool_for_seq_merge=Pool)
-  
+
+  ############################
   ## input sequence will be like this: (UniMod:1)AGGKPS(UniMod:21)QS(UniMod:21)PSQEAAGEAVLGAK
   
   df2 <- apply(quant_phospho[,"Modified.Sequence"],1,getModificationPosition_)
@@ -596,11 +604,11 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
     
     # Create data frames from matrices
     all_pvalues <- as.data.frame(all_pvalues)
-    colnames(all_pvalues) <- paste0("pvalues_A1/", "A", 2:sample_size)
+    colnames(all_pvalues) <- paste0("pvalues_A",numerator,"/", "A", 2:sample_size)
     rownames(all_pvalues) <- row.names(stat_analysis)
     
     all_adjust_pval <- as.data.frame(all_adjust_pval)
-    colnames(all_adjust_pval) <- paste0("adjust_pval_A1/", "A", 2:sample_size)
+    colnames(all_adjust_pval) <- paste0("adjust_pval_A",numerator,"/", "A", 2:sample_size)
     rownames(all_adjust_pval) <- row.names(stat_analysis)
     
     
@@ -608,9 +616,9 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
       select(pep_with_pos, isomericity, Pool) %>% #spectrum_title
       bind_cols(all_pvalues) %>%  #all_adjust_pval
       pivot_longer(cols = starts_with("pvalues"), values_to = "pval", names_to ="pratios") %>% #adj_pval and adj_pratios
-      separate(pratios, into = c("tmp","A1vs_Ai","tmp1"),sep = "_") %>%
+      separate(pratios, into = c("tmp","fold_change_comp","tmp1"),sep = "_") %>%
       select(!c(tmp,tmp1)) %>%
-      mutate(common_col = paste(pep_with_pos,Pool,A1vs_Ai,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) #spectrum_title
+      mutate(common_col = paste(pep_with_pos,Pool,fold_change_comp,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) #spectrum_title
     
     ## THE BEST WAY TO DO is this:
     merge_stat_df <- stat_analysis %>%
@@ -619,16 +627,17 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
       separate(fold_change_ratios, into = c("tmp","tmp1","ratio"),sep = "_") %>%
       select(!c(tmp,tmp1)) %>%
       #mutate(common_col = paste(pep_with_pos,Pool,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) %>%
-      bind_cols(all_pvalues_common_col$A1vs_Ai,all_pvalues_common_col$pval) %>%
-      rename_with(.col =6 , ~"A1vs_Ai") %>%
+      bind_cols(all_pvalues_common_col$fold_change_comp,all_pvalues_common_col$pval) %>%
+      rename_with(.col =6 , ~"fold_change_comp") %>%
       rename_with(.col=7, ~ "P.Value") %>%
       #filter(!grepl("ECOLI",Pool))
       #separate(accession, into = c("prot_id","species"),sep = "_")
       mutate(isomericity = ifelse(is.na(isomericity), "False Positive", isomericity)) %>%
       unite(Pool_new, Pool, isomericity,sep = "_",remove = FALSE) %>%
       unite('new_col_coloring',Pool_new,ratio,sep = "_",remove = FALSE) %>%
-      mutate(new_col_coloring = if_else(grepl("ISO-REF", new_col_coloring), "ISO-REF", new_col_coloring)) %>%
-      mutate(new_col_coloring = if_else(grepl("unexpected", new_col_coloring), "unexpected", new_col_coloring))
+      mutate(new_col_coloring = if_else(grepl("Fixed_multi", new_col_coloring), "Fixed_multi", new_col_coloring)) %>%
+      mutate(new_col_coloring = if_else(grepl("REF_mono", new_col_coloring), "REF_mono", new_col_coloring)) %>%
+      mutate(new_col_coloring = if_else(grepl("Unexpected", new_col_coloring), "Unexpected", new_col_coloring))
     
     
     ###############################################################################
@@ -693,8 +702,8 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
       mutate(isomericity = ifelse(is.na(isomericity), "False Positive", isomericity)) %>%
       unite(Pool_new, Pool.x, isomericity,sep = "_",remove = FALSE) %>%
       unite('new_col_coloring',Pool_new,ratio,sep = "_",remove = FALSE) %>%
-      mutate(new_col_coloring = if_else(grepl("ISO-REF", new_col_coloring), "ISO-REF", new_col_coloring)) %>%
-      mutate(new_col_coloring = if_else(grepl("REF_mono", new_col_coloring), "REF_mono", new_col_coloring)) %>%
+      mutate(new_col_coloring = if_else(grepl("Fixed_multi", new_col_coloring), "Fixed_multi", new_col_coloring)) %>%
+      mutate(new_col_coloring = if_else(grepl("Fixed_mono", new_col_coloring), "Fixed_mono", new_col_coloring)) %>%
       mutate(new_col_coloring = if_else(grepl("Unexpected", new_col_coloring), "Unexpected", new_col_coloring)) %>%
       #mutate(new_col_coloring = if_else(grepl("Unexpected_False Positive", new_col_coloring), "Unexpected", new_col_coloring)) %>%
       rename(pep_with_pos=pep_with_pos.x) %>% rename(Pool=Pool.x) 
@@ -747,7 +756,19 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
   col <- RColorBrewer::brewer.pal(n=length(comparisons),name = "Dark2")
   colors <- c(RColorBrewer::brewer.pal(n=length(comparisons),name = "Dark2"),"#2171b5","#999999")
   labels <- unique(merge_stat_df_final$new_col_coloring)
-  new_comparisons <- c(comparisons,"Unexpected","REF_mono")
+  
+  if (sheet_theo_name == "ISOREF_REF2_Others"){
+    
+    new_comparisons <- c(comparisons,"Unexpected","Fixed_mono")
+    
+  }else if (sheet_theo_name == "ISO-refOTHER with FC_correct"){
+    
+    new_comparisons <- c(comparisons,"Unexpected")
+    
+  }else{
+    print("Sheet_theo_name could not be found, please make sure that you selected the correct sheet_name.")
+  }
+  
   
   mapped_coloring <- rep("#000000",length(labels))
   
@@ -810,7 +831,7 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
   ### ROC analysis custom func
   df_roc_order <- df_roc[order(df_roc$P.Value),]
 
-  df_roc_func <- compute_roc_curve(df=df_roc_order, flag = "Others",expected = (length(comparisons)*size_variying_pep))
+  df_roc_func <- compute_roc_curve(df=df_roc_order, flag = "Spiked",expected = (length(comparisons)*size_variying_pep))
   
   plot10 <- ggplot(df_roc_func, aes(y=tpr, x = fdr)) +
     geom_path(size=1.5) +
