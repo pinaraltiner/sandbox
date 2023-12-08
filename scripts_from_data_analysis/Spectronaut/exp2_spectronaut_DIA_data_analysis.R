@@ -25,20 +25,25 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
                                                  loc_filter_opt,
                                                  loc_filter,
                                                  acquisiton_type,
+                                                 size_variying_pep_size,
                                                  software_name,
                                                  test_type,
                                                  num_reps,
+                                                 numerator,
                                                  actual_ratio,
                                                  subtitle){
-    sample_size <- length(exp_design) / num_reps
-    sample_names <- paste0("A",1:sample_size)
-    comparisons <- NULL
-    for (i in 1:sample_size){
-        tmp <- paste0(sample_names[1], "/",sample_names[i])
-        comparisons[i] <- tmp
-        rm(tmp)
-    }
-    comparisons <- comparisons[-1]
+  sample_size <- length(exp_design) / num_reps
+  sample_names <- paste0("A",1:sample_size)
+  comparisons <- NULL
+  
+  for (i in 1:sample_size){
+    tmp <- paste0(sample_names[numerator], "/",sample_names[i])
+    comparisons[i] <- tmp
+    rm(tmp)
+  }
+  #comparisons <- comparisons[-1]
+  comparisons <- comparisons[-numerator]
+  
     #### FUNCTION FOR MERGING POSITION AND SCORING INFO
     #### FUNCTION FOR MERGING POSITION AND SCORING INFO
     find_max_value_and_pos <- function(ptm_count, ptm_prob, ptm_pos) {
@@ -118,15 +123,22 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     pep_list_w_theo <- read.xlsx(paste0(theo_file_path, theo_file_name), sheet = sheet_theo_name)
     pep_list_w_theo_quant <- pep_list_w_theo[,-1]
     
-    common_col_theo_quant <- as.data.frame(paste(pep_list_w_theo_quant$Phosphopeptide.sequence,
-                                                 pep_list_w_theo_quant$modified.position.in.peptide, sep = "_"))
-    colnames(common_col_theo_quant) <- "pep_with_pos"
-    pep_list_w_theo_quant_new <- cbind(common_col_theo_quant,pep_list_w_theo_quant)
+    if(sheet_theo_name == "ISO-refOTHER with FC_correct") {
+      common_col_theo_quant <- as.data.frame(paste(pep_list_w_theo_quant$Phosphopeptide.sequence,
+                                                  pep_list_w_theo_quant$modified.position.in.peptide, sep = "_"))
+      colnames(common_col_theo_quant) <- "pep_with_pos"
+      pep_list_w_theo_quant <- cbind(common_col_theo_quant,pep_list_w_theo_quant)
+      
+    } else if (sheet_theo_name == "ISOREF_REF2_Others"){
+      
+    }else{
+      print("Please check the sheet name of the theo. peptide list.")
+    }
     
     #################################################
-    pep_list_w_theo_unique <- pep_list_w_theo %>% select(Phospopeptide.sequence, Pool) %>%
-      distinct(Phospopeptide.sequence,.keep_all = TRUE) %>%
-      rename(PEP.GroupingKey = Phospopeptide.sequence) %>%
+    pep_list_w_theo_unique <- pep_list_w_theo %>% select(Phosphopeptide.sequence, Pool) %>%
+      distinct(Phosphopeptide.sequence,.keep_all = TRUE) %>%
+      rename(PEP.GroupingKey = Phosphopeptide.sequence) %>%
       rename(Pool_for_seq_merge=Pool)
     
     ecoli_seq <- quant_peptides %>% 
@@ -162,10 +174,10 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
       mutate(soft_name=software_name)
       
     ## This is the same as p13 in DDA data analysis
-    p12 <- gg_barplt_id_pep_count(data_set = all_seq_syn,
+    plot12 <- gg_barplt_id_pep_count(data_set = all_seq_syn,
                                   x_df = all_seq_syn$Pool_for_seq_merge,
                                   fill_df = all_seq_syn$Pool_for_seq_merge,
-                                  ymax = 20000,
+                                  ymax = nrow(all_seq_syn),
                                   header = paste("Total number of identified phosphorylated", selected_spcies,"and", background_species,"across each sample",sep=" "),
                                   caption_lab = "NA values are removed. (p13)",
                                   x_lab = "Sample id",
@@ -220,13 +232,13 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     df_merge_syn <- barplt_df %>%
       select(pep_with_pos,Experiment,Intensity, PG.ProteinLabel) %>% 
       pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
-      full_join(pep_list_w_theo_quant_new,by="pep_with_pos") %>% 
+      full_join(pep_list_w_theo_quant,by="pep_with_pos") %>% 
       mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
       mutate(Pool= ifelse(is.na(PG.ProteinLabel),"missing",Pool)) %>%
       select(pep_with_pos,starts_with(exp_design),Pool) %>%
       mutate(soft_name=software_name)
     
-    p11 <- gg_barplt_id_pep_count(data_set = df_merge_syn,
+    plot11 <- gg_barplt_id_pep_count(data_set = df_merge_syn,
                                   x_df = df_merge_syn$Pool,
                                   fill_df = df_merge_syn$Pool,
                                   ymax = 20000,
@@ -253,7 +265,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     
     
     
-    p1 <- gg_barplt_id_pep_count(data_set = barplt_df,
+    plot1 <- gg_barplt_id_pep_count(data_set = barplt_df,
                                  x_df = barplt_df$Sample_id,
                                  fill_df = barplt_df$Rep_id,
                                  ymax = 20000,
@@ -263,7 +275,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
                                  fill_lab =  "Sample id",
                                  y_lab = "Number of identified peptides",
                                  subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
-    p2 <- gg_barplt_id_pep_count(data_set = barplt_df_ecoli,
+    plot2 <- gg_barplt_id_pep_count(data_set = barplt_df_ecoli,
                                  x_df = barplt_df_ecoli$Sample_id,
                                  fill_df = barplt_df_ecoli$Rep_id,
                                  ymax = 20500,
@@ -351,11 +363,11 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     #### MEAN ABUNDANCE RATIO WITH  DENSITY PLOT ####
     ### BEFORE IMPUTATION ###
     
-    quant_peptides_ECOLI_density_plot <- filtered_abundances_ecoli %>%
+    quant_peptides_ECOLI_density_plt <- filtered_abundances_ecoli %>%
       select(!starts_with("E")) %>%
       bind_cols(abundances_ecoli_rowMeans) %>%
       tibble() %>%
-      rename_with(~ paste0("mean abundance",1:5), matches("^row")) %>%
+      rename_with(~ paste0("mean abundance",1:sample_size), matches("^row")) %>%
       pivot_longer(cols = starts_with("mean"),
                    values_to = "Intensity",
                    names_to = "sample_ids",
@@ -363,12 +375,12 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
       mutate(sample_id_seq = paste(PEP.GroupingKey, sample_ids, sep = "_"))
 
     
-    ecoli_density_plot<- quant_peptides_ECOLI_density_plot %>%
+    ecoli_density_plt<- quant_peptides_ECOLI_density_plt %>%
       select(contains(c("sample_ids","Intensity","species")))
     
     colnames(abundances_rowMeans) <- paste0("mean abundance",1:sample_size)
     
-    quant_phospho_density_plot <- filtered_abundances %>%
+    quant_phospho_density_plt <- filtered_abundances %>%
       select(!starts_with("E")) %>%
       bind_cols(abundances_rowMeans) %>%
       #rename_with(~ paste0("mean_abun",1:5), matches("^row")) %>%
@@ -380,11 +392,11 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
       mutate(sample_id_seq = paste(pep_with_pos, sample_ids, sep = "_"))
     
     
-    density_df <-quant_phospho_density_plot %>%
+    density_df <-quant_phospho_density_plt %>%
       select(c(sample_ids,Intensity,species)) %>%
-      bind_rows(ecoli_density_plot) #%>%
+      bind_rows(ecoli_density_plt) #%>%
     
-    p3 <- gg_density(data_set = density_df,
+    plot3 <- gg_density(data_set = density_df,
                      x_df = density_df$Intensity,
                      fill_df = density_df$species,
                      color_df = NULL,
@@ -419,6 +431,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     filtered_abundances_rowMeans <- NULL
     filtered_abundances_log10 <- NULL
     filtered_abundances_log10_rowMeans <- NULL
+    
     for (k in 1:sample_size){
       assign(paste0("aft_imp_abundances_A",k),as.data.frame(rowMeans(abundances_all_aft_imputation  %>% select(contains(paste0("A",k))))))
       filtered_abundances_rowMeans<- bind_cols(filtered_abundances_rowMeans,get(paste0("aft_imp_abundances_A",k)))
@@ -434,16 +447,19 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
       rename_with(~ paste0("log10_", .x), everything())
     # Calculate Fold Change by keeping A1 constant (mean(S1)/mean(S2), etc.)
     cols <- ncol(filtered_abundances_rowMeans)
-    for(An in 2:cols){
-      filtered_abundances_rowMeans[,paste0("exp_FC_A1/A",An)] <- filtered_abundances_rowMeans[,1]/filtered_abundances_rowMeans[,An]
+    for(An in 1:cols){
+      filtered_abundances_rowMeans[,paste0("exp_FC_A",numerator,"/A",An)] <- filtered_abundances_rowMeans[,numerator]/filtered_abundances_rowMeans[,An]
+      
     }
+    rmv_col <- paste0("exp_FC_A",numerator,"/A",numerator)
+    filtered_abundances_rowMeans <- filtered_abundances_rowMeans %>% select(!rmv_col)
     
     final_imputed_data <- cbind(abundances_all_aft_imputation, filtered_abundances_rowMeans,filtered_abundances_log10,filtered_abundances_log10_rowMeans) #filtered_abundances
     final_imputed_data_syn <- final_imputed_data %>% filter(grepl(selected_spcies,species))
     final_imputed_data_ecoli <- final_imputed_data  %>% filter(!grepl(selected_spcies, species))
     
     df_merge <- final_imputed_data_syn %>%
-      left_join(pep_list_w_theo_quant_new,by="pep_with_pos") %>%
+      left_join(pep_list_w_theo_quant,by="pep_with_pos") %>%
       mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
       bind_rows(final_imputed_data_ecoli) %>%
       mutate_at("Pool", ~replace_na(.,background_species))
@@ -468,7 +484,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     #mutate_at("Pool", ~replace_na(.,background_species))
     
     
-    p4 <- gg_density(data_set = df_mean_ab_after_impt, 
+    plot4 <- gg_density(data_set = df_mean_ab_after_impt, 
                      x_df = df_mean_ab_after_impt$values,
                      fill_df = df_mean_ab_after_impt$Mean_abundance,
                      color_df = df_mean_ab_after_impt$Pool,
@@ -490,7 +506,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     #                    caption_lab = "",
     #                    subtitle_txt = "")
     
-    p5 <- gg_density(data_set = df_FC_ratio_after_impt,
+    plot5 <- gg_density(data_set = df_FC_ratio_after_impt,
                      x_df = df_FC_ratio_after_impt$values,
                      fill_df = df_FC_ratio_after_impt$exp_FC,
                      color_df = df_FC_ratio_after_impt$Pool,
@@ -504,7 +520,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     
     ### BOX-PLOT: Experimental Quantity Ratio of Phospho Peptides  
     
-    p6 <- gg_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
+    plot6 <- gg_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
                               x_df = df_FC_ratio_after_impt$exp_FC,
                               y_df = df_FC_ratio_after_impt$values,
                               fill_df = df_FC_ratio_after_impt$Pool,
@@ -518,7 +534,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     ### HALF-BOX-PLOT & HALF-SCATTER-PLOT: Experimental Quantity Ratio of Synthetic Peptides  
     library(gghalves)
     
-    p7 <- gg_half_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
+    plot7 <- gg_half_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
                                    x_df = df_FC_ratio_after_impt$exp_FC,
                                    y_df = df_FC_ratio_after_impt$values,
                                    fill_df = df_FC_ratio_after_impt$Pool,
@@ -531,7 +547,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     ### VIOLIN-PLOT: Experimental Quantity Ratio of Synthetic Peptides   
     
     ### TODO: fix y scaling without trimming 
-    p8 <- gg_violin_exp_ratio(data_set = df_FC_ratio_after_impt, 
+    plot8 <- gg_violin_exp_ratio(data_set = df_FC_ratio_after_impt, 
                               x_df = df_FC_ratio_after_impt$exp_FC,
                               y_df = df_FC_ratio_after_impt$values,
                               fill_df = df_FC_ratio_after_impt$Pool,
@@ -604,11 +620,11 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
       
       # Create data frames from matrices
       all_pvalues <- as.data.frame(all_pvalues)
-      colnames(all_pvalues) <- paste0("pvalues_A1/", "A", 2:sample_size)
+      colnames(all_pvalues) <- paste0("pvalues_A",numerator,"/", "A", 2:sample_size)
       rownames(all_pvalues) <- row.names(stat_analysis)
       
       all_adjust_pval <- as.data.frame(all_adjust_pval)
-      colnames(all_adjust_pval) <- paste0("adjust_pval_A1/", "A", 2:sample_size)
+      colnames(all_adjust_pval) <- paste0("adjust_pval_A",numerator,"/", "A", 2:sample_size)
       rownames(all_adjust_pval) <- row.names(stat_analysis)
       
       
@@ -616,9 +632,9 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
         select(pep_with_pos, isomericity, Pool) %>% #spectrum_title
         bind_cols(all_pvalues) %>%  #all_adjust_pval
         pivot_longer(cols = starts_with("pvalues"), values_to = "pval", names_to ="pratios") %>% #adj_pval and adj_pratios
-        separate(pratios, into = c("tmp","A1vs_Ai","tmp1"),sep = "_") %>%
+        separate(pratios, into = c("tmp","fold_change_comp","tmp1"),sep = "_") %>%
         select(!c(tmp,tmp1)) %>%
-        mutate(common_col = paste(pep_with_pos,Pool,A1vs_Ai,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) #spectrum_title
+        mutate(common_col = paste(pep_with_pos,Pool,fold_change_comp,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) #spectrum_title
       
       ## THE BEST WAY TO DO is this:
       merge_stat_df <- stat_analysis %>%
@@ -627,43 +643,69 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
         separate(fold_change_ratios, into = c("tmp","tmp1","ratio"),sep = "_") %>%
         select(!c(tmp,tmp1)) %>%
         #mutate(common_col = paste(pep_with_pos,Pool,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) %>%
-        bind_cols(all_pvalues_common_col$A1vs_Ai,all_pvalues_common_col$pval) %>%
-        rename_with(.col =6 , ~"A1vs_Ai") %>%
+        bind_cols(all_pvalues_common_col$fold_change_comp,all_pvalues_common_col$pval) %>%
+        rename_with(.col =6 , ~"fold_change_comp") %>%
         rename_with(.col=7, ~ "P.Value") %>%
         #filter(!grepl("ECOLI",Pool))
         #separate(accession, into = c("prot_id","species"),sep = "_")
         mutate(isomericity = ifelse(is.na(isomericity), "False Positive", isomericity)) %>%
         unite(Pool_new, Pool, isomericity,sep = "_",remove = FALSE) %>%
         unite('new_col_coloring',Pool_new,ratio,sep = "_",remove = FALSE) %>%
-        mutate(new_col_coloring = if_else(grepl("ISO-REF", new_col_coloring), "ISO-REF", new_col_coloring)) %>%
-        mutate(new_col_coloring = if_else(grepl("unexpected", new_col_coloring), "unexpected", new_col_coloring))
-      
+        mutate(new_col_coloring = if_else(grepl("Fixed_mono", new_col_coloring), "Fixed_mono", new_col_coloring)) %>%
+        mutate(new_col_coloring = if_else(grepl("Fixed_multi", new_col_coloring), "Fixed_multi", new_col_coloring)) %>%
+        mutate(new_col_coloring = if_else(grepl("Unexpected", new_col_coloring), "Unexpected", new_col_coloring))
+    
       
       ###############################################################################
       merge_stat_df_final <- merge_stat_df
       
       
     }else if(test_type=="limma"){
+      # library(limma)
+      # design_matrix <- model.matrix(~factor(c(rep(2,num_reps),rep(1,num_reps))))
+      # merge_stat_df <-NULL
+      # for ( i in 1:sample_size){
+      #   # Change only the colname iteratively makes fit to every comparison
+      #   colnames(design_matrix) <- c("Intercept", paste0("A",numerator,"-A",i))
+      #   #print(colnames(design_matrix))
+      #   # Col selection for each comparison
+      #   assign(paste0("df_A1vsA",i),stat_analysis %>% select(1:2 | contains("A",numerator,"-") & contains("log10_") | contains(paste0("A",i,"-")) & contains("log10_")))
+      #   # First, linear model was built
+      #   assign(paste0("fit",i) ,lmFit(get(paste0("df_A1vsA",i))[,3:8], design_matrix))
+      #   assign(paste0("fit",i), eBayes(get(paste0("fit",i))))
+      #   # Readable dataframe format was generated 
+      #   assign(paste0("alllimma",i), topTable(get(paste0("fit",i)), coef=2,adjust.method="BH",p.value=1,"P"))
+      #   # Colnames were labeled in each comparison to make easier data merging
+      #   #assign(paste0("alllimma",i),get(paste0("alllimma",i)) %>% rename_with(~ paste0(colnames(design_matrix)[2],"_", .x), everything()))
+      #   
+      #   assign(paste0("alllimma",i),get(paste0("alllimma",i)) %>% bind_cols(colnames(design_matrix)[2])) 
+      #   # Collect everything into one object
+      #   merge_stat_df <- bind_rows(merge_stat_df,get(paste0("alllimma",i)))
+      # }
+      # 
       library(limma)
       design_matrix <- model.matrix(~factor(c(rep(2,num_reps),rep(1,num_reps))))
       merge_stat_df <-NULL
-      for ( i in 2:sample_size){
+      for (i in 1:sample_size){
         # Change only the colname iteratively makes fit to every comparison
-        colnames(design_matrix) <- c("Intercept", paste0("A1-A",i))
+        colnames(design_matrix) <- c("Intercept", paste0("A",numerator,"-A",i))
         #print(colnames(design_matrix))
         # Col selection for each comparison
-        assign(paste0("df_A1vsA",i),stat_analysis %>% select(1:2 | contains("A1-") & contains("log10_") | contains(paste0("A",i,"-")) & contains("log10_")))
-        # First, linear model was built
-        assign(paste0("fit",i) ,lmFit(get(paste0("df_A1vsA",i))[,3:8], design_matrix))
-        assign(paste0("fit",i), eBayes(get(paste0("fit",i))))
-        # Readable dataframe format was generated 
-        assign(paste0("alllimma",i), topTable(get(paste0("fit",i)), coef=2,adjust.method="BH",p.value=1,"P"))
-        # Colnames were labeled in each comparison to make easier data merging
-        #assign(paste0("alllimma",i),get(paste0("alllimma",i)) %>% rename_with(~ paste0(colnames(design_matrix)[2],"_", .x), everything()))
-        
-        assign(paste0("alllimma",i),get(paste0("alllimma",i)) %>% bind_cols(colnames(design_matrix)[2])) 
-        # Collect everything into one object
-        merge_stat_df <- bind_rows(merge_stat_df,get(paste0("alllimma",i)))
+        if(numerator != i){
+          assign(paste0("df_A",numerator,"vsA",i),stat_analysis %>% 
+                   select(1:2 | contains(paste0("A",numerator,"-")) & contains("log10_") | contains(paste0("A",i,"-")) & contains("log10_")))
+          # First, linear model was built
+          assign(paste0("fit",i) ,lmFit(get(paste0("df_A",numerator,"vsA",i))[,3:8], design_matrix))
+          assign(paste0("fit",i), eBayes(get(paste0("fit",i))))
+          # Readable dataframe format was generated 
+          assign(paste0("alllimma",i), topTable(get(paste0("fit",i)), coef=2,adjust.method="BH",p.value=1,"P"))
+          # Colnames were labeled in each comparison to make easier data merging
+          #assign(paste0("alllimma",i),get(paste0("alllimma",i)) %>% rename_with(~ paste0(colnames(design_matrix)[2],"_", .x), everything()))
+          
+          assign(paste0("alllimma",i),get(paste0("alllimma",i)) %>% bind_cols(colnames(design_matrix)[2])) 
+          # Collect everything into one object
+          merge_stat_df <- bind_rows(merge_stat_df,get(paste0("alllimma",i)))
+        }else{}
       }
       
       merge_stat_df <- bind_cols(rownames(merge_stat_df),merge_stat_df) 
@@ -672,10 +714,10 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
       merge_stat_df1 <- merge_stat_df %>% 
         separate(common_col, into = c("pep_with_pos","Pool","tmp"),sep = "@") %>%
         select(!tmp) %>%
-        rename_with(.col=9, ~ "A1vs_Ai") %>%
-        separate(A1vs_Ai, into = c("first","second"),sep = "-") %>%
-        mutate(A1vs_Ai = paste(first,second,sep = "/")) %>%
-        mutate(common_col = paste(pep_with_pos,Pool,A1vs_Ai,sep = "@")) %>%
+        rename_with(.col=9, ~ "fold_change_comp") %>%
+        separate(fold_change_comp, into = c("first","second"),sep = "-") %>%
+        mutate(fold_change_comp = paste(first,second,sep = "/")) %>%
+        mutate(common_col = paste(pep_with_pos,Pool,fold_change_comp,sep = "@")) %>%
         select(!c(first,second))
       
       merge_stat_df_final <- stat_analysis %>%
@@ -696,30 +738,53 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
         mutate(isomericity = ifelse(is.na(isomericity), "False Positive", isomericity)) %>%
         unite(Pool_new, Pool.x, isomericity,sep = "_",remove = FALSE) %>%
         unite('new_col_coloring',Pool_new,ratio,sep = "_",remove = FALSE) %>%
-        mutate(new_col_coloring = if_else(grepl("ISO-REF", new_col_coloring), "ISO-REF", new_col_coloring)) %>%
-        mutate(new_col_coloring = if_else(grepl("unexpected", new_col_coloring), "unexpected", new_col_coloring)) %>%
+        mutate(new_col_coloring = if_else(grepl("Fixed_multi", new_col_coloring), "Fixed_multi", new_col_coloring)) %>%
+        mutate(new_col_coloring = if_else(grepl("Fixed_mono", new_col_coloring), "Fixed_mono", new_col_coloring)) %>%
+        mutate(new_col_coloring = if_else(grepl("Unexpected", new_col_coloring), "Unexpected", new_col_coloring)) %>%
         rename(pep_with_pos=pep_with_pos.x) %>% rename(Pool=Pool.x)
       
     }else{
       print("Statistical test could not be assessed. Check the input files!")
     }
+    ##TODO: Find more logical way to map these values!!!
     
-    ## Generation of df -> expected abundance ratio for volcano plot
-    actual_ratio_col <- merge_stat_df_final %>%
-      select(A1vs_Ai) %>% distinct() %>%
-      mutate(actual_ratio_val = case_when(grepl(comparisons[1],A1vs_Ai) ~actual_ratio[1],
-                                          grepl(comparisons[2],A1vs_Ai) ~actual_ratio[2],
-                                          grepl(comparisons[3],A1vs_Ai) ~actual_ratio[3],
-                                          grepl(comparisons[4],A1vs_Ai) ~actual_ratio[4]))
+    if(length(comparisons) == 4){
+      actual_ratio_col <- merge_stat_df_final %>%
+        select(fold_change_comp) %>% distinct() %>%
+        mutate(actual_ratio_val= case_when(grepl(comparisons[1],fold_change_comp) ~ actual_ratio[1],
+                                           grepl(comparisons[2],fold_change_comp) ~actual_ratio[2],
+                                           grepl(comparisons[3],fold_change_comp) ~actual_ratio[3],
+                                           grepl(comparisons[4],fold_change_comp) ~actual_ratio[4]))
+    }else if(length(comparisons) == 5){
+      actual_ratio_col <- merge_stat_df_final %>%
+        select(fold_change_comp) %>% distinct() %>%
+        mutate(actual_ratio_val= case_when(grepl(comparisons[1],fold_change_comp) ~ actual_ratio[1],
+                                           grepl(comparisons[2],fold_change_comp) ~actual_ratio[2],
+                                           grepl(comparisons[3],fold_change_comp) ~actual_ratio[3],
+                                           grepl(comparisons[4],fold_change_comp) ~actual_ratio[4],
+                                           grepl(comparisons[5],fold_change_comp) ~actual_ratio[5]))
+    }else{
+      print("Mapping between theoretical ratio and comparison cannot be done. Please make sure that you have either 4 or 5 comparisons overall.")
+    }
     
+    # ## Generation of df -> expected abundance ratio for volcano plot
+    # actual_ratio_col <- merge_stat_df_final %>%
+    #   select(A1vs_Ai) %>% distinct() %>%
+    #   mutate(actual_ratio_val = case_when(grepl(comparisons[1],A1vs_Ai) ~actual_ratio[1],
+    #                                       grepl(comparisons[2],A1vs_Ai) ~actual_ratio[2],
+    #                                       grepl(comparisons[3],A1vs_Ai) ~actual_ratio[3],
+    #                                       grepl(comparisons[4],A1vs_Ai) ~actual_ratio[4]))
+    # 
     point_count_y_axis <- merge_stat_df_final %>%
-      group_by(A1vs_Ai, new_col_coloring) %>%
+      group_by(fold_change_comp, new_col_coloring) %>%
       filter(P.Value < 0.05) %>% 
       count(new_col_coloring) %>% left_join(actual_ratio_col)
     
+    ymax <- max(-log10(merge_stat_df_final$P.Value)) + 0.5
+    y_decrement <- 0.5
     
-    ymax <- 9 + 0.5 #max(-log10(merge_stat_df_final$P.Value))
-    y_decrement <- 0.50
+    #ymax <- 9 + 0.5 #max(-log10(merge_stat_df_final$P.Value))
+    #y_decrement <- 0.50
     
     calculate_y_pos <- function(group) {
       group_length <- length(group)
@@ -728,62 +793,65 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     }
     
     # Apply the function to calculate y_pos within each group
-    point_count_y_axis$y_pos <- unlist(by(point_count_y_axis$A1vs_Ai, point_count_y_axis$A1vs_Ai, calculate_y_pos))
+    point_count_y_axis$y_pos <- unlist(by(point_count_y_axis$fold_change_comp, 
+                                          point_count_y_axis$fold_change_comp, calculate_y_pos))
+    
+    col <- RColorBrewer::brewer.pal(n=length(comparisons),name = "Dark2")
+    
+    labels <- unique(merge_stat_df_final$new_col_coloring)
+    
+    if (sheet_theo_name == "ISOREF_REF2_Others"){
+      
+      colors <- c(RColorBrewer::brewer.pal(n=length(comparisons),name = "Dark2"),"#2171b5","#999999")
+      new_comparisons <- c(comparisons,"Unexpected","Fixed_mono")
+      
+    }else if (sheet_theo_name == "ISO-refOTHER with FC_correct"){
+      
+      new_comparisons <- c(comparisons,"Unexpected")
+      colors <- c(RColorBrewer::brewer.pal(n=length(comparisons),name = "Dark2"),"#999999")
+      
+    }else{
+      print("Sheet_theo_name could not be found, please make sure that you selected the correct sheet_name.")
+    }
     
     
-    p9 <- ggplot(merge_stat_df_final,aes(x =log2(merge_stat_df_final$fold_change_values), y = -log10(merge_stat_df_final$P.Value))) +
-      geom_point(aes(color = new_col_coloring,shape=Pool_new), size = 4) +
+    mapped_coloring <- rep("#000000",length(labels))
+    
+    for (i in 1:length(labels)) {
+      # Check if the color_element contains any of the comparisons
+      if (any(new_comparisons %in% str_extract_all(labels[i], paste(new_comparisons, collapse = "|"))[[1]])) {
+        # Find the index of the matching comparison in the comparisons list
+        comp_index <- match(TRUE, sapply(new_comparisons, function(comp) comp %in% str_extract_all(labels[i], comp)))
+        
+        # Assign the corresponding color to the data frame
+        mapped_coloring[i]<- paste0(colors[comp_index])
+        #mapped_coloring[i]<- paste(paste0(labels[i],'"'),paste0('"',colors[comp_index]),sep = "=")
+      }
+    }
+    
+    actual_ratio_col <- actual_ratio_col %>% bind_cols(col)
+    
+    mapped_coloring_dat <- as.data.frame(mapped_coloring)
+    
+    point_count_y_axis <- mapped_coloring_dat %>% 
+      bind_cols(labels) %>%
+      rename(colors=1,new_col_coloring=2) %>%
+      right_join(point_count_y_axis,by="new_col_coloring")
+    
+    
+    
+    plot9 <- ggplot(merge_stat_df_final,aes(x =log2(merge_stat_df_final$fold_change_values), y = -log10(merge_stat_df_final$P.Value))) +
+      geom_point(size = 3, aes(color = new_col_coloring,shape=Pool_new)) + 
+      #scale_shape_identity() +
       #geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red") +
-      scale_fill_manual(values = c("ISO-REF" = "#000000",
-                                   "Unexpected_False Positive_A1/A2"="#999999",
-                                   "Unexpected_False Positive_A1/A3" ="#999999",
-                                   "Unexpected_False Positive_A1/A4"="#999999",
-                                   "Unexpected_False Positive_A1/A5"="#999999",
-                                   "Others_multi_A1/A2" = "#CC79A7",
-                                   "Others_mono_A1/A2" = "#CC79A7",
-                                   "Others_multi_A1/A3" = "#E69F00",
-                                   "Others_mono_A1/A3" = "#E69F00",
-                                   "Others_multi_A1/A4" = "#56B4E9",
-                                   "Others_mono_A1/A4" = "#56B4E9",
-                                   "Others_multi_A1/A5" = "#009E73",
-                                   "Others_mono_A1/A5" = "#009E73")) + 
-      #geom_line(aes(color = new_col_coloring), size = 1) +  # Add color aesthetic to geom_line()
-      scale_color_manual(values = c("ISO-REF" = "#000000",
-                                    "Unexpected_False Positive_A1/A2"="#999999",
-                                    "Unexpected_False Positive_A1/A3" ="#999999",
-                                    "Unexpected_False Positive_A1/A4"="#999999",
-                                    "Unexpected_False Positive_A1/A5"="#999999",
-                                    "Others_multi_A1/A2" = "#CC79A7",
-                                    "Others_mono_A1/A2" = "#CC79A7",
-                                    "Others_multi_A1/A3" = "#E69F00",
-                                    "Others_mono_A1/A3" = "#E69F00",
-                                    "Others_multi_A1/A4" = "#56B4E9",
-                                    "Others_mono_A1/A4" = "#56B4E9",
-                                    "Others_multi_A1/A5" = "#009E73",
-                                    "Others_mono_A1/A5" = "#009E73"),
-                         
-                         labels = c('Non-variant', 'Variant non-isomeric A1 vs A2',
-                                    'Variant non-isomeric A1 vs A3',
-                                    'Variant non-isomeric A1 vs A4',
-                                    'Variant non-isomeric A1 vs A5',
-                                    'Variant isomeric A1 vs A2',
-                                    'Variant isomeric A1 vs A3',
-                                    'Variant isomeric A1 vs A4',
-                                    'Variant isomeric A1 vs A5',
-                                    "Unexpected_False Positive A1/A2",
-                                    "Unexpected_False Positive A1/A3",
-                                    "Unexpected_False Positive A1/A4",
-                                    "Unexpected_False Positive A1/A5")) +
-      scale_shape_manual(values = c(16, 15, 12, 17),
-                         labels = c('Non-variant', 'Variant non-isomeric', 'Variant isomeric', 'Unexpected')) +
+      #scale_fill_manual(values=setNames(mapped_coloring, labels)) + 
+      #geom_line(aes(color =setNames(mapped_coloring, labels)), size = 1) +  # Add color aesthetic to geom_line()
+      scale_color_manual(values =setNames(mapped_coloring, labels)) +
       #scale_y_continuous(limits = c(0, max(-log10(merge_stat_df_final$adj.P.Val))), breaks = seq(0, max(-log10(merge_stat_df_final$adj.P.Val)), by = 0.8)) +
       #scale_x_continuous(limits = c(min(log2(merge_stat_df_final$fold_change_values)),max(log2(merge_stat_df_final$fold_change_values)))) +#facet_wrap(~ratio) +
-      #scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=1)) +
-      #scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=1)) +
+      scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=1)) +
+      scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=1)) +
       #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
-      scale_x_continuous(limits = c(-8, 10),breaks = seq(from = -8, to = 10, by = 2)) +  # Set the ticks for the x-axis
-      scale_y_continuous(limits = c(0, 10),breaks = seq(from = 0, to = 10, by = 2))+  # Set the ticks for the y-axis
-      
       theme_bw() +
       theme(legend.text = element_text(size = 30),
             axis.title.x = element_text(size = 30),
@@ -795,10 +863,80 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
             axis.text.y = element_text(size = 30),
             plot.subtitle = element_text(size = 30)) +
       labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n", subtitle)) +
-      geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"),size=2) +
-      geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=2) + 
-      geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos,fill=new_col_coloring, label = n),size=14, colour="white",show.legend = FALSE) 
+      geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=col,size=1.5) +
+      geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=1.5) + 
+      geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos, fill=new_col_coloring,label = n),color="white",size=6,show.legend = FALSE) +
+      scale_fill_manual(values =setNames(mapped_coloring, labels))
     
+    
+    # p9 <- ggplot(merge_stat_df_final,aes(x =log2(merge_stat_df_final$fold_change_values), y = -log10(merge_stat_df_final$P.Value))) +
+    #   geom_point(aes(color = new_col_coloring,shape=Pool_new), size = 4) +
+    #   #geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red") +
+    #   scale_fill_manual(values = c("ISO-REF" = "#000000",
+    #                                "Unexpected_False Positive_A1/A2"="#999999",
+    #                                "Unexpected_False Positive_A1/A3" ="#999999",
+    #                                "Unexpected_False Positive_A1/A4"="#999999",
+    #                                "Unexpected_False Positive_A1/A5"="#999999",
+    #                                "Others_multi_A1/A2" = "#CC79A7",
+    #                                "Others_mono_A1/A2" = "#CC79A7",
+    #                                "Others_multi_A1/A3" = "#E69F00",
+    #                                "Others_mono_A1/A3" = "#E69F00",
+    #                                "Others_multi_A1/A4" = "#56B4E9",
+    #                                "Others_mono_A1/A4" = "#56B4E9",
+    #                                "Others_multi_A1/A5" = "#009E73",
+    #                                "Others_mono_A1/A5" = "#009E73")) + 
+    #   #geom_line(aes(color = new_col_coloring), size = 1) +  # Add color aesthetic to geom_line()
+    #   scale_color_manual(values = c("ISO-REF" = "#000000",
+    #                                 "Unexpected_False Positive_A1/A2"="#999999",
+    #                                 "Unexpected_False Positive_A1/A3" ="#999999",
+    #                                 "Unexpected_False Positive_A1/A4"="#999999",
+    #                                 "Unexpected_False Positive_A1/A5"="#999999",
+    #                                 "Others_multi_A1/A2" = "#CC79A7",
+    #                                 "Others_mono_A1/A2" = "#CC79A7",
+    #                                 "Others_multi_A1/A3" = "#E69F00",
+    #                                 "Others_mono_A1/A3" = "#E69F00",
+    #                                 "Others_multi_A1/A4" = "#56B4E9",
+    #                                 "Others_mono_A1/A4" = "#56B4E9",
+    #                                 "Others_multi_A1/A5" = "#009E73",
+    #                                 "Others_mono_A1/A5" = "#009E73"),
+    #                      
+    #                      labels = c('Non-variant', 'Variant non-isomeric A1 vs A2',
+    #                                 'Variant non-isomeric A1 vs A3',
+    #                                 'Variant non-isomeric A1 vs A4',
+    #                                 'Variant non-isomeric A1 vs A5',
+    #                                 'Variant isomeric A1 vs A2',
+    #                                 'Variant isomeric A1 vs A3',
+    #                                 'Variant isomeric A1 vs A4',
+    #                                 'Variant isomeric A1 vs A5',
+    #                                 "Unexpected_False Positive A1/A2",
+    #                                 "Unexpected_False Positive A1/A3",
+    #                                 "Unexpected_False Positive A1/A4",
+    #                                 "Unexpected_False Positive A1/A5")) +
+    #   scale_shape_manual(values = c(16, 15, 12, 17),
+    #                      labels = c('Non-variant', 'Variant non-isomeric', 'Variant isomeric', 'Unexpected')) +
+    #   #scale_y_continuous(limits = c(0, max(-log10(merge_stat_df_final$adj.P.Val))), breaks = seq(0, max(-log10(merge_stat_df_final$adj.P.Val)), by = 0.8)) +
+    #   #scale_x_continuous(limits = c(min(log2(merge_stat_df_final$fold_change_values)),max(log2(merge_stat_df_final$fold_change_values)))) +#facet_wrap(~ratio) +
+    #   #scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=1)) +
+    #   #scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=1)) +
+    #   #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
+    #   scale_x_continuous(limits = c(-8, 10),breaks = seq(from = -8, to = 10, by = 2)) +  # Set the ticks for the x-axis
+    #   scale_y_continuous(limits = c(0, 10),breaks = seq(from = 0, to = 10, by = 2))+  # Set the ticks for the y-axis
+    #   
+    #   theme_bw() +
+    #   theme(legend.text = element_text(size = 30),
+    #         axis.title.x = element_text(size = 30),
+    #         axis.title.y = element_text(size = 30),
+    #         plot.title = element_text(size = 35),
+    #         legend.title = element_text(size = 30),
+    #         axis.text.x = element_text(size = 30),
+    #         axis.title = element_text(size = 30),
+    #         axis.text.y = element_text(size = 30),
+    #         plot.subtitle = element_text(size = 30)) +
+    #   labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n", subtitle)) +
+    #   geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"),size=2) +
+    #   geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=2) + 
+    #   geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos,fill=new_col_coloring, label = n),size=14, colour="white",show.legend = FALSE) 
+    # 
     
     
     merge_stat_df_final_text <- merge_stat_df_final %>% mutate(soft_name=paste0(software_name)) %>% mutate(acq_type=paste0(acquisiton_type))
@@ -812,9 +950,9 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     ### ROC analysis custom func
     df_roc_order <- df_roc[order(df_roc$P.Value),]
     
-    df_roc_func <- compute_roc_curve(df=df_roc_order, flag = "Others",expected = (4*141))
+    df_roc_func <- compute_roc_curve(df=df_roc_order, flag = "Spiked",expected = length(comparisons)*size_variying_pep_size)
     
-    p13 <- ggplot(df_roc_func, aes(y=tpr, x = fdr)) +
+    plot13 <- ggplot(df_roc_func, aes(y=tpr, x = fdr)) +
       geom_path(size=1.5) +
       #geom_vline(aes(xintercept=fdr)) +
       #geom_text(data=as.data.frame(result),aes(label=fdr)) +
@@ -837,7 +975,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     
     #### ROC Analysis using pROC 
     
-    df_roc$variant <- ifelse(df_roc$Pool == "Others", TRUE, FALSE)
+    df_roc$variant <- ifelse(df_roc$Pool == "Spiked", TRUE, FALSE)
     #df_roc$non_var <- ifelse(df_roc$Pool == "ISO-REF", TRUE, FALSE)
     
     library(pROC)
@@ -846,7 +984,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     fpr <- as.data.frame(1 - roc_raw_variant$specificities)
     tpr_and_fpr_variant  <- cbind(roc_raw_variant$sensitivities,
                                   fpr,#roc_raw_variant$specificities,
-                                  "Variant Pool")
+                                  "Spiked Pool")
     
     
     #roc_raw_non_var <- roc(df_roc$non_var, df_roc$P.Value)
@@ -854,13 +992,13 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     #roc_raw_non_var$specificities,
     #"Non-variant Pool")
     
-    roc_plot_df <- as.data.frame(tpr_and_fpr_variant) %>% 
+    roc_plt_df <- as.data.frame(tpr_and_fpr_variant) %>% 
       #bind_rows(as.data.frame(tpr_and_fpr_non_var)) 
       bind_cols(software_name)
     
-    colnames(roc_plot_df) <- c("sensitivity", "fpr","Pool_type","Software_name")
+    colnames(roc_plt_df) <- c("sensitivity", "fpr","Pool_type","Software_name")
     
-    p10 <- roc_plot_df %>% #group_by(Pool_type) %>% 
+    plot10 <- roc_plt_df %>% #group_by(Pool_type) %>% 
       ggplot( aes(y=as.numeric(sensitivity), x = as.numeric(fpr), color=Pool_type)) +
       geom_path(size=1.5) + theme_bw() +# scale_x_reverse() +  +
       theme(legend.text = element_text(size = 20),
@@ -876,14 +1014,24 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
            title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), 
            subtitle = paste(subtitle), color="Pool Type")
     
-    write.table(roc_plot_df, file = paste0(file_path,"outputs_with_new_script/pRoc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
+    write.table(roc_plt_df, file = paste0(file_path,"outputs_with_new_script/pRoc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
     
-    sapply(1:13,function(x) ggsave(filename = paste0("p",x,".tiff"),
-                                   width = 60, height = 45, 
-                                   path = paste0(file_path,"/outputs_with_new_script/"),
-                                   units = "cm",
-                                   get(paste0("p",x)),
-                                   device = "tiff", #".svg"
+    # sapply(1:13,function(x) ggsave(filename = paste0("p",x,".tiff"),
+    #                                width = 60, height = 45, 
+    #                                path = paste0(file_path,"/outputs_with_new_script/"),
+    #                                units = "cm",
+    #                                get(paste0("p",x)),
+    #                                device = "tiff", #".svg"
+    # ))
+    
+    plt_obj <- ls(pattern="plot")
+    plot_obj <- plt_obj[!is.na(plt_obj)]
+    sapply(1:length(plot_obj),function(x) ggsave(filename = paste0("p",x,".tiff"),
+                                                 width = 60, height = 45, 
+                                                 path = paste0(file_path,"/outputs_with_new_script/"),
+                                                 units = "cm",
+                                                 get(plot_obj[x]),
+                                                 device = "tiff", #".svg"
     ))
     
     
