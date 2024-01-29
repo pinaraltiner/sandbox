@@ -68,13 +68,13 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
   
   ## THEORETICAL PEPTIDE LIST
   pep_list_w_theo <- read.xlsx(paste0(theo_file_path, theo_file_name), sheet = sheet_theo_name)
-  pep_list_w_theo_quant <- pep_list_w_theo[,-1]
+  #pep_list_w_theo_quant <- pep_list_w_theo[,-1]
   
   if(sheet_theo_name == "ISO-refOTHER with FC_correct") {
-    common_col_theo_quant <- as.data.frame(paste(pep_list_w_theo_quant$Phosphopeptide.sequence,
-                                                 pep_list_w_theo_quant$modified.position.in.peptide, sep = "_"))
+    common_col_theo_quant <- as.data.frame(paste(pep_list_w_theo$Phosphopeptide.sequence,
+                                                 pep_list_w_theo$modified.position.in.peptide, sep = "_"))
     colnames(common_col_theo_quant) <- "pep_with_pos"
-    pep_list_w_theo_quant <- cbind(common_col_theo_quant,pep_list_w_theo_quant)
+    pep_list_w_theo <- cbind(common_col_theo_quant,pep_list_w_theo)
     
   } else if (sheet_theo_name == "ISOREF_REF2_Others"){
     
@@ -118,6 +118,35 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
     bind_rows(ecoli_seq) %>% 
     mutate(Pool_for_seq_merge= ifelse(is.na(Pool_for_seq_merge),background_species,Pool_for_seq_merge))
   
+  ########## ########## ########## ########## ########## ########## ########## ##########
+  all_corr_seq <- quant_peptides %>% 
+    filter(grepl("Phospho",Modifications)) %>%
+    filter(grepl(selected_spcies,Proteins) & !grepl("CON__",Proteins)) %>%
+    mutate(species=selected_spcies) %>% 
+    group_by(Experiment) %>%
+    distinct(Sequence,.keep_all = T) %>%
+    full_join(pep_list_w_theo_unique,by="Sequence") %>%
+    mutate_at("situation", ~replace_na(.,"Unexpected")) %>%
+    mutate(situation= ifelse(is.na(species),"missing",situation)) %>%
+    filter(!grepl("Unexpected",situation) & !grepl("missing",situation) ) %>%
+    select(Sequence,Modifications,Experiment,situation,Pool_for_seq_merge) %>%
+    separate(Experiment, into = c("exp_id","samp_id","rep_id"),sep = "-")
+  
+  plot15 <- gg_barplt_id_pep_count(data_set = all_seq,
+                                   x_df = all_seq$samp_id,
+                                   fill_df = all_seq$rep_id,
+                                   ymax = nrow(all_seq),
+                                   size_num=10,
+                                   header = paste("Total number of correctly identified ",selected_spcies,"phospho-peptides","across each sample",sep=" "),
+                                   caption_lab = "Mapping was done without considering phospho-positions.",
+                                   x_lab = "Sample id",
+                                   fill_lab =  "Sample id",
+                                   y_lab = "Number of identified peptides",
+                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +
+    theme(axis.text.x = element_text(angle = 90))
+  
+  ########## ########## ########## ########## ########## ########## ########## ##########
+  
   all_seq_syn <- all_seq %>%
     select(Sequence,Modifications,Proteins,Pool_for_seq_merge) %>% 
     distinct(Sequence, .keep_all = T) %>%
@@ -130,6 +159,7 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
                                 x_df = all_seq_syn$Pool_for_seq_merge,
                                 fill_df = all_seq_syn$Pool_for_seq_merge,
                                 ymax = nrow(all_seq_syn),
+                                size_num=10,
                                 header = paste("Total number of identified phosphorylated", selected_spcies,"and", background_species,"across each sample",sep=" "),
                                 caption_lab = "NA values are removed.",
                                 x_lab = "Sample id",
@@ -273,6 +303,7 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
                                 x_df = barplt_phospho_seq$Sample_id,
                                 fill_df = barplt_phospho_seq$Rep_id,
                                 ymax = 20000,
+                                size_num=10,
                                 header = "Total number of quantified phospho-sequence across each sample",
                                 caption_lab = "NA values and multiple sequences are removed.",
                                 x_lab = "Sample id",
@@ -300,7 +331,7 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
     pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
     relocate(exp_design) %>%
     full_join(site_prob, by="pep_with_pos") %>%
-    full_join(pep_list_w_theo_quant,by="pep_with_pos") %>% 
+    full_join(pep_list_w_theo,by="pep_with_pos") %>% 
     mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
     mutate(Pool= ifelse(is.na(Proteins),"missing",Pool)) %>%
     select(pep_with_pos,starts_with(exp_design),Pool) %>%
@@ -310,6 +341,7 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
                                 x_df = df_merge_syn$Pool,
                                 fill_df = df_merge_syn$Pool,
                                 ymax = 20000,
+                                size_num=10,
                                 header = "Total number of quantified phospho-site across each sample",
                                 caption_lab = "NA values are removed. \n No filtering based on localization",
                                 x_lab = "Sample id",
@@ -339,6 +371,7 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
                                x_df = barplt_df$Sample_id,
                                fill_df = barplt_df$Rep_id,
                                ymax = 20000,
+                               size_num=10,
                                header = "Total number of quantified phospho-site across each sample",
                                caption_lab = "NA values are removed.",
                                x_lab = "Sample id",
@@ -351,6 +384,7 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
                                x_df = barplt_df_ecoli$Sample_id,
                                fill_df = barplt_df_ecoli$Rep_id,
                                ymax = 20500,
+                               size_num=10,
                                header = "Total number of quantified Ecoli across each sample",
                                caption_lab = "NA values are removed.",
                                x_lab = "Sample id",
@@ -388,7 +422,7 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
     pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
     mutate(species=background_species) %>% relocate(exp_design,.after = "Proteins")
   
-  extract_df <- barplt_df_wide %>% full_join(pep_list_w_theo_quant,by="pep_with_pos")
+  extract_df <- barplt_df_wide %>% full_join(pep_list_w_theo,by="pep_with_pos")
   
   write.table(extract_df,file=paste0(file_path,"MQ_transposed_data_corr_pep_list.txt"),sep = "\t",col.names = T,row.names = F)
   
@@ -572,7 +606,7 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
   final_imputed_data_ecoli <- final_imputed_data  %>% filter(!grepl(selected_spcies, species))
   
   df_merge <- final_imputed_data_syn %>%
-    left_join(pep_list_w_theo_quant,by="pep_with_pos") %>% 
+    left_join(pep_list_w_theo,by="pep_with_pos") %>% 
     mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
     bind_rows(final_imputed_data_ecoli) %>%
     mutate_at("Pool", ~replace_na(.,background_species)) 
@@ -969,8 +1003,10 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
     scale_color_manual(values =setNames(mapped_coloring, labels)) +
     #scale_y_continuous(limits = c(0, max(-log10(merge_stat_df_final$adj.P.Val))), breaks = seq(0, max(-log10(merge_stat_df_final$adj.P.Val)), by = 0.8)) +
     #scale_x_continuous(limits = c(min(log2(merge_stat_df_final$fold_change_values)),max(log2(merge_stat_df_final$fold_change_values)))) +#facet_wrap(~ratio) +
-    scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=1)) +
-    scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=1)) +
+    scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=2)) +
+    scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=2)) +
+    #scale_y_continuous(limits = c(0, 11), breaks = seq(0,11, by = 2)) +
+    #scale_x_continuous(limits = c(-7,11),breaks = seq(-7,11, by = 2))+
     #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
     theme_bw() +
     theme(legend.text = element_text(size = 30),
@@ -985,7 +1021,7 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
     labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n", subtitle)) +
     geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=col,size=1.5) +
     geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=1.5) + 
-    geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos, fill=new_col_coloring,label = n),color="white",size=6,show.legend = FALSE) +
+    geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos, fill=new_col_coloring,label = n),color="white",size=12,show.legend = FALSE) +
     scale_fill_manual(values =setNames(mapped_coloring, labels))
   
   
@@ -1148,11 +1184,11 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
   plt_obj <- ls(pattern="plot")
   plot_obj <- plt_obj[!is.na(plt_obj)]
   sapply(1:length(plot_obj),function(x) ggsave(filename = paste0("p",x,".tiff"),
-                                               width = 60, height = 45, 
+                                               width = 80, height = 60, 
                                                path = paste0(file_path,"/outputs_with_new_script/"),
                                                units = "cm",
                                                get(plot_obj[x]),
-                                               device = "tiff", #".svg"
+                                               device = "png", #".svg"
   ))
   
   
