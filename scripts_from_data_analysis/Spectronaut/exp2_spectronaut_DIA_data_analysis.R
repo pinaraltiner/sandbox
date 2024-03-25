@@ -1195,15 +1195,15 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
            title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), 
            subtitle = paste(subtitle,"including unexpected"), color="Pool Type")
     
-     intened_path <-paste0(file_path,"outputs_new")
+    new_path <-paste0(file_path,"outputs_new")
      
-     if(dir.exists(intened_path)){
+     if(dir.exists(new_path)){
        
      }else{
-       new_path <- dir.create(intened_path)
+       new_path <- dir.create(new_path)
      }
      
-     write.table(df_roc_func, file = paste0(new_path,"new_custom_Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
+     write.table(df_roc_func, file = paste0(new_path,"/new_custom_Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
     
     #### ROC Analysis using pROC 
     
@@ -1216,7 +1216,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     fpr <- as.data.frame(1 - roc_raw_variant$specificities)
     tpr_and_fpr_variant  <- cbind(roc_raw_variant$sensitivities,
                                   fpr,#roc_raw_variant$specificities,
-                                  "Spiked Pool")
+                                  "Diluted Pool")
     
     
     #roc_raw_non_var <- roc(df_roc$non_var, df_roc$P.Value)
@@ -1246,7 +1246,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
            title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), 
            subtitle = paste(subtitle), color="Pool Type")
     
-    write.table(roc_plt_df, file = paste0(new_path,"pRoc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
+    write.table(roc_plt_df, file = paste0(new_path,"/pRoc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
     
     # sapply(1:13,function(x) ggsave(filename = paste0("p",x,".tiff"),
     #                                width = 60, height = 45, 
