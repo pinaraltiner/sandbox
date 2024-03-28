@@ -224,7 +224,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                                      ymax = nrow(all_corr_seq),
                                      size_num=10,
                                      header = paste("Total number of correctly identified ",selected_spcies,"phospho-sequence","across each sample",sep=" "),
-                                     caption_lab = "Mapping was done without considering phospho-positions. \n In the case of muultiple PSMs, max. intensity was selected.",
+                                     caption_lab = "Mapping was done without considering phospho-positions. \n In the case of multiple PSMs, max. intensity was selected.",
                                      x_lab = "Sample id",
                                      fill_lab =  "Sample id",
                                      y_lab = "Number of identified peptides",
@@ -236,7 +236,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
       
       
     ########## ########## ########## ########## ########## ########## ########## ##########  
-    all_seq_syn <- all_seq %>%
+    all_seq_dist <- all_seq %>%
       select(sequence, modifications, Pool_for_seq_merge) %>%
       distinct(sequence, .keep_all = T) %>%
       bind_rows(ecoli_seq_dist) %>%
@@ -244,10 +244,10 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
       mutate(acq_type=acquisiton_type) %>%
       mutate(soft_name=software_name)
     
-    plot13 <- gg_barplt_id_pep_count(data_set = all_seq_syn,
-                           x_df = all_seq_syn$Pool_for_seq_merge,
-                           fill_df = all_seq_syn$Pool_for_seq_merge,
-                           ymax = nrow(all_seq_syn),
+    plot13 <- gg_barplt_id_pep_count(data_set = all_seq_dist,
+                           x_df = all_seq_dist$Pool_for_seq_merge,
+                           fill_df = all_seq_dist$Pool_for_seq_merge,
+                           ymax = nrow(all_seq_dist),
                            size_num=10,
                            header = paste("Total number of identified phosphorylated", selected_spcies,"and", background_species,"sequences across each sample",sep=" "),
                            caption_lab = "NA values are removed.",
@@ -256,7 +256,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                            y_lab = "Number of identified sequences",
                            subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
 
-    write.table(all_seq_syn, file=paste0(file_path,"Experiment2",software_name,"_number_of_unique_sequence_for_each_species.txt"),sep = "\t",col.names = T,row.names = F)
+    write.table(all_seq_dist, file=paste0(file_path,"Experiment2",software_name,"_number_of_unique_sequence_for_each_species.txt"),sep = "\t",col.names = T,row.names = F)
     
     
     #################################################  
@@ -645,7 +645,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                  # symbol = c("Footnote Symbol 1; ", "Footnote Symbol 2")
                  footnote_as_chunk = T, title_format = c("italic", "underline")) %>%
         #as_image(width = 8) %>%
-        save_kable(paste0(file_path,"/outputs_with_filtering/table1.png"))
+        save_kable(paste0(file_path,"/outputs/table1.png"))
     
     ## REMOVE SEQUENCE COLUMN AFTER NA TABLE
     barplt_df_wide <- barplt_df_wide %>% select(!sequence)
@@ -876,13 +876,65 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     #write.table(final_imputed_data, file = "final_imputed_normalized_data_PAL _T_cell_Exp3_( 5 conc 3reps)_NoFAIMS_DDA_with_cont_230206_2023-02-07_0947.txt",sep = "\t",row.names = F)
     
     df_mean_ab_after_impt <- df_merge %>% 
-        select(contains("aft_imp") | contains("accession"),Pool) %>%
+        select(pep_with_pos,contains("aft_imp") | contains("accession"),Pool) %>%
         tibble() %>% 
         separate(accession, into = c("uniprot_id", "species", "position"), remove = F) %>%
         pivot_longer(cols = contains("aft_imp"),
                      names_to = "Mean_abundance",
                      values_to = "values") %>%
-        mutate_at("Pool", ~replace_na(.,background_species))
+        mutate_at("Pool", ~replace_na(.,background_species)) 
+    
+    
+    
+    for (i in 1:(sample_size-1)){
+      
+      dftmp_mean <-  df_merge %>% select(pep_with_pos,contains(paste0("log10_E2-A",i))) %>%
+        rowwise() %>%
+        mutate(row_mean = mean(c_across(where(is.numeric)), na.rm = TRUE)) %>%
+        select(row_mean)
+      
+      if (i==1){
+        
+        assign(paste0('log10_E2_A_CV',i), df_merge %>% 
+                 select(pep_with_pos,contains(paste0("log10_E2-A",i)),Pool,accession) %>%
+                 rowwise() %>%
+                 mutate(row_sd = sd(c_across(where(is.numeric)), na.rm = TRUE)) %>%
+                 bind_cols(dftmp_mean) %>%
+                 mutate(CV=row_sd/row_mean) %>%
+                 select(!contains("log10_")))
+        }else{
+          
+          assign(paste0('log10_E2_A_CV',i), df_merge %>% 
+                 select(contains(paste0("log10_E2-A",i))) %>%
+                 rowwise() %>%
+                 mutate(row_sd = sd(c_across(where(is.numeric)), na.rm = TRUE)) %>%
+                 bind_cols(dftmp_mean) %>%
+                 mutate(CV=row_sd/row_mean) %>%
+                 select(CV))
+          }
+      print(i)
+    }
+    
+    colnames(log10_E2_A_CV1)[6] <-"CV1" 
+    colnames(log10_E2_A_CV2) <- "CV2"
+    colnames(log10_E2_A_CV3) <- "CV3"
+    colnames(log10_E2_A_CV4) <- "CV4"
+    colnames(log10_E2_A_CV5) <- "CV5"
+    
+    df_CV_aft_impt <- log10_E2_A_CV1 %>% 
+      
+      bind_cols(log10_E2_A_CV2,
+                log10_E2_A_CV3,
+                log10_E2_A_CV4,
+                log10_E2_A_CV5) %>% 
+      pivot_longer(cols = contains("CV"),
+                   names_to = "CV_samples",
+                   values_to = "CV_values") %>%
+      filter(!grepl("Unexpected",Pool)) %>%
+      mutate(CV_values=(CV_values*100)) %>%
+      mutate(acq_type=acquisiton_type) %>%
+      mutate(soft_name=software_name)
+      
     
     
     df_FC_ratio_after_impt <- df_merge %>% 
@@ -919,7 +971,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     ############################## ############################
     
     ratio_supp_FC <-df_merge %>% 
-      select(starts_with("exp_") | contains("species"),pep_with_pos) %>%
+      select(starts_with("exp_") | contains("accession"),pep_with_pos) %>%
       left_join(pep_list_w_theo_sel,by="pep_with_pos") %>%
       pivot_longer(cols = starts_with("exp_"),
                    names_to = "exp_FC",
@@ -985,10 +1037,68 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                               fill_lab = "Sample Names",
                               subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
     
+   
     
-    ### HALF-BOX-PLOT & HALF-SCATTER-PLOT: Experimental Quantity Ratio of Synthetic Peptides  
+    ### BOX-PLOT: Experimental Quantity Ratio of Phospho Peptides  
+    df_FC_ratio_absErr_after_impt <- df_merge %>% 
+      select(pep_with_pos,starts_with("exp_") | contains("accession"),Pool) %>%
+      separate(accession, into = c("uniprot_id", "species", "position"), remove = F) %>%
+      tibble() %>% 
+      pivot_longer(cols = starts_with("exp_"),
+                   names_to = "exp_FC",
+                   values_to = "values") %>%
+      mutate_at("Pool", ~replace_na(.,background_species)) %>%
+      mutate(actual_ratio_val= case_when(grepl(comparisons[1],exp_FC) ~ as.numeric(actual_ratio[1]),
+                                         grepl(comparisons[2],exp_FC) ~as.numeric(actual_ratio[2]),
+                                         grepl(comparisons[3],exp_FC) ~as.numeric(actual_ratio[3]),
+                                         grepl(comparisons[4],exp_FC) ~as.numeric(actual_ratio[4]))) %>%
+      drop_na(actual_ratio_val) %>%
+      mutate(abs_err = abs(actual_ratio_val-values)) %>%
+      filter(!grepl("Unexpected",Pool)) %>%
+      mutate(acq_type=acquisiton_type) %>%
+      mutate(soft_name=software_name)
+    
+    write.table(df_FC_ratio_absErr_after_impt,file = paste0(file_path,"AbsError_FC",software_name,"_",acquisiton_type,".txt"),sep = 
+                  "\t",col.names = T,row.names = F)
+    
+    
     library(gghalves)
+    plot18 <- gg_half_boxplt_exp_ratio(data_set = df_FC_ratio_absErr_after_impt, 
+                                 x_df = df_FC_ratio_absErr_after_impt$exp_FC,
+                                 y_df = df_FC_ratio_absErr_after_impt$abs_err,
+                                 fill_df = df_FC_ratio_absErr_after_impt$Pool,
+                                 header="Experimental Quantity Ratio of Phospho Peptides",
+                                 x_lab="Sample Names",
+                                 y_lab="Abundance Ratios",
+                                 fill_lab = "Sample Names",
+                                
+                                 subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) + 
+      scale_fill_manual(values = c("#6A51A3","#6A51A3","grey68","#E6550D","#E6550D"))+
+            scale_color_manual(values = c("white","black","grey68","white","black")) + 
+      theme_dark()
     
+    plot19 <-  gg_half_boxplt_exp_ratio(data_set = df_CV_aft_impt, 
+                             x_df = df_CV_aft_impt$CV_samples,
+                             y_df = df_CV_aft_impt$CV_values,
+                             fill_df = df_CV_aft_impt$Pool,
+                             header="Experimental Quantity Ratio of Phospho Peptides",
+                             x_lab="Sample Names",
+                             y_lab="Abundance Ratios",
+                             fill_lab = "Sample Names",
+                             
+                             subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) + 
+      scale_fill_manual(values = c("#6A51A3","#6A51A3","grey68","#E6550D","#E6550D"))+
+      scale_color_manual(values = c("white","black","grey68","white","black")) + 
+      theme_dark() 
+    
+    write.table(df_CV_aft_impt,file = paste0(file_path,"CV_percentage",software_name,"_",acquisiton_type,".txt"),sep = 
+                  "\t",col.names = T,row.names = F)
+    
+    
+    
+    #cols <- c(rep("#E6550D" ,4),"#3F007D","#6A51A3","#807DBA","#BCBDDC",rep("cyan3",4))
+    ### HALF-BOX-PLOT & HALF-SCATTER-PLOT: Experimental Quantity Ratio of Synthetic Peptides  
+  
     plot7 <- gg_half_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
                                    x_df = df_FC_ratio_after_impt$exp_FC,
                                    y_df = df_FC_ratio_after_impt$values,
@@ -1213,7 +1323,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
         
         
         ###############################################################################
-        merge_stat_df_final <- merge_stat_df
+        merge_stat_df_final <- merge_stat_df %>% filter(!grepl("A1/A6",fold_change_comp))
         
         
     }else if(test_type=="limma"){
@@ -1273,7 +1383,8 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
             mutate(new_col_coloring = if_else(grepl("Fixed_multi", new_col_coloring), "Fixed_multi", new_col_coloring)) %>%
             mutate(new_col_coloring = if_else(grepl("Fixed_mono", new_col_coloring), "Fixed_mono", new_col_coloring)) %>%
             mutate(new_col_coloring = if_else(grepl("Unexpected", new_col_coloring), "Unexpected", new_col_coloring)) %>%
-            rename(pep_with_pos=pep_with_pos.x) %>% rename(Pool=Pool.x)
+            rename(pep_with_pos=pep_with_pos.x) %>% rename(Pool=Pool.x) %>%
+            filter(!grepl("A1/A6",fold_change_comp))
         
     }else{
         print("Statistical test could not be assessed. Check the input files!")
@@ -1293,8 +1404,8 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
         mutate(actual_ratio_val= case_when(grepl(comparisons[1],fold_change_comp) ~ actual_ratio[1],
                                            grepl(comparisons[2],fold_change_comp) ~actual_ratio[2],
                                            grepl(comparisons[3],fold_change_comp) ~actual_ratio[3],
-                                           grepl(comparisons[4],fold_change_comp) ~actual_ratio[4],
-                                           grepl(comparisons[5],fold_change_comp) ~actual_ratio[5]))
+                                           grepl(comparisons[4],fold_change_comp) ~actual_ratio[4]))#,
+                                           #grepl(comparisons[5],fold_change_comp) ~actual_ratio[5]))
     }else{
       print("Mapping between theoretical ratio and comparison cannot be done. Please make sure that you have either 4 or 5 comparisons overall.")
     }
@@ -1305,7 +1416,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
         count(new_col_coloring) %>% left_join(actual_ratio_col)
     
     
-    ymax <- max(-log10(merge_stat_df_final$P.Value)) + 0.5
+    ymax <- 11 + 0.5
     y_decrement <- 0.5
     
     #ymax <- 9 + 0.5 #max(-log10(merge_stat_df_final$P.Value))
@@ -1319,6 +1430,8 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     
     # Apply the function to calculate y_pos within each group
     #point_count_y_axis$y_pos <- unlist(by(point_count_y_axis$A1vs_Ai, point_count_y_axis$A1vs_Ai, calculate_y_pos))
+    
+    #comparisons <- comparisons[-5]
     
     # Apply the function to calculate y_pos within each group
     point_count_y_axis$y_pos <- unlist(by(point_count_y_axis$fold_change_comp, 
@@ -1367,7 +1480,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     
     
     plot9 <- ggplot(merge_stat_df_final,aes(x =log2(merge_stat_df_final$fold_change_values), y = -log10(merge_stat_df_final$P.Value))) +
-      geom_point(size = 3, aes(color = new_col_coloring,shape=Pool_new)) + # Pool_new might be use to 
+      geom_point(size = 4, aes(color = new_col_coloring,shape=Pool)) + # Pool_new might be use to 
       #scale_shape_identity() +                                        # differentiate peptides are found as Unexpected and reference 
                                                                        # in their associated concentration 
                                                                        # Pool can be used to show only difference btw pools same as coloring 'less complex visualization)
@@ -1375,8 +1488,16 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
       #scale_fill_manual(values=setNames(mapped_coloring, labels)) + 
       #geom_line(aes(color =setNames(mapped_coloring, labels)), size = 1) +  # Add color aesthetic to geom_line()
       scale_color_manual(values =setNames(mapped_coloring, labels)) +
-      scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=2)) +
-      scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=2)) +
+      #scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=2)) +
+      #scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=2)) +
+      scale_y_continuous(
+        limits = c(0,12), 
+        breaks = seq(0, 12,2)
+      ) +
+      scale_x_continuous(
+        limits = c(-9,11), 
+        breaks = seq(-9, 11,2)
+      ) +
       
       #expand_limits(x=c(-7,11), y=c(0, 16))+
       #scale_x_continuous(limits = c(-7,11)) +
@@ -1392,10 +1513,11 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
             axis.title = element_text(size = 45),
             axis.text.y = element_text(size = 45),
             plot.subtitle = element_text(size = 45)) +
+      
       labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n", subtitle)) +
       geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=col,size=1.5) +
       geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=1.5) + 
-      geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos, fill=new_col_coloring,label = n),color="white",size=12,show.legend = FALSE) +
+      geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos, fill=new_col_coloring,label = n),color="white",size=14,show.legend = FALSE) +
       scale_fill_manual(values =setNames(mapped_coloring, labels))
     
     
@@ -1474,13 +1596,14 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
             "\t",col.names = T,row.names = F)
     
     df_roc <- merge_stat_df_final %>%
-      select(pep_with_pos, Pool,P.Value) 
-      #filter(!grepl("Unexpected",Pool))
+      select(pep_with_pos, Pool,P.Value) %>%
+      mutate(Pool = if_else(grepl("Diluted_isomeric", Pool), "Diluted", Pool)) %>%
+      mutate(Pool = if_else(grepl("Diluted_nonisomeric", Pool), "Diluted", Pool))
     
     ### ROC analysis custom func
     df_roc_order <- df_roc[order(df_roc$P.Value),]
     
-    df_roc_func <- compute_roc_curve(df=df_roc_order, flag = "Spiked",expected =length(comparisons)*size_variying_pep_size)
+    df_roc_func <- compute_roc_curve(df=df_roc_order, flag = "Diluted",expected =length(comparisons)*size_variying_pep_size)
    
     plot14 <- ggplot(df_roc_func, aes(y=tpr, x = fdr)) +
       geom_path(size=1.5) +
@@ -1501,8 +1624,16 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
            title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), 
            subtitle = paste(subtitle,"including unexpected"), color="Pool Type")
     
-    write.table(df_roc_func, file = paste0(file_path,"outputs_with_filtering/new_custom_Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
+    new_path <-paste0(file_path,"outputs_new")
     
+    if(dir.exists(new_path)){
+      
+    }else{
+      new_path <- dir.create(new_path)
+    }
+    
+    write.table(df_roc_func, file = paste0(new_path,"/new_custom_Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
+     
     #### ROC Analysis using pROC 
     
     df_roc$variant <- ifelse(df_roc$Pool == "Spiked", TRUE, FALSE)
@@ -1518,7 +1649,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     fpr <- as.data.frame(1 - roc_raw_variant$specificities)
     tpr_and_fpr_variant  <- cbind(roc_raw_variant$sensitivities,
                                   fpr,#roc_raw_variant$specificities,
-                                  "Spiked Pool")
+                                  "Diluted Pool")
     
     
     roc_plt_df <- as.data.frame(tpr_and_fpr_variant) %>% 
@@ -1544,7 +1675,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
              title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), 
              subtitle = paste(subtitle), color="Pool Type")
     
-    write.table(roc_plt_df, file = paste0(file_path,"outputs_with_filtering/pRoc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
+    write.table(roc_plt_df, file = paste0(new_path,"/pRoc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
     
     # sapply(1:14,function(x) ggsave(filename = paste0("p",x,".tiff"),
     #                                width = 60, height = 45, 
@@ -1553,12 +1684,12 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     #                                get(paste0("p",x)),
     #                                device = "tiff", #".svg"
     # ))
-    
+
     plt_obj <- ls(pattern="plot")
     plot_obj <- plt_obj[!is.na(plt_obj)]
     sapply(1:length(plot_obj),function(x) ggsave(filename = paste0("p",x,".png"),
                                                  width = 80, height = 60, 
-                                                 path = paste0(file_path,"/outputs_with_filtering/"),
+                                                 path = paste0(file_path,"/outputs_new/"),
                                                  units = "cm",
                                                  get(plot_obj[x]),
                                                  device = "png", #".svg"
