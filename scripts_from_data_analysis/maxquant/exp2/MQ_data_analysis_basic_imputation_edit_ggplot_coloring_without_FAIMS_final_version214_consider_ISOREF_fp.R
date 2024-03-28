@@ -88,7 +88,8 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
     select(Phosphopeptide.sequence,Pool) %>%
     distinct(Phosphopeptide.sequence,.keep_all = TRUE) %>%
     rename(Sequence = Phosphopeptide.sequence) %>%
-    rename(Pool_for_seq_merge=Pool)
+    rename(Pool_for_seq_merge=Pool) %>%
+    mutate(situation="Correct")
   
   ecoli_seq <- quant_peptides %>% 
     select(Sequence,Modifications,Proteins) %>%
@@ -105,7 +106,6 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
     #filter(grepl(background_species,Proteins)) %>%
     distinct(Sequence,.keep_all = T) %>%
     mutate(species=background_species) 
-  
   
   all_seq <- quant_peptides %>% 
     filter(grepl("Phospho",Modifications)) %>%
@@ -132,12 +132,12 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
     select(Sequence,Modifications,Experiment,situation,Pool_for_seq_merge) %>%
     separate(Experiment, into = c("exp_id","samp_id","rep_id"),sep = "-")
   
-  plot15 <- gg_barplt_id_pep_count(data_set = all_seq,
-                                   x_df = all_seq$samp_id,
-                                   fill_df = all_seq$rep_id,
-                                   ymax = nrow(all_seq),
+  plot15 <- gg_barplt_id_pep_count(data_set = all_corr_seq,
+                                   x_df = all_corr_seq$samp_id,
+                                   fill_df = all_corr_seq$rep_id,
+                                   ymax = nrow(all_corr_seq),
                                    size_num=10,
-                                   header = paste("Total number of correctly identified ",selected_spcies,"phospho-peptides","across each sample",sep=" "),
+                                   header = paste("Total number of correctly identified ",selected_spcies,"phospho-sequence","across each sample",sep=" "),
                                    caption_lab = "Mapping was done without considering phospho-positions.",
                                    x_lab = "Sample id",
                                    fill_lab =  "Sample id",
@@ -160,11 +160,11 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
                                 fill_df = all_seq_syn$Pool_for_seq_merge,
                                 ymax = nrow(all_seq_syn),
                                 size_num=10,
-                                header = paste("Total number of identified phosphorylated", selected_spcies,"and", background_species,"across each sample",sep=" "),
+                                header = paste("Total number of identified phosphorylated", selected_spcies,"and", background_species,"sequences across each sample",sep=" "),
                                 caption_lab = "NA values are removed.",
                                 x_lab = "Sample id",
                                 fill_lab =  "Sample id",
-                                y_lab = "Number of identified peptides",
+                                y_lab = "Number of identified sequences",
                                 subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
   
   write.table(all_seq_syn, file=paste0(file_path,software_name,"_num_unique_seq_each_species.txt"),sep = "\t",col.names = T,row.names = F)
@@ -305,7 +305,7 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
                                 ymax = 20000,
                                 size_num=10,
                                 header = "Total number of quantified phospho-sequence across each sample",
-                                caption_lab = "NA values and multiple sequences are removed.",
+                                caption_lab = "NA values and multiple sequences are removed. \n In the case of muultiple PSMs, max. intensity was selected.",
                                 x_lab = "Sample id",
                                 fill_lab =  "Sample id",
                                 y_lab = "Number of identified peptides",
@@ -324,34 +324,6 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
   #mutate(max_value=ifelse(!is.numeric(max_value),NA,max_value))
   #filter(!grepl(-Inf,max_value))
   
-  
-  ####### ADDITIONAL PLOT TO DISPLAY MISSING and UNEXPECTED PEPTIDES ########
-  df_merge_syn <- barplt_df %>%
-    select(pep_with_pos,Experiment,Intensity, Proteins) %>% 
-    pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
-    relocate(exp_design) %>%
-    full_join(site_prob, by="pep_with_pos") %>%
-    full_join(pep_list_w_theo,by="pep_with_pos") %>% 
-    mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
-    mutate(Pool= ifelse(is.na(Proteins),"missing",Pool)) %>%
-    select(pep_with_pos,starts_with(exp_design),Pool) %>%
-    mutate(soft_name=software_name, Acquisition_type=acquisiton_type)
-  
-  plot11 <- gg_barplt_id_pep_count(data_set = df_merge_syn,
-                                x_df = df_merge_syn$Pool,
-                                fill_df = df_merge_syn$Pool,
-                                ymax = 20000,
-                                size_num=10,
-                                header = "Total number of quantified phospho-site across each sample",
-                                caption_lab = "NA values are removed. \n No filtering based on localization",
-                                x_lab = "Sample id",
-                                fill_lab =  "Sample id",
-                                y_lab = "Number of identified peptides",
-                                subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
-  
-  write.table(df_merge_syn,file = paste0(file_path,"Count_of_miss_unexpctd_corr_phosphosites_",
-                                         software_name,".txt"),
-              sep = "\t",row.names = F)
   #############################################################################
   ### COMPARED TO pd AND proline, MQ DOES NOT HAVE ANY QUERY THAT CONTAINS BACKGROUND SPECIES.
   ## THUS, WE FILTERED ECOLI DATA USING NOT SELECTING HUMAN AND CONTAMINANTS
@@ -392,6 +364,32 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
                                y_lab = "Number of identified peptides",
                                subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
   
+  barplt_prot_ecoli <- quant_peptides %>% 
+    filter(!grepl(selected_spcies, Proteins) & !grepl("CON__", Proteins)) %>%
+    select(Sequence,Experiment,Intensity,Proteins) %>%
+    separate(Experiment, into = c("Exp_id","Sample_id", "Rep_id"), sep = "-",remove = F) %>%
+    #mutate(sample_rep_id_seq = paste(Sequence, Sample_id,Rep_id, sep = "_")) %>%
+    group_by(Proteins,Experiment) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
+    slice(which.max(Intensity)) %>%
+    ungroup() %>%
+    mutate(type=acquisiton_type)
+  
+  plot16 <- gg_barplt_id_pep_count(data_set = barplt_prot_ecoli,
+                                   x_df = barplt_prot_ecoli$Sample_id,
+                                   fill_df = barplt_prot_ecoli$Rep_id,
+                                   ymax = 20500,
+                                   size_num = 10,
+                                   header = "Total number of identified Ecoli proteins across each sample",
+                                   caption_lab = "NA values are removed.",
+                                   x_lab = "Sample id",
+                                   fill_lab =  "Sample id",
+                                   y_lab = "Number of identified proteins",
+                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
+  
+  
+  write.table(barplt_prot_ecoli, file=paste0(file_path,"Exp2",software_name,"_number_of_unique_",background_species,"proteins_",".txt"),sep = "\t",col.names = T,row.names = F)
+  
+  
   
   ## THIS RESHAPING IS ONLY FOR ELIMINATION OF MULTIPLE PHOSPHO-SITES and ECOLI PEPTIDES
   ## ELIMINATION STEP IS NOT NECESSARY FOR ECOLI, 1st STRATEGY can be used only (this will decrease lines of code)
@@ -416,6 +414,32 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
       #filter(max_value >= loc_filter) %>%
       relocate(pep_with_pos, .after = Sequence) 
   }
+  
+  
+  
+  ####### ADDITIONAL PLOT TO DISPLAY MISSING and UNEXPECTED PEPTIDES ########
+  df_merge_syn <- barplt_df_wide %>%
+    full_join(pep_list_w_theo,by="pep_with_pos") %>% 
+    mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
+    mutate(Pool= ifelse(is.na(Proteins),"missing",Pool)) %>%
+    select(pep_with_pos,starts_with(exp_design),Pool) %>%
+    mutate(soft_name=software_name, Acquisition_type=acquisiton_type)
+  
+  plot11 <- gg_barplt_id_pep_count(data_set = df_merge_syn,
+                                   x_df = df_merge_syn$Pool,
+                                   fill_df = df_merge_syn$Pool,
+                                   ymax = 20000,
+                                   size_num=10,
+                                   header = "Total number of quantified phospho-site across each sample",
+                                   caption_lab = "NA values are removed. \n No filtering based on localization",
+                                   x_lab = "Sample id",
+                                   fill_lab =  "Sample id",
+                                   y_lab = "Number of identified peptides",
+                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
+  
+  write.table(df_merge_syn,file = paste0(file_path,"Count_of_miss_unexpctd_corr_phosphosites_",
+                                         software_name,".txt"),
+              sep = "\t",row.names = F)
   
   barplt_df_ecoli_wide <- barplt_df_ecoli %>% 
     select(Sequence,Experiment, Proteins,Intensity) %>%
@@ -605,6 +629,12 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
   
   final_imputed_data_ecoli <- final_imputed_data  %>% filter(!grepl(selected_spcies, species))
   
+  write.table(final_imputed_data, 
+              file =paste0(file_path,"/outputs_with_new_script/final_imputed_data_MQ_",
+                           exp_id, 
+                           acquisiton_type,".txt"),sep = "\t",row.names = F)
+  
+  
   df_merge <- final_imputed_data_syn %>%
     left_join(pep_list_w_theo,by="pep_with_pos") %>% 
     mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
@@ -642,6 +672,53 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
                    color_lab= "",
                    fill_lab = "Sample Names",
                    subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
+  
+  ############################## ############################
+  pep_list_w_theo_sel <- pep_list_w_theo %>%
+    select(pep_with_pos,isomericity,Pool,pool_id) 
+  
+  ratio_supp_FC <-df_merge %>% 
+    select(starts_with("exp_") | contains("species"),pep_with_pos) %>%
+    left_join(pep_list_w_theo_sel,by="pep_with_pos") %>%
+    pivot_longer(cols = starts_with("exp_"),
+                 names_to = "exp_FC",
+                 values_to = "values")
+  
+  ratio_supp_FC_Fixed <- ratio_supp_FC %>%
+    filter(grepl("Fixed",Pool)) %>%
+    drop_na(Pool)
+  
+  ratio_supp_FC_Spiked <- ratio_supp_FC %>%
+    filter(!grepl("Fixed",Pool)) %>%
+    drop_na(Pool) %>%
+    mutate(Pool=paste(Pool,isomericity,sep = "_"))
+  
+  p15 <- gg_raincloud(data_set = ratio_supp_FC_Spiked,
+                      x_df = ratio_supp_FC_Spiked$exp_FC,
+                      y_df = ratio_supp_FC_Spiked$values,
+                      fill_df = ratio_supp_FC_Spiked$Pool,
+                      header = "Distribution of mean abundance of every sample after imputation",
+                      x_lab = "Sample Names",
+                      y_lab = " Density of log10(Mean Abundance)",
+                      fill_lab = "Sample Names",
+                      caption_lab = "",
+                      subtitle_txt = "Spiked Pool")
+  
+  p16 <-  gg_raincloud(data_set = ratio_supp_FC_Fixed,
+                       x_df = ratio_supp_FC_Fixed$exp_FC,
+                       y_df = ratio_supp_FC_Fixed$values,
+                       fill_df = ratio_supp_FC_Fixed$Pool,
+                       header = "Distribution of mean abundance of every sample after imputation",
+                       x_lab = "Sample Names",
+                       y_lab = " Density of log10(Mean Abundance)",
+                       fill_lab = "Sample Names",
+                       caption_lab = "",
+                       subtitle_txt = "Fixed Pool")
+  
+  
+  library(patchwork)
+  plot17 <- p15/p16
+  
   
   # px <- gg_raincloud(data_set = df_mean_ab_after_impt,
   #                    x_df = df_mean_ab_after_impt$Mean_abundance,
@@ -806,7 +883,7 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
     
     
     ###############################################################################
-    merge_stat_df_final <- merge_stat_df
+    merge_stat_df_final <- merge_stat_df #%>% filter(!grepl("A1/A6",fold_change_ratios))
     
     
   }else if(test_type=="limma"){
@@ -891,7 +968,8 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
       mutate(new_col_coloring = if_else(grepl("Fixed_multi", new_col_coloring), "Fixed_multi", new_col_coloring)) %>%
       mutate(new_col_coloring = if_else(grepl("Fixed_mono", new_col_coloring), "Fixed_mono", new_col_coloring)) %>%
       mutate(new_col_coloring = if_else(grepl("Unexpected", new_col_coloring), "Unexpected", new_col_coloring)) %>%
-      rename(pep_with_pos=pep_with_pos.x) %>% rename(Pool=Pool.x)
+      rename(pep_with_pos=pep_with_pos.x) %>% rename(Pool=Pool.x) #%>%
+      #filter(!grepl("A1/A6",fold_change_ratios))
     
   }else{
     print("Statistical test could not be assessed. Check the input files!")
@@ -936,7 +1014,7 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
     count(new_col_coloring) %>% left_join(actual_ratio_col)
   
   
-  ymax <- max(-log10(merge_stat_df_final$P.Value)) + 0.5
+  ymax <-11 + 0.5 # max(-log10(merge_stat_df_final$P.Value)) 
   y_decrement <- 0.5
   
   
@@ -945,6 +1023,8 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
     y_pos <- ymax - seq(0, by = y_decrement, length.out = group_length)
     return(y_pos)
   }
+  
+  #comparisons <- comparisons[-5]
   
   # Apply the function to calculate y_pos within each group
   point_count_y_axis$y_pos <- unlist(by(point_count_y_axis$fold_change_comp, 
@@ -993,7 +1073,7 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
     right_join(point_count_y_axis,by="new_col_coloring")
   
   plot9 <- ggplot(merge_stat_df_final,aes(x =log2(merge_stat_df_final$fold_change_values), y = -log10(merge_stat_df_final$P.Value))) +
-    geom_point(size = 3, aes(color = new_col_coloring,shape=Pool_new)) + # Pool_new might be use to 
+    geom_point(size = 4, aes(color = new_col_coloring,shape=Pool)) + # Pool_new might be use to 
     #scale_shape_identity() +                                        # differentiate peptides are found as Unexpected and reference 
     # in their associated concentration 
     # Pool can be used to show only difference btw pools same as coloring 'less complex visualization)
@@ -1001,27 +1081,36 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
     #scale_fill_manual(values=setNames(mapped_coloring, labels)) + 
     #geom_line(aes(color =setNames(mapped_coloring, labels)), size = 1) +  # Add color aesthetic to geom_line()
     scale_color_manual(values =setNames(mapped_coloring, labels)) +
+    scale_y_continuous(
+      limits = c(0,12), 
+      breaks = seq(0, 12,2)
+    ) +
+    scale_x_continuous(
+      limits = c(-9,11), 
+      breaks = seq(-9, 11,2)
+    ) +
+    
     #scale_y_continuous(limits = c(0, max(-log10(merge_stat_df_final$adj.P.Val))), breaks = seq(0, max(-log10(merge_stat_df_final$adj.P.Val)), by = 0.8)) +
     #scale_x_continuous(limits = c(min(log2(merge_stat_df_final$fold_change_values)),max(log2(merge_stat_df_final$fold_change_values)))) +#facet_wrap(~ratio) +
-    scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=2)) +
-    scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=2)) +
+    #scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=2)) +
+    #scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=2)) +
     #scale_y_continuous(limits = c(0, 11), breaks = seq(0,11, by = 2)) +
     #scale_x_continuous(limits = c(-7,11),breaks = seq(-7,11, by = 2))+
     #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
     theme_bw() +
-    theme(legend.text = element_text(size = 30),
-          axis.title.x = element_text(size = 30),
-          axis.title.y = element_text(size = 30),
-          plot.title = element_text(size = 35),
-          legend.title = element_text(size = 30),
-          axis.text.x = element_text(size = 30),
-          axis.title = element_text(size = 30),
-          axis.text.y = element_text(size = 30),
-          plot.subtitle = element_text(size = 30)) +
+    theme(legend.text = element_text(size = 45),
+          axis.title.x = element_text(size = 45),
+          axis.title.y = element_text(size = 45),
+          plot.title = element_text(size = 55),
+          legend.title = element_text(size = 45),
+          axis.text.x = element_text(size = 45),
+          axis.title = element_text(size = 45),
+          axis.text.y = element_text(size = 45),
+          plot.subtitle = element_text(size = 45)) +
     labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n", subtitle)) +
     geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=col,size=1.5) +
     geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=1.5) + 
-    geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos, fill=new_col_coloring,label = n),color="white",size=12,show.legend = FALSE) +
+    geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos, fill=new_col_coloring,label = n),color="white",size=14,show.legend = FALSE) +
     scale_fill_manual(values =setNames(mapped_coloring, labels))
   
   
@@ -1183,9 +1272,9 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
   # 
   plt_obj <- ls(pattern="plot")
   plot_obj <- plt_obj[!is.na(plt_obj)]
-  sapply(1:length(plot_obj),function(x) ggsave(filename = paste0("p",x,".tiff"),
+  sapply(1:length(plot_obj),function(x) ggsave(filename = paste0("p",x,".png"),
                                                width = 80, height = 60, 
-                                               path = paste0(file_path,"/outputs_with_new_script/"),
+                                               path = paste0(file_path,"/df_merge_syn_change/"),
                                                units = "cm",
                                                get(plot_obj[x]),
                                                device = "png", #".svg"
