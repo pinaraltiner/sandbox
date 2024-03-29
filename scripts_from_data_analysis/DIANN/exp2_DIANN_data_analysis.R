@@ -173,34 +173,6 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
   #mutate(max_value=ifelse(!is.numeric(max_value),NA,max_value))
   #filter(!grepl(-Inf,max_value))
   
-  ####### ADDITIONAL PLOT TO DISPLAY MISSING and UNEXPECTED PEPTIDES ########
-  df_merge_syn <- barplt_df %>%
-    select(pep_with_pos,Experiment,Intensity, Protein.Names) %>% 
-    pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
-    full_join(site_prob, by="pep_with_pos") %>%
-    full_join(pep_list_w_theo,by="pep_with_pos") %>% 
-    mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
-    mutate(Pool= ifelse(is.na(Protein.Names),"missing",Pool)) %>%
-    select(pep_with_pos,starts_with(exp_design),Pool) %>%
-    mutate(soft_name=software_name, ion_mobility=acquisiton_type)
-  
-  plot11 <- gg_barplt_id_pep_count(data_set = df_merge_syn,
-                                x_df = df_merge_syn$Pool,
-                                fill_df = df_merge_syn$Pool,
-                                ymax = 20000,
-                                size_num = 10,
-                                header = "Total number of quantified phospho-site across each sample",
-                                caption_lab = "NA values are removed.",
-                                x_lab = "Sample id",
-                                fill_lab =  "Sample id",
-                                y_lab = "Number of identified peptides",
-                                subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
-  
-  write.table(df_merge_syn,file = paste0(file_path,"Count_of_missing_unexpected_correct_phospho-sites_",
-                                         software_name,"_Experiment",exp_id,".txt"),
-              sep = "\t",row.names = F)
-  
-  ########## ########## ########## ########## ########## ########## ########## ##########
   ecoli_seq_dist <- quant_peptides_with_cond %>% 
     select(Sequence,Modified.Sequence, Protein.Names) %>%
     filter(grepl(background_species,Protein.Names)) %>%
@@ -344,17 +316,18 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
                                   y_lab = "Number of identified peptides",
                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
   
-  plot16 <- gg_barplt_id_pep_count(data_set = barplt_df_ecoli,
-                               x_df = barplt_df_ecoli$Sample_id,
-                               fill_df = barplt_df_ecoli$Rep_id,
-                               ymax = 20500,
-                               size_num = 10,
-                               header = "Total number of unique quantified Ecoli proteins across each sample",
-                               caption_lab = "NA values are removed. \n In case of multiple proteins the most abundant was selected.",
-                               x_lab = "Sample id",
-                               fill_lab =  "Sample id",
-                               y_lab = "Number of proteins",
-                               subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
+  
+  plot16 <- gg_barplt_id_pep_count(data_set = barplt_prot_ecoli,
+                                   x_df = barplt_prot_ecoli$Sample_id,
+                                   fill_df = barplt_prot_ecoli$Rep_id,
+                                   ymax = 20500,
+                                   size_num = 10,
+                                   header = "Total number of identified Ecoli proteins across each sample",
+                                   caption_lab = "NA values are removed.",
+                                   x_lab = "Sample id",
+                                   fill_lab =  "Sample id",
+                                   y_lab = "Number of identified proteins",
+                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
   
   
   write.table(barplt_prot_ecoli, file=paste0(file_path,"Exp2",software_name,"_number_of_unique_",background_species,"proteins_",".txt"),sep = "\t",col.names = T,row.names = F)
@@ -400,6 +373,32 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
   }
   
   #################################################
+  
+  ####### ADDITIONAL PLOT TO DISPLAY MISSING and UNEXPECTED PEPTIDES ########
+  df_merge_syn <- barplt_df_wide %>%
+    full_join(pep_list_w_theo,by="pep_with_pos") %>% 
+    mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
+    mutate(Pool= ifelse(is.na(Protein.Names),"missing",Pool)) %>%
+    select(pep_with_pos,starts_with(exp_design),Pool) %>%
+    mutate(soft_name=software_name, ion_mobility=acquisiton_type)
+  
+  plot11 <- gg_barplt_id_pep_count(data_set = df_merge_syn,
+                                   x_df = df_merge_syn$Pool,
+                                   fill_df = df_merge_syn$Pool,
+                                   ymax = 20000,
+                                   size_num = 10,
+                                   header = "Total number of quantified phospho-site across each sample",
+                                   caption_lab = "NA values are removed.",
+                                   x_lab = "Sample id",
+                                   fill_lab =  "Sample id",
+                                   y_lab = "Number of identified peptides",
+                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
+  
+  write.table(df_merge_syn,file = paste0(file_path,"Count_of_missing_unexpected_correct_phospho-sites_",
+                                         software_name,"_Experiment",exp_id,".txt"),
+              sep = "\t",row.names = F)
+  
+  ########## ########## ########## ########## ########## ########## ########## ##########
   
   # Nothing is changed
   filtered_abundances<-barplt_df_wide[rowSums(!is.na(select(barplt_df_wide,starts_with(exp_design))))>0,]
@@ -945,12 +944,21 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
       #filter(!grepl("ECOLI",Pool))
       #separate(accession, into = c("prot_id","species"),sep = "_")
       mutate(isomericity = ifelse(is.na(isomericity), "False Positive", isomericity)) %>%
-      unite(Pool_new, Pool.x, isomericity,sep = "_",remove = FALSE) %>%
+      unite('Pool_new',Pool.x, isomericity,sep = "_",remove = FALSE) %>%
+      mutate(Pool_new=ifelse(Pool_new=="Fixed_isomeric_isomeric","Fixed_isomeric",Pool_new)) %>%
+      mutate(Pool_new=ifelse(Pool_new=="Fixed_non-isomeric_nonisomeric","Fixed_non-isomeric",Pool_new)) %>%
       unite('new_col_coloring',Pool_new,ratio,sep = "_",remove = FALSE) %>%
-      mutate(new_col_coloring = if_else(grepl("Fixed_multi", new_col_coloring), "Fixed_multi", new_col_coloring)) %>%
-      mutate(new_col_coloring = if_else(grepl("Fixed_mono", new_col_coloring), "Fixed_mono", new_col_coloring)) %>%
+      #mutate(new_col_coloring = if_else(grepl("Fixed_isomeric", new_col_coloring), "Fixed_isomeric", new_col_coloring)) %>%
+      #mutate(new_col_coloring = if_else(grepl("Fixed_non-isomeric_nonisomeric", new_col_coloring), "Fixed_nonisomeric", new_col_coloring)) %>%
       mutate(new_col_coloring = if_else(grepl("Unexpected", new_col_coloring), "Unexpected", new_col_coloring)) %>%
-      rename(pep_with_pos=pep_with_pos.x) %>% rename(Pool=Pool.x)
+      rename(pep_with_pos=pep_with_pos.x) %>% rename(Pool=Pool.x) #%>%
+      #unite(Pool_new, Pool.x, isomericity,sep = "_",remove = FALSE) %>%
+      #unite('new_col_coloring',Pool_new,ratio,sep = "_",remove = FALSE) %>%
+      #mutate(new_col_coloring = if_else(grepl("Fixed_multi", new_col_coloring), "Fixed_multi", new_col_coloring)) %>%
+      #mutate(new_col_coloring = if_else(grepl("Fixed_mono", new_col_coloring), "Fixed_mono", new_col_coloring)) %>%
+      #mutate(new_col_coloring = if_else(grepl("Unexpected", new_col_coloring), "Unexpected", new_col_coloring)) %>%
+      #rename(pep_with_pos=pep_with_pos.x) %>% rename(Pool=Pool.x) #%>%
+      #filter(!grepl("A1/A6",fold_change_comp))
     
   }else{
     print("Statistical test could not be assessed. Check the input files!")
@@ -1069,14 +1077,32 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
     scale_fill_manual(values =setNames(mapped_coloring, labels))
   
   df_roc <- merge_stat_df_final %>%
-    select(pep_with_pos, Pool,P.Value)
+    select(pep_with_pos, Pool,P.Value) %>%
+    select(pep_with_pos, Pool,P.Value) %>%
+    mutate(Pool = if_else(grepl("Diluted_isomeric", Pool), "Diluted", Pool)) %>%
+    mutate(Pool = if_else(grepl("Diluted_nonisomeric", Pool), "Diluted", Pool))
   #filter(!grepl("Unexpected",Pool))
   
   ### ROC analysis custom func
   df_roc_order <- df_roc[order(df_roc$P.Value),]
-
-  df_roc_func <- compute_roc_curve(df=df_roc_order, flag = "Spiked",expected = (length(comparisons)*size_variying_pep))
   
+  df_roc_func <- compute_roc_curve(df=df_roc_order, flag = "Diluted",expected = (length(comparisons)*size_variying_pep_size))
+  
+  
+  intended_dir <-paste0(file_path,"outputs_new")
+  
+  if(dir.exists(intended_dir)){
+    new_path <- intended_dir
+    
+  }else{
+    dir.create(intended_dir)
+    new_path <- list.dirs(intended_dir)
+    
+  }
+  
+  write.table(df_roc_func, file = paste0(new_path,"/new_custom_Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
+  
+ 
   plot14 <- ggplot(df_roc_func, aes(y=tpr, x = fdr)) +
     geom_path(size=1.5) +
     #geom_vline(aes(xintercept=fdr)) +
@@ -1100,7 +1126,7 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
   #outputs_with_new_script
   #### ROC Analysis using pROC 
   
-  df_roc$variant <- ifelse(df_roc$Pool == "Spiked", TRUE, FALSE)
+  df_roc$variant <- ifelse(df_roc$Pool == "Diluted", TRUE, FALSE)
   #df_roc$non_var <- ifelse(df_roc$Pool == "ISO-REF", TRUE, FALSE)
   
   library(pROC)
@@ -1113,7 +1139,7 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
   fpr <- as.data.frame(1 - roc_raw_variant$specificities)
   tpr_and_fpr_variant  <- cbind(roc_raw_variant$sensitivities,
                                 fpr,#roc_raw_variant$specificities,
-                                "Spiked Pool")
+                                "Diluted Pool")
   
   
   roc_plt_df <- as.data.frame(tpr_and_fpr_variant) %>% 
@@ -1187,13 +1213,13 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
   # 
   
   
-  plot_obj <- ls(pattern="plot")
-  plot_obj <- plot_obj[!is.na(plot_obj)]
-  sapply(1:length(plot_obj),function(x) ggsave(filename = paste0("p",x,".png"),
+  plt_obj <- ls(pattern="plot")
+  plt_obj <- plt_obj[!is.na(plt_obj)]
+  sapply(1:length(plt_obj),function(x) ggsave(filename = paste0("p",x,".png"),
                                                width = 60, height = 45, 
-                                               path = paste0(file_path,"/outputs_with_new_script/"),
+                                               path = paste0(file_path,"/outputs_new/"),
                                                units = "cm",
-                                               get(plot_obj[x]),
+                                               get(plt_obj[x]),
                                                device = "png", #".svg"
   ))
   
