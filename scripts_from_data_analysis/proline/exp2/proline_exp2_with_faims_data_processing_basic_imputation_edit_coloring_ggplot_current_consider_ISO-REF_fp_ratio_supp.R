@@ -668,10 +668,44 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     
     library(kableExtra)
     
-    na_phospho_phospho <- apply(X = is.na(select(barplt_df_wide,contains(exp_design))), MARGIN = 1, FUN = sum)
-    na_ecoli <- apply(X = is.na(filtered_abundances_ecoli), MARGIN = 1, FUN = sum)
+    barplt_df_wide[,"na_val"] <- apply(X = !is.na(select(barplt_df_wide,contains(exp_design))), MARGIN = 1, FUN = sum)
     
-    test <- barplt_df_wide %>% bind_cols(na_phospho_mouse)
+    phospho_completeness <- barplt_df_wide %>% 
+      count(na_val) %>%
+      mutate(data_complete=((n/dim(barplt_df_wide)[1])*100)) %>% mutate(species=selected_spcies)
+    
+    barplt_df_ecoli_wide[,"na_val"] <- apply(X = !is.na(select(barplt_df_ecoli_wide,contains(exp_design))), MARGIN = 1, FUN = sum)
+    
+    completeness <- barplt_df_ecoli_wide %>% 
+      count(na_val) %>%
+      mutate(data_complete=((n/dim(barplt_df_ecoli_wide)[1])*100)) %>%
+      mutate(species=background_species) %>%
+      bind_rows(phospho_completeness)
+    
+    write.table(completeness,file = paste0(new_path,"/data_completeness",acquisiton_type,software_name,".txt"))
+      
+    plot23 <- ggplot(completeness, aes(x=na_val,y=data_complete,color=species)) + geom_point(size=2.5) +
+       geom_line(size=2)+
+       scale_x_reverse(limits=c(18,0),breaks=seq(0, 18, by = 2)) +
+      ## If you look for is.na() in apply function, you should use the one below:
+     #### scale_x_continuous(limits=c(0,18),breaks=seq(0, 18, by = 2)) +
+       scale_y_continuous(limits = c(0,100), breaks = seq(from =0, to=100,by=10)) +
+       theme_minimal() +
+       theme(legend.text = element_text(size=30), 
+             axis.title.x = element_text(size=30),
+             axis.title.y = element_text(size=30),
+             plot.title = element_text(size=35),
+             plot.subtitle = element_text(size = 20),
+             legend.title=element_text(size=30),
+             axis.text=element_text(size=30),
+             axis.title=element_text(size=30),
+             strip.text.x = element_text(
+               size = 15
+             )
+       ) + scale_color_manual(values = c("#3182bd","#a6bddb"))+
+       ggtitle(label = paste("Data completeness of",background_species,"and",selected_spcies)) +
+       labs(x="n Sample", y="% of peptides",subtitle = "")
+  
     
     #na_phospho_selected <- apply(X = is.na(barplt_df_wide %>% select(sequence, accession,starts_with("E2"))), MARGIN = 2, FUN = sum)
     #na_ecoli <- apply(X = is.na(barplt_df_ecoli_wide %>% select(sequence,accession,starts_with("E2"))), MARGIN = 2, FUN = sum)
@@ -978,7 +1012,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
             title = paste(background_species)) 
             #subtitle = paste('Experiment 2 ', acquisiton_type, " data processed by ", software_name))
     
-    plot21 <- p21/p22
+    plot22 <- p21/p22
     #abundances_all_aft_imputation <- barplt_df_ecoli_wide %>%
         #rename_with(~ paste0("pep_with_pos"), matches("^seq")) %>%
         #bind_rows(barplt_df_wide) 
@@ -1142,7 +1176,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     median_val <- df_FC_ratio_after_impt %>% group_by(exp_FC) %>%
       summarise(exp_median=median(log2_exp_val))
     
-    test <- df_FC_ratio_after_impt %>% group_by(exp_FC) %>% summarise(min_val=min(log2_exp_val),max_val=max(log2_exp_val))
+    #test <- df_FC_ratio_after_impt %>% group_by(exp_FC) %>% summarise(min_val=min(log2_exp_val),max_val=max(log2_exp_val))
     
     plot21 <-gg_quant_ratio_acc(data_set = df_FC_ratio_after_impt,
                              x_df = df_FC_ratio_after_impt$log2_act_val,
@@ -1902,10 +1936,13 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
             #separate(accession, into = c("prot_id","species"),sep = "_")
             mutate(isomericity = ifelse(is.na(isomericity), "False Positive", isomericity)) %>%
             
-            unite('Pool_new',Pool.x, isomericity,sep = "_",remove = FALSE) %>%
-            mutate(Pool_new=ifelse(Pool_new=="Fixed_isomeric_isomeric","Fixed_isomeric",Pool_new)) %>%
-            mutate(Pool_new=ifelse(Pool_new=="Fixed_non-isomeric_nonisomeric","Fixed_non-isomeric",Pool_new)) %>%
-            unite('new_col_coloring',Pool_new,ratio,sep = "_",remove = FALSE) %>%
+            #unite('Pool_new',Pool.x, isomericity,sep = "_",remove = FALSE) %>%
+            #mutate(Pool_new=ifelse(Pool_new=="Fixed_isomeric_isomeric","Fixed_isomeric",Pool_new)) %>%
+            #mutate(Pool_new=ifelse(Pool_new=="Fixed_non-isomeric_nonisomeric","Fixed_non-isomeric",Pool_new)) %>%
+            separate(Pool.x,into = c("Pool_name","isomer_type"),sep = "_",remove = F) %>%
+            mutate(coloring_comp=paste0(Pool_name,"_",ratio)) %>%
+            unite('new_col_coloring',Pool.x,ratio,sep = "_",remove = FALSE) %>%
+           
             #mutate(new_col_coloring = if_else(grepl("Fixed_isomeric", new_col_coloring), "Fixed_isomeric", new_col_coloring)) %>%
             #mutate(new_col_coloring = if_else(grepl("Fixed_non-isomeric_nonisomeric", new_col_coloring), "Fixed_nonisomeric", new_col_coloring)) %>%
             mutate(new_col_coloring = if_else(grepl("Unexpected", new_col_coloring), "Unexpected", new_col_coloring)) %>%
@@ -1949,7 +1986,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     }
     
     point_count_y_axis <- merge_stat_df_final %>%
-        group_by(fold_change_comp, new_col_coloring) %>%
+        group_by(fold_change_comp, coloring_comp) %>% #new_col_coloring
         filter(P.Value < 0.05) %>% 
         count(new_col_coloring) %>% left_join(actual_ratio_col)
     
@@ -1974,60 +2011,94 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                                           point_count_y_axis$fold_change_comp, calculate_y_pos))
     
     # Apply the function to calculate y_pos within each group
+    ######################################################################################################
+    ######### COLORING STRATEGY BASED ON ISOMERICITY AND RATIO OF EACH SAMPLE (new_col_coloring) #########
+    # col <- RColorBrewer::brewer.pal(n=length(comparisons),name = "Dark2")
+    # 
+    # labels <- unique(merge_stat_df_final$new_col_coloring)
+    # 
+    # if (sheet_theo_name == "ISOREF_REF2_Others"){
+    #   
+    #   colors <- c(RColorBrewer::brewer.pal(n=length(comparisons),name = "Dark2"),"#2171b5","#999999")
+    #   new_comparisons <- c(comparisons,"Unexpected","Fixed_mono")
+    #   
+    # }else if (sheet_theo_name == "ISO-refOTHER with FC_correct"){
+    #   
+    #   new_comparisons <- c(comparisons,"Unexpected")
+    #   colors <- c(RColorBrewer::brewer.pal(n=length(comparisons),name = "Dark2"),"#999999")
+    #   
+    # }else{
+    #   print("Sheet_theo_name could not be found, please make sure that you selected the correct sheet_name.")
+    # }
+    # 
+    # mapped_coloring <- rep("#000000",length(labels))
+    # 
+    # for (i in 1:length(labels)) {
+    #   # Check if the color_element contains any of the comparisons
+    #   if (any(new_comparisons %in% str_extract_all(labels[i], paste(new_comparisons, collapse = "|"))[[1]])) {
+    #     # Find the index of the matching comparison in the comparisons list
+    #     comp_index <- match(TRUE, sapply(new_comparisons, function(comp) comp %in% str_extract_all(labels[i], comp)))
+    #     
+    #     # Assign the corresponding color to the data frame
+    #     mapped_coloring[i]<- paste0(colors[comp_index])
+    #     #mapped_coloring[i]<- paste(paste0(labels[i],'"'),paste0('"',colors[comp_index]),sep = "=")
+    #   }
+    # }
+    # 
+    # actual_ratio_col <- actual_ratio_col %>% bind_cols(col)
+    # 
+    # mapped_coloring_dat <- as.data.frame(mapped_coloring)
+    # 
+    # point_count_y_axis <- mapped_coloring_dat %>% 
+    #   bind_cols(labels) %>%
+    #   rename(colors=1,new_col_coloring=2) %>%
+    #   right_join(point_count_y_axis,by="new_col_coloring")
     
-    col <- RColorBrewer::brewer.pal(n=length(comparisons),name = "Dark2")
+###############################################################################
+######### COLORING STRATEGY BASED ON ONLY RATIO and SAMPLE NAME (coloring_comp) #########
+    col_vline <- rep("#000000",4)
+    cols <- c(rep("#E6550D" ,4),"#3F007D","#6A51A3","#807DBA","#BCBDDC",rep("cyan3",4)) #"#FD8D3C" ligther orange ,"#9E9AC8"=lighter purple instead of #807DBA
     
-    labels <- unique(merge_stat_df_final$new_col_coloring)
+    corr_level <-  c("Fixed_A1/A2","Fixed_A1/A3","Fixed_A1/A4","Fixed_A1/A5",
+                     "Diluted_A1/A2","Diluted_A1/A3","Diluted_A1/A4","Diluted_A1/A5",
+                     "Unexpected_A1/A2", "Unexpected_A1/A3", "Unexpected_A1/A4", "Unexpected_A1/A5"
+    )
     
-    if (sheet_theo_name == "ISOREF_REF2_Others"){
-      
-      colors <- c(RColorBrewer::brewer.pal(n=length(comparisons),name = "Dark2"),"#2171b5","#999999")
-      new_comparisons <- c(comparisons,"Unexpected","Fixed_mono")
-      
-    }else if (sheet_theo_name == "ISO-refOTHER with FC_correct"){
-      
-      new_comparisons <- c(comparisons,"Unexpected")
-      colors <- c(RColorBrewer::brewer.pal(n=length(comparisons),name = "Dark2"),"#999999")
-      
-    }else{
-      print("Sheet_theo_name could not be found, please make sure that you selected the correct sheet_name.")
-    }
+    labels <- factor(unique(merge_stat_df_final$coloring_comp),levels=corr_level)
     
-    mapped_coloring <- rep("#000000",length(labels))
+    sorted_labels <- sort(labels)
     
-    for (i in 1:length(labels)) {
-      # Check if the color_element contains any of the comparisons
-      if (any(new_comparisons %in% str_extract_all(labels[i], paste(new_comparisons, collapse = "|"))[[1]])) {
-        # Find the index of the matching comparison in the comparisons list
-        comp_index <- match(TRUE, sapply(new_comparisons, function(comp) comp %in% str_extract_all(labels[i], comp)))
-        
-        # Assign the corresponding color to the data frame
-        mapped_coloring[i]<- paste0(colors[comp_index])
-        #mapped_coloring[i]<- paste(paste0(labels[i],'"'),paste0('"',colors[comp_index]),sep = "=")
-      }
-    }
+    actual_ratio_col <- as.data.frame(actual_ratio_col %>% bind_cols(col_vline)) %>% rename(col=3)
+    #actual_ratio_col_filt <- as.data.frame(actual_ratio_col_filt %>% bind_cols(col_vline)) %>% rename(col=3)
     
-    actual_ratio_col <- actual_ratio_col %>% bind_cols(col)
-    
-    mapped_coloring_dat <- as.data.frame(mapped_coloring)
+    mapped_coloring_dat <- as.data.frame(cols)
     
     point_count_y_axis <- mapped_coloring_dat %>% 
-      bind_cols(labels) %>%
-      rename(colors=1,new_col_coloring=2) %>%
-      right_join(point_count_y_axis,by="new_col_coloring")
+      bind_cols(sorted_labels) %>%
+      rename(colors=1,coloring_comp=2) %>%
+      right_join(point_count_y_axis,by="coloring_comp")
     
-
-    plot9 <- ggplot(merge_stat_df_final,aes(x =log2(merge_stat_df_final$fold_change_values), y = -log10(merge_stat_df_final$P.Value))) +
-      geom_point(size = 4, aes(color = new_col_coloring,shape=Pool)) + # Pool_new might be use to 
+    plot9 <- ggplot(merge_stat_df_final, aes(x =log2(fold_change_values), y = -log10(P.Value))) +
+      geom_point(size = 9, aes(color = coloring_comp,shape=isomericity)) + # Pool_new might be use to 
+    
+      #geom_point(shape = 21, colour = "black", fill = "white", size = 5, stroke = 5)
+      
+      scale_color_manual(values =setNames(cols, sorted_labels)) +
+      
+      
       #scale_shape_identity() +                                        # differentiate peptides are found as Unexpected and reference 
-                                                                       # in their associated concentration 
-                                                                       # Pool can be used to show only difference btw pools same as coloring 'less complex visualization)
+      # in their associated concentration 
+      # Pool can be used to show only difference btw pools same as coloring 'less complex visualization)
       #geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red") +
       #scale_fill_manual(values=setNames(mapped_coloring, labels)) + 
       #geom_line(aes(color =setNames(mapped_coloring, labels)), size = 1) +  # Add color aesthetic to geom_line()
-      scale_color_manual(values =setNames(mapped_coloring, labels)) +
-      #scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=2)) +
-      #scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=2)) +
+      ##scale_color_manual(values =setNames(mapped_coloring, labels)) +
+      #scale_y_continuous(limits = c(0, max(-log10(merge_stat_df_final$adj.P.Val))), breaks = seq(0, max(-log10(merge_stat_df_final$adj.P.Val)), by = 0.8)) +
+      #scale_x_continuous(limits = c(min(log2(merge_stat_df_final$fold_change_values)),max(log2(merge_stat_df_final$fold_change_values)))) +#facet_wrap(~ratio) +
+      #scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=1)) +
+      ##scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=1)) +
+    #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
+    theme_bw() +
       scale_y_continuous(
         limits = c(0,12), 
         breaks = seq(0, 12,2)
@@ -2037,11 +2108,6 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
         breaks = seq(-9, 11,2)
       ) +
       
-      #expand_limits(x=c(-7,11), y=c(0, 16))+
-      #scale_x_continuous(limits = c(-7,11)) +
-      #scale_y_continuous(limits = c(0,16)) +
-      #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
-      theme_bw() +
       theme(legend.text = element_text(size = 45),
             axis.title.x = element_text(size = 45),
             axis.title.y = element_text(size = 45),
@@ -2051,13 +2117,61 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
             axis.title = element_text(size = 45),
             axis.text.y = element_text(size = 45),
             plot.subtitle = element_text(size = 45)) +
-      
-      labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n", subtitle)) +
-      geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=col,size=1.5) +
-      geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=1.5) + 
-      geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos, fill=new_col_coloring,label = n),color="white",size=14,show.legend = FALSE) +
-      scale_fill_manual(values =setNames(mapped_coloring, labels))
+      labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n")) + #plt_data_type[j], , subtitle,"\n"
+      geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE,color=col),size=2) +
+      geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "#006D2C",size=2) + 
+      geom_label(data =point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos, fill=coloring_comp ,label = n),color="white",size=22,show.legend = FALSE) + #coloring_comp
+      scale_fill_manual(values =setNames(cols, sorted_labels))
     
+    
+    
+  ########################################################################################  
+    
+    
+    
+  
+    
+    # plot9 <- ggplot(merge_stat_df_final,aes(x =log2(merge_stat_df_final$fold_change_values), y = -log10(merge_stat_df_final$P.Value))) +
+    #   geom_point(size = 4, aes(color = new_col_coloring,shape=Pool)) + # Pool_new might be use to 
+    #   #scale_shape_identity() +                                        # differentiate peptides are found as Unexpected and reference 
+    #                                                                    # in their associated concentration 
+    #                                                                    # Pool can be used to show only difference btw pools same as coloring 'less complex visualization)
+    #   #geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red") +
+    #   #scale_fill_manual(values=setNames(mapped_coloring, labels)) + 
+    #   #geom_line(aes(color =setNames(mapped_coloring, labels)), size = 1) +  # Add color aesthetic to geom_line()
+    #   scale_color_manual(values =setNames(mapped_coloring, labels)) +
+    #   #scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=2)) +
+    #   #scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=2)) +
+    #   scale_y_continuous(
+    #     limits = c(0,12), 
+    #     breaks = seq(0, 12,2)
+    #   ) +
+    #   scale_x_continuous(
+    #     limits = c(-9,11), 
+    #     breaks = seq(-9, 11,2)
+    #   ) +
+    #   
+    #   #expand_limits(x=c(-7,11), y=c(0, 16))+
+    #   #scale_x_continuous(limits = c(-7,11)) +
+    #   #scale_y_continuous(limits = c(0,16)) +
+    #   #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
+    #   theme_bw() +
+    #   theme(legend.text = element_text(size = 45),
+    #         axis.title.x = element_text(size = 45),
+    #         axis.title.y = element_text(size = 45),
+    #         plot.title = element_text(size = 55),
+    #         legend.title = element_text(size = 45),
+    #         axis.text.x = element_text(size = 45),
+    #         axis.title = element_text(size = 45),
+    #         axis.text.y = element_text(size = 45),
+    #         plot.subtitle = element_text(size = 45)) +
+    #   
+    #   labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n", subtitle)) +
+    #   geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=col,size=1.5) +
+    #   geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=1.5) + 
+    #   geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos, fill=new_col_coloring,label = n),color="white",size=14,show.legend = FALSE) +
+    #   scale_fill_manual(values =setNames(mapped_coloring, labels))
+    # 
 
     merge_stat_df_final_text <- merge_stat_df_final %>% 
       mutate(soft_name=paste0(software_name)) %>%
