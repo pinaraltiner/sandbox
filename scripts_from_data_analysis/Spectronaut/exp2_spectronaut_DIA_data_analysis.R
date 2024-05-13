@@ -6,6 +6,9 @@ library(openxlsx)
 library(tidyr)
 library(ggplot2)
 library(tidyverse)
+library(ggridges)
+library(paletteer) 
+
 ###############################################
 source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/ggplot/ggplot_functions.R")
 #source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/roc_curve/roc_curve_generation_proline_edit.R")
@@ -117,7 +120,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     
     imputed_values <- quant_peptides_with_cond  %>%
         group_by(Experiment) %>% 
-        summarise(first_quantile=quantile(Intensity,probs=0.01,na.rm=TRUE))
+        summarise(first_quantile=quantile(Intensity,probs=0.05,na.rm=TRUE)) ## changed from 1 to 5
     
     imputed_values_vec <- as.vector(imputed_values$first_quantile)
     
@@ -313,9 +316,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
       group_by(sample_rep_id_seq,Experiment) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
       slice(which.max(Intensity)) %>%
       ungroup()
-    
-    
-    
+ 
     plot1 <- gg_barplt_id_pep_count(data_set = barplt_df,
                                  x_df = barplt_df$Sample_id,
                                  fill_df = barplt_df$Rep_id,
@@ -394,9 +395,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
         #relocate(pep_with_pos, .after = Sequence)
        relocate(exp_design,.after = "pep_with_pos")
     }
-   
-    
-    
+  
     ######################################################################
     
     ####### ADDITIONAL PLOT TO DISPLAY MISSING and UNEXPECTED PEPTIDES ########
@@ -436,8 +435,8 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
       mutate(species=background_species) %>% relocate(exp_design,.after = "PG.ProteinLabel")
     
     # Nothing is changed
-    filtered_abundances<-barplt_df_wide[rowSums(!is.na(select(barplt_df_wide,starts_with(exp_design))))>0,]
-    filtered_abundances_ecoli <-barplt_df_ecoli_wide[rowSums(!is.na(select(barplt_df_ecoli_wide,starts_with(exp_design))))>0,]
+    filtered_abundances<-barplt_df_wide[rowSums(!is.na(select(barplt_df_wide,starts_with(exp_design))))>0,] #3
+    filtered_abundances_ecoli <-barplt_df_ecoli_wide[rowSums(!is.na(select(barplt_df_ecoli_wide,starts_with(exp_design))))>0,] #3
     
     
     ############################################################################
@@ -473,12 +472,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
                                   fill_lab =  "Sample id",
                                   y_lab = "Number of identified peptides",
                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
-    
-    
-    #############################################################################
-    
-    
-    
+    ############################################################################
     # 
     # library(kableExtra)
     # na_phospho_selected <- apply(X = is.na(filtered_abundances %>% select(PEP.GroupingKey, PG.ProteinLabel,starts_with("E2"))), MARGIN = 2, FUN = sum)
@@ -500,6 +494,10 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     #   #as_image(width = 8) %>%
     #   save_kable(paste0(file_path,"table1.png"))
     # 
+    # library("mice")
+    # mice.impute.norm(y=filtered_abundances_bef_impt,ry=test,x=length(filtered_abundances_bef_impt))
+    # 
+    # x <- model.matrix(~ x1 + x3, data = data) 
     filtered_abundances <- filtered_abundances %>% select(!`PEP.GroupingKey`)
     
     abundances_rowMeans <- NULL
@@ -564,7 +562,19 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
                      fill_lab = "species",
                      subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
   
-    # Impute missing values
+    #filtered_abundances_bef_impt <- filtered_abundances
+    #filtered_abundances_ecoli_bef_impt <- filtered_abundances_ecoli
+    filtered_abundances_ecoli <- as.data.frame(filtered_abundances_ecoli)
+    # 
+    rownames(filtered_abundances_ecoli) <-  paste(filtered_abundances_ecoli$PEP.GroupingKey,
+                                                  filtered_abundances_ecoli$PG.ProteinLabel,
+                                                  1:nrow(filtered_abundances_ecoli),
+                                                  filtered_abundances_ecoli$species,sep='@')
+    # 
+    filtered_abundances_ecoli_bef_impt <- filtered_abundances_ecoli %>% select(PEP.GroupingKey, contains("E2-A"))
+    
+    #######################################################
+    #### Impute missing values with percentatile #######"
     for (j in 1:length(imputed_values_vec)){
       # Number NA
       #num_NA <- length(abundances_for_impute_all[,j+2][is.na(abundances_for_impute_all[,j+2])])
@@ -579,27 +589,134 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
       #print(num_NA)
       #print(num_imp)
     }
+    #######################################################
+    #### Impute missing values with Gaussian Distribution  #######"
+     #filtered_abundances <- as.data.frame(filtered_abundances)
+     #rownames(filtered_abundances) <-  paste(filtered_abundances$pep_with_pos,
+                                             #filtered_abundances$PG.ProteinLabel,
+                                             #filtered_abundances$max_value,
+                                             #filtered_abundances$species,sep ='@')
+     
+    #filtered_abundances_bef_impt <- filtered_abundances %>% select(pep_with_pos, contains("E2-A"))
+    # 
+     
+    # 
+    # 
+    # df <- impute_background_noise_gaussian(filtered_abundances_bef_impt)[[3]]
+    # df_ecoli <- impute_background_noise_gaussian(filtered_abundances_ecoli_bef_impt)[[3]]
+    # 
+    # library(imputeLCMD)
+    # all_filt_aft_impt <- NULL
+    # for (i in 1:sample_size){
+    #   
+    #   sel_cols <- filtered_abundances_bef_impt %>% select(contains("E2-A",i))
+    #   sel_cols_ecoli <- filtered_abundances_ecoli_bef_impt %>% select(contains("E2-A",i))
+    #   filtered_abundances_aft_impt <-   impute.MinProb(sel_cols, q = 0.01, tune.sigma = 1)
+    #   filtered_abundances_ecoli_aft_impt <- impute.MinProb(filtered_abundances_ecoli_bef_impt, q = 0.01, tune.sigma = 1)
+    #   
+    #   all_filt_aft_impt <- bind_rows(all_filt_aft_impt, filtered_abundances_aft_impt,filtered_abundances_ecoli_aft_impt)
+    #   rm(sel_cols)
+    # }
+    
+    
+    # dataSet.mvs <- filtered_abundances_bef_impt
+    # 
+    # function (filtered_abundances_bef_impt, q = 0.01, tune.sigma = 1) 
+    # {
+    #   nSamples = dim(dataSet.mvs)[2]
+    #   nFeatures = dim(dataSet.mvs)[1]
+    #   dataSet.imputed = dataSet.mvs
+    #   min.samples = apply(dataSet.imputed, 2, quantile, prob = q, 
+    #                       na.rm = T)
+    #   count.NAs = apply(!is.na(dataSet.mvs), 1, sum)
+    #   count.NAs = count.NAs/nSamples
+    #   dataSet.filtered = dataSet.mvs[which(count.NAs > 0.5), ]
+    #   protSD = apply(dataSet.filtered, 1, sd)
+    #   sd.temp = median(protSD, na.rm = T) * tune.sigma
+    #   print(sd.temp)
+    #   for (i in 1:(nSamples)) {
+    #     dataSet.to.impute.temp = rnorm(nFeatures, 
+    #                                    mean = min.samples[i], 
+    #                                    sd = sd.temp)
+    #     dataSet.imputed[which(is.na(dataSet.mvs[, i])), i] = 
+    #       dataSet.to.impute.temp[which(is.na(dataSet.mvs[,i]))]
+    #   }
+    #   return(dataSet.imputed)
+    # }
+    # 
+    
+    ##################################################################
+    
+    # library(missForest)
+    # 
+    # ## PHOSPHO PART ##
+    # filtered_abundances_df <- as.data.frame(filtered_abundances)
+    # 
+    # rownames(filtered_abundances_df) <- paste(filtered_abundances_df$pep_with_pos,filtered_abundances_df$PG.ProteinLabel,
+    #                                           filtered_abundances_df$max_value,
+    #                                           filtered_abundances_df$species,sep = "@")
+    # 
+    # filtered_abundances_df <- filtered_abundances_df %>% select(contains("E2-"))
+    # 
+    # filtered_abundances_imp <- missForest(xmis=as.data.frame(filtered_abundances_df),verbose = TRUE)
+    # filtered_abundances_imp_df <- as.data.frame(filtered_abundances_imp[["ximp"]])
+    # 
+    # filtered_abundances_final <- filtered_abundances_imp_df %>% 
+    #   bind_cols(rownames(filtered_abundances_df)) %>%
+    #   separate(col = 19,into = c("pep_with_pos","PG.ProteinLabel","max_value","species"),sep = "@")
+    # 
+    # ## ECOLI PART ##
+    # filtered_abundances_ecoli_df <- as.data.frame(filtered_abundances_ecoli)
+    # 
+    # rownames(filtered_abundances_ecoli_df) <- paste(filtered_abundances_ecoli_df$PEP.GroupingKey,
+    #                                                 filtered_abundances_ecoli_df$PG.ProteinLabel,
+    #                                                 filtered_abundances_ecoli_df$species,sep = "@")
+    # 
+    # filtered_abundances_ecoli_df <- filtered_abundances_ecoli_df %>% select(contains("E2-"))
+    # 
+    # filtered_abundances_ecoli_imp <- missForest(ntree=5,maxiter = 2,xmis=as.data.frame(filtered_abundances_ecoli_df),verbose = TRUE)
+    # 
+    # filtered_abundances_ecoli_imp_df <- as.data.frame(filtered_abundances_ecoli_imp[["ximp"]])
+    # 
+    # filtered_abundances_ecoli_final <- filtered_abundances_ecoli_imp_df %>% 
+    #   bind_cols(rownames(filtered_abundances_ecoli_df)) %>%
+    #   separate(col = 19,into = c("pep_with_pos","PG.ProteinLabel","species"),sep = "@")
+    # 
+    # 
+    filtered_abundances_ecoli_final <- filtered_abundances_ecoli %>% drop_na()
+      
+    
+    #filtered_abundances_final <- filtered_abundances %>% drop_na() #%>%
+      #mutate(merge=rownames(filtered_abundances_aft_impt))
     
     # UNNECESSARY TO KEEP DATA BEFORE IMPUTATION
-    abundances_all_aft_imputation <- filtered_abundances_ecoli %>%
-      rename_with(~ paste0("pep_with_pos"), matches("^PEP")) %>%
-      bind_rows(filtered_abundances)
+    #abundances_all_aft_imputation <- df %>% select(!pep_with_pos) %>%
+      #mutate(merge=rownames(df)) %>%
+      #separate(merge,into = c("pep_with_pos","ProteinLabel","loc_num","species"),sep = "@")
+    
+    abundances_all_aft_imputation <- filtered_abundances %>% bind_rows(filtered_abundances_ecoli)
     
     filtered_abundances_rowMeans <- NULL
     filtered_abundances_log10 <- NULL
     filtered_abundances_log10_rowMeans <- NULL
     
     for (k in 1:sample_size){
-      assign(paste0("aft_imp_abundances_A",k),as.data.frame(rowMeans(abundances_all_aft_imputation  %>% select(contains(paste0("A",k))))))
+      assign(paste0("aft_imp_abundances_A",k),as.data.frame(rowMeans(abundances_all_aft_imputation %>% select(contains(paste0("A",k))))))
+      
       filtered_abundances_rowMeans<- bind_cols(filtered_abundances_rowMeans,get(paste0("aft_imp_abundances_A",k)))
-      assign(paste0("log10_abundances_A",k),as.data.frame(log10(abundances_all_aft_imputation  %>% select(contains(paste0("A",k))))))
+      
+      assign(paste0("log10_abundances_A",k),as.data.frame(log10(abundances_all_aft_imputation %>% select(contains(paste0("A",k))))))
+      
       filtered_abundances_log10 <- bind_cols(filtered_abundances_log10, get(paste0("log10_abundances_A",k)))
+      
       assign(paste0("rowMean_log10_abundances_A",k),as.data.frame(rowMeans(get(paste0("log10_abundances_A",k)) %>% select(contains(paste0("A",k))))))
+      
       filtered_abundances_log10_rowMeans<- bind_cols(filtered_abundances_log10_rowMeans,get(paste0("rowMean_log10_abundances_A",k)))
     }
     
     colnames(filtered_abundances_rowMeans) <- paste0("mean_abundances_aft_imp_A",1:sample_size)
     colnames(filtered_abundances_log10_rowMeans) <- paste0("mean_log10_abundances_A",1:sample_size)
+    
     filtered_abundances_log10 <- filtered_abundances_log10 %>%
       rename_with(~ paste0("log10_", .x), everything())
     # Calculate Fold Change by keeping A1 constant (mean(S1)/mean(S2), etc.)
@@ -619,7 +736,6 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
                 file =paste0(file_path,"final_imputed_data_Spectronaut_",
                               
                              acquisiton_type,".txt"),sep = "\t",row.names = F)
-    
     df_merge <- final_imputed_data_syn %>%
       left_join(pep_list_w_theo,by="pep_with_pos") %>%
       mutate_at("Pool", ~replace_na(.,"Unexpected")) %>%
@@ -632,24 +748,24 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
       #separate(accession, into = c("uniprot_id", "species", "position"), remove = F) %>%
       pivot_longer(cols = contains("aft_imp"),
                    names_to = "Mean_abundance",
-                   values_to = "values")# %>%
-    #mutate_at("Pool", ~replace_na(.,background_species))
-    
+                   values_to = "values") %>%
+    mutate_at("Pool", ~replace_na(.,background_species))
     
     df_FC_ratio_after_impt <- df_merge %>% 
-      select(starts_with("exp_") | contains("species"),Pool) %>%
+      select(starts_with("exp_") | contains("species"),Pool,isomericity) %>%
       #separate(accession, into = c("uniprot_id", "species", "position"), remove = F) %>%
       tibble() %>% 
       pivot_longer(cols = starts_with("exp_"),
                    names_to = "exp_FC",
-                   values_to = "values")# %>%
+                   values_to = "values") %>%
+      mutate(Pool=ifelse(Pool=="Diluted",paste0(Pool,"_",isomericity),Pool))
     #mutate_at("Pool", ~replace_na(.,background_species))
-    
-    
+    df_mean_ab_after_impt <- df_mean_ab_after_impt %>% mutate(species=ifelse(Pool!="ECOLI","HUMAN","ECOLI"))
+      
     plot4 <- gg_density(data_set = df_mean_ab_after_impt, 
                      x_df = df_mean_ab_after_impt$values,
-                     fill_df = df_mean_ab_after_impt$Mean_abundance,
-                     color_df = df_mean_ab_after_impt$Pool,
+                     fill_df = df_mean_ab_after_impt$species,
+                     color_df = NULL,
                      header="Distribution of mean abundance of every sample after imputation",
                      facet_df = "Mean_abundance",
                      x_lab = "log10(values)",
@@ -660,6 +776,241 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     pep_list_w_theo_sel <- pep_list_w_theo %>%
       select(pep_with_pos,isomericity,Pool,pool_id) 
     
+    ##########################################################
+    ### BOX-PLOT: Experimental Quantity Ratio of Phospho Peptides  
+    
+  #   df_FC_ratio_absErr_after_impt <- df_merge %>% 
+  #     select(pep_with_pos,starts_with("exp_") | contains("species"),Pool,isomericity) %>%
+  #     #separate(accession, into = c("uniprot_id", "species", "position"), remove = F) %>%
+  #     tibble() %>% 
+  #     pivot_longer(cols = starts_with("exp_"),
+  #                  names_to = "exp_FC",
+  #                  values_to = "values") %>%
+  #     mutate_at("Pool", ~replace_na(.,background_species)) %>%
+  #     mutate(actual_ratio_val= case_when(grepl(comparisons[1],exp_FC) ~ as.numeric(actual_ratio[1]),
+  #                                        grepl(comparisons[2],exp_FC) ~as.numeric(actual_ratio[2]),
+  #                                        grepl(comparisons[3],exp_FC) ~as.numeric(actual_ratio[3]),
+  #                                        grepl(comparisons[4],exp_FC) ~as.numeric(actual_ratio[4]))) %>%
+  #     drop_na(actual_ratio_val) %>%
+  #     mutate(actual_ratio_val=ifelse(Pool=="ECOLI",1,actual_ratio_val)) %>%
+  #     mutate(actual_ratio_val=ifelse((Pool=="Fixed_isomeric" | Pool=="Fixed_non-isomeric"),1,actual_ratio_val)) %>%
+  #     mutate(log2_fc_values =log2(values)) %>%
+  #     filter(!grepl("Unexpected",Pool)) %>%
+  #     #filter(!grepl("ECOLI",species)) %>%
+  #     mutate(Pool=ifelse(Pool=="Diluted",paste0(Pool,"_",isomericity),Pool)) %>%
+  #     #mutate(lower_bound = quantile(log2_fc_values, 0.25) - 1.5 * IQR(log2_fc_values),
+  #           # upper_bound = quantile(log2_fc_values, 0.75) + 1.5 * IQR(log2_fc_values)) %>%
+  #     mutate(acq_type=acquisiton_type) %>%
+  #     mutate(soft_name=software_name)
+  # 
+    # ranges <- df_FC_ratio_absErr_after_impt %>%
+    #   group_by(exp_FC,Pool) %>%
+    #   summarise(firstQ=(quantile(log2_fc_values,probs = 0.25)),
+    #             iqr_val=IQR(log2_fc_values),
+    #             thirdQ=(quantile(log2_fc_values,probs = 0.75))) %>%
+    #   mutate(lower_bound=firstQ - 1.5*iqr_val) %>%
+    #   mutate(upper_bound=thirdQ + 1.5*iqr_val) %>%
+    #   ungroup() %>%
+    #   mutate(Pool_FC=paste0(Pool,"_",exp_FC)) %>%
+    #   select(Pool_FC,lower_bound,upper_bound)
+  #   
+  #   df_FC_ratio_absErr_after_impt_filt <- df_FC_ratio_absErr_after_impt %>% #filter(log2_fc_values >= lower_bound & log2_fc_values <= upper_bound) %>%
+  #     mutate(Pool_FC = paste0(Pool,"_",exp_FC)) %>%
+  #     left_join(ranges,by = "Pool_FC") %>%
+  #     group_by(Pool_FC) %>%
+  #     filter(log2_fc_values >= lower_bound & log2_fc_values <= upper_bound) %>%
+  #     mutate(abs_err = abs(log2(actual_ratio_val)-log2_fc_values)) %>%
+  #     mutate(rel_err=(abs_err/abs(actual_ratio_val)*100)) 
+  #   
+  # 
+  #  
+  #   
+  #   write.table(df_FC_ratio_absErr_after_impt_filt,file = paste0(file_path,"AbsError_FC",software_name,"_",acquisiton_type,".txt"),sep = 
+  #                 "\t",col.names = T,row.names = F)
+  #   
+  #   
+  #   library(gghalves)
+  #   plot18 <- gg_half_boxplt_exp_ratio_nolog(data_set = df_FC_ratio_absErr_after_impt_filt , 
+  #                                      x_df = df_FC_ratio_absErr_after_impt_filt$exp_FC,
+  #                                      y_df = df_FC_ratio_absErr_after_impt_filt$rel_err,
+  #                                      fill_df = df_FC_ratio_absErr_after_impt_filt$Pool,
+  #                                      header="Relative Absolute Error (%) using Experimental Quantity Ratio of Phospho Peptides",
+  #                                      x_lab="Sample Names",
+  #                                      y_lab="Relative Absolute Error (%)",
+  #                                      fill_lab = "Pool Names",
+  #                                      
+  #                                      subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) + 
+  #     #scale_y_continuous(limits = c(0,200)) + #breaks = seq(from =0, to=100,by=10)) +
+  #     
+  #     scale_fill_manual(values = c("#6A51A3","#6A51A3","grey68","#E6550D","#E6550D"))+ #"grey68"
+  #     scale_color_manual(values =  c("#6A51A3","#6A51A3","grey68","#E6550D","#E6550D")) #"grey68"
+  #     #geom_half_point(alpha = 1, show.legend = TRUE, aes(color=df_FC_ratio_absErr_after_impt_filt$Pool,shape=df_FC_ratio_absErr_after_impt_filt$Pool))#+ scale_shape_manual(values = c(15,24,8,15,24)) 
+  #    
+  #   plot19 <- gg_violin_exp_ratio_nolog(data_set = df_FC_ratio_absErr_after_impt_filt, 
+  #                                 x_df = df_FC_ratio_absErr_after_impt_filt$exp_FC,
+  #                                 y_df = df_FC_ratio_absErr_after_impt_filt$log2_fc_values,
+  #                                 fill_df = df_FC_ratio_absErr_after_impt_filt$Pool,
+  #                                 trim=TRUE,
+  #                                 header="Fold change Ratio of every sample based on pool names after imputation",
+  #                                 x_lab="Sample Names",
+  #                                 y_lab="Fold change values",
+  #                                 fill_lab = "Pool Names",
+  #                                 subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name,"\n after filtering outliers")
+  #  ) + scale_fill_manual(values = c("#6A51A3","#6A51A3","grey68","#E6550D","#E6550D"))+ #"grey68"
+  #     scale_color_manual(values =  c("#6A51A3","#6A51A3","grey68","#E6550D","#E6550D")) 
+  # #scale_y_continuous(limits = c(0,200)) + #breaks = seq(from =0, to=100,by=10)) 
+    
+    ############      ############    CV ASSESSMENT BEFORE & AFTER IMPUTATION      ############      ############  
+    ### BEFEORE  ### 
+    filtered_abundances_ecoli_bef_impt <- filtered_abundances_ecoli_bef_impt %>% 
+      mutate(merge=rownames(filtered_abundances_ecoli_bef_impt)) %>%
+      separate(merge,into = c("pep_with_pos","ProteinLabel","loc_num","species"),sep = "@") %>%
+      rename(Pool=ProteinLabel) %>%
+      #rename(pep_with_pos=PEP.GroupingKey) %>%
+      select(!species) %>% drop_na()
+    
+    pep_list_w_theo_iso <- pep_list_w_theo %>% select(pep_with_pos,isomericity)
+    
+    df_merge_before_imp <- df_merge_syn %>% left_join(pep_list_w_theo_iso,by="pep_with_pos") %>%
+      mutate(Pool=ifelse(Pool=="Diluted",paste0(Pool,"_",isomericity),Pool)) %>% 
+      #pivot_longer(cols = contains("E2"),
+      #names_to = "Experiment",
+      #values_to = "Abundances") %>% 
+      drop_na() %>% select(!isomericity) %>%
+      #pivot_wider(names_from = "Experiment",values_from = "Abundances")%>% drop_na() 
+      bind_rows(filtered_abundances_ecoli_bef_impt)
+    
+    abundances_all_before_impt <- NULL
+    
+    for (k in 1:(sample_size-1)){
+      assign(paste0("df_merge_before_imp_A",k),as.data.frame(rowMeans(df_merge_before_imp  %>% select(contains(paste0("A",k))))))
+      
+      abundances_all_before_impt<- bind_cols(abundances_all_before_impt,get(paste0("df_merge_before_imp_A",k)))
+    }
+    colnames(abundances_all_before_impt) <- paste0("mean_abundance_A",1:(sample_size-1))
+    
+    df_merge_before_imp_all <- df_merge_before_imp %>% bind_cols(abundances_all_before_impt)
+    
+    df_before_impt_CV <- CV_calculator(data = df_merge_before_imp_all,abundance_col = "mean_abundance_A",iter = 5,acquisiton_type = acquisiton_type,software_name = software_name)
+    
+    write.table(df_before_impt_CV,file = paste0(file_path,"CV_calculation_before_imputation",acquisiton_type,software_name,".txt"))
+    
+    plot21 <- df_before_impt_CV %>% 
+      filter(grepl("Diluted",Pool) | grepl("Fixed",Pool)) %>%
+      ggplot(aes(x=CV_values,y=CV_samples,color=Pool,linetype=Pool)) + 
+
+      geom_density_ridges(jittered_points = TRUE,
+                          alpha=0,
+                          linewidth=2,
+                          position = position_points_jitter(width = 0.05, height = 0),
+                          point_shape = '*', point_size = 3, point_alpha = 1)+ 
+      #scale_fill_brewer(palette ="PuOr")+
+      #scale_fill_grey()+
+      scale_color_manual(values = c("#FD8D3C","#FD8D3C","#6A51A3","#6A51A3"))+ #"grey68"
+      scale_linetype_manual(values = c("solid","dashed","solid","dashed")) +
+      theme_bw() +
+      #facet_wrap(~Pool) +
+      theme(aspect.ratio=6.5/11, legend.text = element_text(size = 45),
+            axis.title.x = element_text(size = 45),
+            axis.title.y = element_text(size = 45),
+            plot.title = element_text(size = 55),
+            legend.title = element_text(size = 45),
+            axis.text.x = element_text(size = 45),
+            axis.title = element_text(size = 45),
+            axis.text.y = element_text(size = 45),
+            plot.subtitle = element_text(size = 45)) +
+      labs( y= "Intensity", x="Percentage of CVs",
+            title = paste("Experiment 2 Percentage of CVs", acquisiton_type, " data processed by ", software_name), 
+            subtitle = paste("Before imputation")) 
+    
+    ############      ############                     ############      ############  
+    ### AFTER  ### 
+   
+    df_merge_aft_impt <- df_merge %>% 
+      mutate(Pool=ifelse(Pool=="Diluted",paste0(Pool,"_",isomericity),Pool)) %>%
+      select(!PG.ProteinLabel) 
+    
+    df_aft_impt_CV <- CV_calculator(data = df_merge_aft_impt,abundance_col = "mean_abundances_aft_imp_A",
+                                   iter = 5,
+                                   acquisiton_type = acquisiton_type,
+                                   software_name = software_name)
+   write.table(df_aft_impt_CV,file = paste0(file_path,"CV_calculation_after_imputation",acquisiton_type,software_name,".txt"))
+   
+   df_aft_impt_CV %>% group_by(Pool,CV_samples) %>% summarise(mean_CV_samples=mean(CV_values))
+   
+   df_aft_impt_CV %>% filter(grepl("Diluted",Pool) | grepl("Fixed",Pool)) %>%
+     ggplot(aes(y=CV_values,x=Pool,color=CV_samples)) + geom_point() + facet_wrap(~CV_samples)
+   
+
+    plot18 <- df_aft_impt_CV %>% filter(grepl("Diluted",Pool) | grepl("Fixed",Pool)) %>%
+      ggplot(aes(x=CV_values,y=CV_samples,color=Pool,linetype=Pool)) + 
+      
+      geom_density_ridges(jittered_points = TRUE,
+                          alpha=0,
+                          linewidth=1,
+                          position = position_points_jitter(width = 0.05, height = 0),
+                          point_shape = '*', point_size = 3, point_alpha = 1)+ 
+      #scale_fill_brewer(palette ="PuOr")+
+      #scale_fill_grey()+
+      scale_color_manual(values = c("#6A51A3","#6A51A3","#FD8D3C","#FD8D3C"))+ #"grey68"
+      scale_linetype_manual(values = c("solid","dashed","solid","dashed"))+ #"grey68"
+              theme_bw() +
+              #facet_wrap(~Pool) +
+       theme(aspect.ratio=6.5/11, legend.text = element_text(size = 45),
+             axis.title.x = element_text(size = 45),
+             axis.title.y = element_text(size = 45),
+             plot.title = element_text(size = 55),
+             legend.title = element_text(size = 45),
+             axis.text.x = element_text(size = 45),
+             axis.title = element_text(size = 45),
+             axis.text.y = element_text(size = 45),
+             plot.subtitle = element_text(size = 45)) +
+       labs( y= "Intensity", x="Percentage of CVs",
+             title = paste("Experiment 2 Percentage of CVs", acquisiton_type, " data processed by ", software_name), 
+             subtitle = paste("After imputation")) 
+
+    plot19 <- df_aft_impt_CV %>% filter(grepl("Diluted",Pool) | grepl("Fixed",Pool)) %>%
+        ggplot(aes(x=CV_values,y=Pool,fill=CV_samples)) + 
+        geom_density_ridges(jittered_points = TRUE,position = position_points_jitter(width = 0.05, height = 0),point_shape = '*', point_size = 3, point_alpha = 1, alpha = 0.75)+ 
+        scale_fill_manual(values =c("#803233FF","#8A4D00FF","#A16928FF","#B0986CFF","#DCBE9BFF"))+ #"#EFDDCFFF",,"#EDEAC2FF"
+        #scale_fill_grey()+
+        theme_bw() +
+        #facet_wrap(~Pool) +
+        theme(aspect.ratio=6.5/11, 
+              legend.text = element_text(size = 45),
+              axis.title.x = element_text(size = 45),
+              axis.title.y = element_text(size = 45),
+              plot.title = element_text(size = 55),
+              legend.title = element_text(size = 45),
+              axis.text.x = element_text(size = 45),
+              axis.title = element_text(size = 45),
+              axis.text.y = element_text(size = 30),
+              plot.subtitle = element_text(size = 45)) +
+        labs( y= "Intensity", x="Percentage of CVs",
+              title = paste("Experiment 2 Percentage of CVs", acquisiton_type, " data processed by ", software_name), 
+              subtitle = paste("After imputation")) 
+      
+       
+    plot20 <-  df_aft_impt_CV %>% filter(!grepl("ECOLI",Pool)) %>% ggplot(aes(x=CV_samples,y=CV_values ,fill=Pool)) + geom_boxplot() + theme_bw() +
+        #facet_wrap(~Pool) +
+        theme(legend.text = element_text(size = 45),
+              axis.title.x = element_text(size = 45),
+              axis.title.y = element_text(size = 45),
+              plot.title = element_text(size = 55),
+              legend.title = element_text(size = 45),
+              axis.text.x = element_text(size = 45),
+              axis.title = element_text(size = 45),
+              axis.text.y = element_text(size = 45),
+              plot.subtitle = element_text(size = 45)) +
+        labs( x= "Sample ID", y="Percentage of CVs",
+              title = paste("Experiment 2 Percentage of CVs", acquisiton_type, " data processed by ", software_name), 
+              subtitle = paste("After imputation")) +
+        scale_fill_manual(values = c("#6A51A3","#6A51A3","#E6550D","#E6550D","cyan3"))+ #"grey68"
+        scale_y_continuous(
+          limits = c(0,130), 
+          breaks = seq(0, 130,10)
+        )
+      
     ############################## ############################
     
     ratio_supp_FC <-df_merge %>% 
@@ -945,17 +1296,45 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
         #filter(!grepl("ECOLI",Pool))
         #separate(accession, into = c("prot_id","species"),sep = "_")
         mutate(isomericity = ifelse(is.na(isomericity), "False Positive", isomericity)) %>%
-        unite(Pool_new, Pool.x, isomericity,sep = "_",remove = FALSE) %>%
+      
+        unite('Pool_new',Pool.x, isomericity,sep = "_",remove = FALSE) %>%
+        mutate(Pool_new=ifelse(Pool_new=="Fixed_isomeric_isomeric","Fixed_isomeric",Pool_new)) %>%
+        mutate(Pool_new=ifelse(Pool_new=="Fixed_non-isomeric_nonisomeric","Fixed_non-isomeric",Pool_new)) %>%
         unite('new_col_coloring',Pool_new,ratio,sep = "_",remove = FALSE) %>%
-        mutate(new_col_coloring = if_else(grepl("Fixed_isomeric", new_col_coloring), "Fixed_isomeric", new_col_coloring)) %>%
-        mutate(new_col_coloring = if_else(grepl("Fixed_nonisomeric", new_col_coloring), "Fixed_nonisomeric", new_col_coloring)) %>%
+        #mutate(new_col_coloring = if_else(grepl("Fixed_isomeric", new_col_coloring), "Fixed_isomeric", new_col_coloring)) %>%
+        #mutate(new_col_coloring = if_else(grepl("Fixed_non-isomeric_nonisomeric", new_col_coloring), "Fixed_nonisomeric", new_col_coloring)) %>%
         mutate(new_col_coloring = if_else(grepl("Unexpected", new_col_coloring), "Unexpected", new_col_coloring)) %>%
-        rename(pep_with_pos=pep_with_pos.x) %>% rename(Pool=Pool.x)
+        rename(pep_with_pos=pep_with_pos.x) %>% rename(Pool=Pool.x) %>%
+        filter(!grepl("A1/A6",fold_change_comp))
+        
       
     }else{
       print("Statistical test could not be assessed. Check the input files!")
     }
+    
+    ranges <- merge_stat_df_final %>% 
+      mutate(log2_fc_values =log2(fold_change_values)) %>%
+      group_by(fold_change_comp,Pool_new) %>%
+      summarise(firstQ=(quantile(log2_fc_values,probs = 0.25)),
+                iqr_val=IQR(log2_fc_values),
+                thirdQ=(quantile(log2_fc_values,probs = 0.75))) %>%
+      mutate(lower_bound=firstQ - 1.5*iqr_val) %>%
+      mutate(upper_bound=thirdQ + 1.5*iqr_val) %>%
+      ungroup() %>%
+      mutate(Pool_FC=paste0(Pool_new,"_",fold_change_comp)) %>%
+      select(Pool_FC,lower_bound,upper_bound)
+    
+    merge_stat_df_final_filt <- merge_stat_df_final %>% 
+      mutate(Pool_FC=paste0(Pool_new,"_",fold_change_comp)) %>%
+      mutate(log2_fc_values =log2(fold_change_values)) %>%
+      left_join(ranges,by = "Pool_FC") %>%
+      group_by(Pool_FC) %>%
+      filter(log2_fc_values >= lower_bound & log2_fc_values <= upper_bound) %>%
+      ungroup()
+    
+    
     ##TODO: Find more logical way to map these values!!!
+    comparisons <- comparisons[-5]
     
     if(length(comparisons) == 4){
       actual_ratio_col <- merge_stat_df_final %>%
@@ -964,14 +1343,30 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
                                            grepl(comparisons[2],fold_change_comp) ~actual_ratio[2],
                                            grepl(comparisons[3],fold_change_comp) ~actual_ratio[3],
                                            grepl(comparisons[4],fold_change_comp) ~actual_ratio[4]))
+      
+      actual_ratio_col_filt <- merge_stat_df_final_filt %>%
+        select(fold_change_comp) %>% distinct() %>%
+        mutate(actual_ratio_val= case_when(grepl(comparisons[1],fold_change_comp) ~ actual_ratio[1],
+                                           grepl(comparisons[2],fold_change_comp) ~actual_ratio[2],
+                                           grepl(comparisons[3],fold_change_comp) ~actual_ratio[3],
+                                           grepl(comparisons[4],fold_change_comp) ~actual_ratio[4]))
+      
     }else if(length(comparisons) == 5){
       actual_ratio_col <- merge_stat_df_final %>%
         select(fold_change_comp) %>% distinct() %>%
         mutate(actual_ratio_val= case_when(grepl(comparisons[1],fold_change_comp) ~ actual_ratio[1],
                                            grepl(comparisons[2],fold_change_comp) ~actual_ratio[2],
                                            grepl(comparisons[3],fold_change_comp) ~actual_ratio[3],
-                                           grepl(comparisons[4],fold_change_comp) ~actual_ratio[4],
-                                           grepl(comparisons[5],fold_change_comp) ~actual_ratio[5]))
+                                           grepl(comparisons[4],fold_change_comp) ~actual_ratio[4]))#,
+                                           #grepl(comparisons[5],fold_change_comp) ~actual_ratio[5]))
+      
+      actual_ratio_col_filt <- merge_stat_df_final_filt %>%
+        select(fold_change_comp) %>% distinct() %>%
+        mutate(actual_ratio_val= case_when(grepl(comparisons[1],fold_change_comp) ~ actual_ratio[1],
+                                           grepl(comparisons[2],fold_change_comp) ~actual_ratio[2],
+                                           grepl(comparisons[3],fold_change_comp) ~actual_ratio[3],
+                                           grepl(comparisons[4],fold_change_comp) ~actual_ratio[4]))#,
+                                           #grepl(comparisons[5],fold_change_comp) ~actual_ratio[5]))
     }else{
       print("Mapping between theoretical ratio and comparison cannot be done. Please make sure that you have either 4 or 5 comparisons overall.")
     }
@@ -989,6 +1384,11 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
       filter(P.Value < 0.05) %>% 
       count(new_col_coloring) %>% left_join(actual_ratio_col)
     
+    point_count_y_axis_filt <- merge_stat_df_final_filt %>%
+      group_by(fold_change_comp, new_col_coloring) %>%
+      filter(P.Value < 0.05) %>% 
+      count(new_col_coloring) %>% left_join(actual_ratio_col_filt)
+    
     ymax <- 11 + 0.5 #max(-log10(merge_stat_df_final$P.Value))
     y_decrement <- 0.5
     
@@ -1004,6 +1404,10 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     # Apply the function to calculate y_pos within each group
     point_count_y_axis$y_pos <- unlist(by(point_count_y_axis$fold_change_comp, 
                                           point_count_y_axis$fold_change_comp, calculate_y_pos))
+    
+    # Apply the function to calculate y_pos within each group
+    point_count_y_axis_filt$y_pos <- unlist(by(point_count_y_axis_filt$fold_change_comp, 
+                                               point_count_y_axis_filt$fold_change_comp, calculate_y_pos))
     
     col <- RColorBrewer::brewer.pal(n=length(comparisons),name = "Dark2")
     
@@ -1040,6 +1444,8 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     
     actual_ratio_col <- actual_ratio_col %>% bind_cols(col)
     
+    actual_ratio_col_filt <- actual_ratio_col_filt %>% bind_cols(col)
+    
     mapped_coloring_dat <- as.data.frame(mapped_coloring)
     
     point_count_y_axis <- mapped_coloring_dat %>% 
@@ -1047,8 +1453,53 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
       rename(colors=1,new_col_coloring=2) %>%
       right_join(point_count_y_axis,by="new_col_coloring")
     
+    point_count_y_axis_filt <-mapped_coloring_dat %>% 
+      bind_cols(labels) %>%
+      rename(colors=1,new_col_coloring=2) %>%
+      right_join(point_count_y_axis_filt,by="new_col_coloring")
     
+    # plot20 <- ggplot(merge_stat_df_final_filt,aes(x =log2(merge_stat_df_final_filt$fold_change_values), y = -log10(merge_stat_df_final_filt$P.Value))) +
+    #   geom_point(size = 4, aes(color = new_col_coloring,shape=Pool)) + # Pool_new might be use to 
+    #   #scale_shape_identity() +                                        # differentiate peptides are found as Unexpected and reference 
+    #   # in their associated concentration 
+    #   # Pool can be used to show only difference btw pools same as coloring 'less complex visualization)
+    #   #geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red") +
+    #   #scale_fill_manual(values=setNames(mapped_coloring, labels)) + 
+    #   #geom_line(aes(color =setNames(mapped_coloring, labels)), size = 1) +  # Add color aesthetic to geom_line()
+    #   scale_color_manual(values =setNames(mapped_coloring, labels)) +
+    #   #scale_y_continuous(limits = c(0, max(-log10(merge_stat_df_final$adj.P.Val))), breaks = seq(0, max(-log10(merge_stat_df_final$adj.P.Val)), by = 0.8)) +
+    #   #scale_x_continuous(limits = c(min(log2(merge_stat_df_final$fold_change_values)),max(log2(merge_stat_df_final$fold_change_values)))) +#facet_wrap(~ratio) +
+    #   
+    #   #scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=2)) +
+    #   #scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=2)) +
+    #   scale_y_continuous(
+    #     limits = c(0,12), 
+    #     breaks = seq(0, 12,2)
+    #   ) +
+    #   scale_x_continuous(
+    #     limits = c(-20,24), 
+    #     breaks = seq(-20, 24,2)
+    #   ) +
+    #   
+    #   #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
+    #   theme_bw() +
+    #   theme(legend.text = element_text(size = 45),
+    #         axis.title.x = element_text(size = 45),
+    #         axis.title.y = element_text(size = 45),
+    #         plot.title = element_text(size = 55),
+    #         legend.title = element_text(size = 45),
+    #         axis.text.x = element_text(size = 45),
+    #         axis.title = element_text(size = 45),
+    #         axis.text.y = element_text(size = 45),
+    #         plot.subtitle = element_text(size = 45)) +
+    #   labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n", subtitle,"\n after filtering outliers")) +
+    #   geom_vline(data = actual_ratio_col_filt, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=col,size=1.5) +
+    #   geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=1.5) + 
+    #   geom_label(data = point_count_y_axis_filt, aes(x = log2(actual_ratio_val), y = y_pos, fill=new_col_coloring,label = n),color="white",size=14,show.legend = FALSE) +
+    #   scale_fill_manual(values =setNames(mapped_coloring, labels))
+    # 
     
+  
     plot9 <- ggplot(merge_stat_df_final,aes(x =log2(merge_stat_df_final$fold_change_values), y = -log10(merge_stat_df_final$P.Value))) +
       geom_point(size = 4, aes(color = new_col_coloring,shape=Pool)) + # Pool_new might be use to 
       #scale_shape_identity() +                                        # differentiate peptides are found as Unexpected and reference 
@@ -1164,17 +1615,46 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     write.table(merge_stat_df_final_text,file = paste0(file_path,"volcano_plot_",software_name,"_",acquisiton_type,".txt"),sep = 
                   "\t",col.names = T,row.names = F)
     
+    merge_stat_df_final_text <- merge_stat_df_final_filt %>% mutate(soft_name=paste0(software_name)) %>% mutate(acq_type=paste0(acquisiton_type))
+    write.table(merge_stat_df_final_text,file = paste0(file_path,"volcano_plot_",software_name,"_",acquisiton_type,"filtered.txt"),sep = 
+                  "\t",col.names = T,row.names = F)
+    
     df_roc <- merge_stat_df_final %>%
       select(pep_with_pos, Pool,P.Value) %>%
       mutate(Pool = if_else(grepl("Diluted_isomeric", Pool), "Diluted", Pool)) %>%
       mutate(Pool = if_else(grepl("Diluted_nonisomeric", Pool), "Diluted", Pool))
       
+    df_roc_filt <- merge_stat_df_final_filt %>%
+      select(pep_with_pos, Pool,P.Value) %>%
+      mutate(Pool = if_else(grepl("Diluted_isomeric", Pool), "Diluted", Pool)) %>%
+      mutate(Pool = if_else(grepl("Diluted_nonisomeric", Pool), "Diluted", Pool))
     #filter(!grepl("Unexpected",Pool))
+    ### ROC analysis custom func
+    df_roc_order_filt <- df_roc_filt[order(df_roc_filt$P.Value),]
+    
+    df_roc_func_filt <- compute_roc_curve(df=df_roc_order_filt, flag = "Diluted",expected = length(comparisons)*size_variying_pep_size)
+    
     
     ### ROC analysis custom func
     df_roc_order <- df_roc[order(df_roc$P.Value),]
     
     df_roc_func <- compute_roc_curve(df=df_roc_order, flag = "Diluted",expected = length(comparisons)*size_variying_pep_size)
+    
+    
+    intended_dir <-paste0(file_path,"outputs_new")
+    
+    if(dir.exists(intended_dir)){
+      new_path <- intended_dir
+      
+    }else{
+      dir.create(intended_dir)
+      new_path <- list.dirs(intended_dir)
+      
+    }
+    
+    write.table(df_roc_func, file = paste0(new_path,"/new_custom_Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
+    write.table(df_roc_func_filt, file = paste0(new_path,"/new_custom_Roc_analysis_",exp_id,"_",software_name,"_","filtered.txt"),sep = "\t",row.names = F)
+    
     
     plot14 <- ggplot(df_roc_func, aes(y=tpr, x = fdr)) +
       geom_path(size=1.5) +
@@ -1194,16 +1674,6 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
       labs(y="True Positive Rate \n (Sensitivity)", x="False Positive Rate \n (Specificity)",
            title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), 
            subtitle = paste(subtitle,"including unexpected"), color="Pool Type")
-    
-    new_path <-paste0(file_path,"outputs_new")
-     
-     if(dir.exists(new_path)){
-       
-     }else{
-       new_path <- dir.create(new_path)
-     }
-     
-     write.table(df_roc_func, file = paste0(new_path,"/new_custom_Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
     
     #### ROC Analysis using pROC 
     
@@ -1260,7 +1730,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     plt_obj <- plt_obj[!is.na(plt_obj)]
     sapply(1:length(plt_obj),function(x) ggsave(filename = paste0("p",x,".png"),
                                                  width = 80, height = 60, 
-                                                 path = paste0(file_path,"/outputs_new/"),
+                                                 path = paste0(file_path,"/outputs_new_with_CVs/"),
                                                  units = "cm",
                                                  get(plt_obj[x]),
                                                  device = "png", #".svg"
