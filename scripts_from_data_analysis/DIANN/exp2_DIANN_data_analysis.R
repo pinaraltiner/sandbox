@@ -680,6 +680,93 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
                    color_lab= "",
                    fill_lab = "Sample Names",
                    subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
+  
+  ############################## ############################
+
+  ### BOX-PLOT: Experimental Quantity Ratio of Phospho Peptides  
+  
+  df_FC_ratio_absErr_after_impt <- df_merge %>% 
+    select(pep_with_pos,starts_with("exp_") | contains("species"),Pool,isomericity) %>%
+    #separate(accession, into = c("uniprot_id", "species", "position"), remove = F) %>%
+    tibble() %>% 
+    pivot_longer(cols = starts_with("exp_"),
+                 names_to = "exp_FC",
+                 values_to = "values") %>%
+    mutate_at("Pool", ~replace_na(.,background_species)) %>%
+    mutate(actual_ratio_val= case_when(grepl(comparisons[1],exp_FC) ~ as.numeric(actual_ratio[1]),
+                                       grepl(comparisons[2],exp_FC) ~as.numeric(actual_ratio[2]),
+                                       grepl(comparisons[3],exp_FC) ~as.numeric(actual_ratio[3]),
+                                       grepl(comparisons[4],exp_FC) ~as.numeric(actual_ratio[4]))) %>%
+    drop_na(actual_ratio_val) %>%
+    mutate(actual_ratio_val=ifelse(Pool=="ECOLI",1,actual_ratio_val)) %>%
+    mutate(actual_ratio_val=ifelse((Pool=="Fixed_isomeric" | Pool=="Fixed_non-isomeric"),1,actual_ratio_val)) %>%
+    mutate(log2_fc_values =log2(values)) %>%
+    filter(!grepl("Unexpected",Pool)) %>%
+    #filter(!grepl("ECOLI",species)) %>%
+    mutate(Pool=ifelse(Pool=="Diluted",paste0(Pool,"_",isomericity),Pool)) %>%
+    #mutate(lower_bound = quantile(log2_fc_values, 0.25) - 1.5 * IQR(log2_fc_values),
+    # upper_bound = quantile(log2_fc_values, 0.75) + 1.5 * IQR(log2_fc_values)) %>%
+    mutate(acq_type=acquisiton_type) %>%
+    mutate(soft_name=software_name)
+  
+  ranges <- df_FC_ratio_absErr_after_impt %>% 
+    group_by(exp_FC,Pool) %>%
+    summarise(firstQ=(quantile(log2_fc_values,probs = 0.25)),
+              iqr_val=IQR(log2_fc_values),
+              thirdQ=(quantile(log2_fc_values,probs = 0.75))) %>%
+    mutate(lower_bound=firstQ - 1.5*iqr_val) %>%
+    mutate(upper_bound=thirdQ + 1.5*iqr_val) %>%
+    ungroup() %>%
+    mutate(Pool_FC=paste0(Pool,"_",exp_FC)) %>%
+    select(Pool_FC,lower_bound,upper_bound)
+  
+  df_FC_ratio_absErr_after_impt_filt <- df_FC_ratio_absErr_after_impt %>% #filter(log2_fc_values >= lower_bound & log2_fc_values <= upper_bound) %>%
+    mutate(Pool_FC = paste0(Pool,"_",exp_FC)) %>%
+    left_join(ranges,by = "Pool_FC") %>%
+    group_by(Pool_FC) %>%
+    filter(log2_fc_values >= lower_bound & log2_fc_values <= upper_bound) %>%
+    mutate(abs_err = abs(log2(actual_ratio_val)-log2_fc_values)) %>%
+    mutate(rel_err=(abs_err/abs(actual_ratio_val))*100) 
+  
+  
+  
+  
+  write.table(df_FC_ratio_absErr_after_impt_filt,file = paste0(file_path,"AbsError_FC",software_name,"_",acquisiton_type,".txt"),sep = 
+                "\t",col.names = T,row.names = F)
+  
+  
+  library(gghalves)
+  plot18 <- gg_half_boxplt_exp_ratio_nolog(data_set = df_FC_ratio_absErr_after_impt_filt , 
+                                           x_df = df_FC_ratio_absErr_after_impt_filt$exp_FC,
+                                           y_df = df_FC_ratio_absErr_after_impt_filt$rel_err,
+                                           fill_df = df_FC_ratio_absErr_after_impt_filt$Pool,
+                                           header="Relative Absolute Error (%) using Experimental Quantity Ratio of Phospho Peptides",
+                                           x_lab="Sample Names",
+                                           y_lab="Relative Absolute Error (%)",
+                                           fill_lab = "Pool Names",
+                                           
+                                           subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) + 
+    #scale_y_continuous(limits = c(0,200)) + #breaks = seq(from =0, to=100,by=10)) +
+    
+    scale_fill_manual(values = c("#6A51A3","#6A51A3","grey68","#E6550D","#E6550D"))+ #"grey68"
+    scale_color_manual(values =  c("#6A51A3","#6A51A3","grey68","#E6550D","#E6550D")) #"grey68"
+  #geom_half_point(alpha = 1, show.legend = TRUE, aes(color=df_FC_ratio_absErr_after_impt_filt$Pool,shape=df_FC_ratio_absErr_after_impt_filt$Pool))#+ scale_shape_manual(values = c(15,24,8,15,24)) 
+  
+  plot19 <- gg_violin_exp_ratio_nolog(data_set = df_FC_ratio_absErr_after_impt_filt, 
+                                      x_df = df_FC_ratio_absErr_after_impt_filt$exp_FC,
+                                      y_df = df_FC_ratio_absErr_after_impt_filt$log2_fc_values,
+                                      fill_df = df_FC_ratio_absErr_after_impt_filt$Pool,
+                                      trim=TRUE,
+                                      header="Fold change Ratio of every sample based on pool names after imputation",
+                                      x_lab="Sample Names",
+                                      y_lab="Fold change values",
+                                      fill_lab = "Pool Names",
+                                      subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name,"\n after filtering outliers")
+  ) + scale_fill_manual(values = c("#6A51A3","#6A51A3","grey68","#E6550D","#E6550D"))+ #"grey68"
+    scale_color_manual(values =  c("#6A51A3","#6A51A3","grey68","#E6550D","#E6550D")) 
+  #scale_y_continuous(limits = c(0,200)) + #breaks = seq(from =0, to=100,by=10)) 
+  
+  
   ############################## ############################
   
   ratio_supp_FC <-df_merge %>% 
@@ -951,20 +1038,43 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
       #mutate(new_col_coloring = if_else(grepl("Fixed_isomeric", new_col_coloring), "Fixed_isomeric", new_col_coloring)) %>%
       #mutate(new_col_coloring = if_else(grepl("Fixed_non-isomeric_nonisomeric", new_col_coloring), "Fixed_nonisomeric", new_col_coloring)) %>%
       mutate(new_col_coloring = if_else(grepl("Unexpected", new_col_coloring), "Unexpected", new_col_coloring)) %>%
-      rename(pep_with_pos=pep_with_pos.x) %>% rename(Pool=Pool.x) #%>%
+      rename(pep_with_pos=pep_with_pos.x) %>% rename(Pool=Pool.x) %>%
       #unite(Pool_new, Pool.x, isomericity,sep = "_",remove = FALSE) %>%
       #unite('new_col_coloring',Pool_new,ratio,sep = "_",remove = FALSE) %>%
       #mutate(new_col_coloring = if_else(grepl("Fixed_multi", new_col_coloring), "Fixed_multi", new_col_coloring)) %>%
       #mutate(new_col_coloring = if_else(grepl("Fixed_mono", new_col_coloring), "Fixed_mono", new_col_coloring)) %>%
       #mutate(new_col_coloring = if_else(grepl("Unexpected", new_col_coloring), "Unexpected", new_col_coloring)) %>%
       #rename(pep_with_pos=pep_with_pos.x) %>% rename(Pool=Pool.x) #%>%
-      #filter(!grepl("A1/A6",fold_change_comp))
+      filter(!grepl("A1/A6",fold_change_comp))
     
   }else{
     print("Statistical test could not be assessed. Check the input files!")
   }
   
   ##TODO: Find more logical way to map these values!!!
+  
+  ranges <- merge_stat_df_final %>% 
+    mutate(log2_fc_values =log2(fold_change_values)) %>%
+    group_by(fold_change_comp,Pool_new) %>%
+    summarise(firstQ=(quantile(log2_fc_values,probs = 0.25)),
+              iqr_val=IQR(log2_fc_values),
+              thirdQ=(quantile(log2_fc_values,probs = 0.75))) %>%
+    mutate(lower_bound=firstQ - 1.5*iqr_val) %>%
+    mutate(upper_bound=thirdQ + 1.5*iqr_val) %>%
+    ungroup() %>%
+    mutate(Pool_FC=paste0(Pool_new,"_",fold_change_comp)) %>%
+    select(Pool_FC,lower_bound,upper_bound)
+  
+  merge_stat_df_final_filt <- merge_stat_df_final %>% 
+    mutate(Pool_FC=paste0(Pool_new,"_",fold_change_comp)) %>%
+    mutate(log2_fc_values =log2(fold_change_values)) %>%
+    left_join(ranges,by = "Pool_FC") %>%
+    group_by(Pool_FC) %>%
+    filter(log2_fc_values >= lower_bound & log2_fc_values <= upper_bound) %>%
+    ungroup()
+  
+  ##TODO: Find more logical way to map these values!!!
+  comparisons <- comparisons[-5]
   
   if(length(comparisons) == 4){
     actual_ratio_col <- merge_stat_df_final %>%
@@ -973,49 +1083,87 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
                                          grepl(comparisons[2],fold_change_comp) ~actual_ratio[2],
                                          grepl(comparisons[3],fold_change_comp) ~actual_ratio[3],
                                          grepl(comparisons[4],fold_change_comp) ~actual_ratio[4]))
+    actual_ratio_col_filt <- merge_stat_df_final_filt %>%
+      select(fold_change_comp) %>% distinct() %>%
+      mutate(actual_ratio_val= case_when(grepl(comparisons[1],fold_change_comp) ~ actual_ratio[1],
+                                         grepl(comparisons[2],fold_change_comp) ~actual_ratio[2],
+                                         grepl(comparisons[3],fold_change_comp) ~actual_ratio[3],
+                                         grepl(comparisons[4],fold_change_comp) ~actual_ratio[4]))
+    
   }else if(length(comparisons) == 5){
     actual_ratio_col <- merge_stat_df_final %>%
       select(fold_change_comp) %>% distinct() %>%
       mutate(actual_ratio_val= case_when(grepl(comparisons[1],fold_change_comp) ~ actual_ratio[1],
                                          grepl(comparisons[2],fold_change_comp) ~actual_ratio[2],
                                          grepl(comparisons[3],fold_change_comp) ~actual_ratio[3],
-                                         grepl(comparisons[4],fold_change_comp) ~actual_ratio[4],
-                                         grepl(comparisons[5],fold_change_comp) ~actual_ratio[5]))
+                                         grepl(comparisons[4],fold_change_comp) ~actual_ratio[4]))#,
+    #grepl(comparisons[5],fold_change_comp) ~actual_ratio[5]))
+    actual_ratio_col_filt <- merge_stat_df_final_filt %>%
+      select(fold_change_comp) %>% distinct() %>%
+      mutate(actual_ratio_val= case_when(grepl(comparisons[1],fold_change_comp) ~ actual_ratio[1],
+                                         grepl(comparisons[2],fold_change_comp) ~actual_ratio[2],
+                                         grepl(comparisons[3],fold_change_comp) ~actual_ratio[3],
+                                         grepl(comparisons[4],fold_change_comp) ~actual_ratio[4]))#,
   }else{
     print("Mapping between theoretical ratio and comparison cannot be done. Please make sure that you have either 4 or 5 comparisons overall.")
   }
   
   
+  
+  
+  
+  ## Generation of df -> expected abundance ratio for volcano plot
+  # actual_ratio_col <- merge_stat_df_final %>%
+  #   select(A1vs_Ai) %>% distinct() %>%
+  #   mutate(actual_ratio_val = case_when(grepl(comparisons[1],A1vs_Ai) ~actual_ratio[1],
+  #                                       grepl(comparisons[2],A1vs_Ai) ~actual_ratio[2],
+  #                                       grepl(comparisons[3],A1vs_Ai) ~actual_ratio[3],
+  #                                       grepl(comparisons[4],A1vs_Ai) ~actual_ratio[4]))
+  # 
   point_count_y_axis <- merge_stat_df_final %>%
     group_by(fold_change_comp, new_col_coloring) %>%
     filter(P.Value < 0.05) %>% 
     count(new_col_coloring) %>% left_join(actual_ratio_col)
   
+  point_count_y_axis_filt <- merge_stat_df_final_filt %>%
+    group_by(fold_change_comp, new_col_coloring) %>%
+    filter(P.Value < 0.05) %>% 
+    count(new_col_coloring) %>% left_join(actual_ratio_col_filt)
   
-  ymax <- max(-log10(merge_stat_df_final$P.Value)) + 0.5
+  
+  ymax <-11 + 0.5 # max(-log10(merge_stat_df_final$P.Value)) 
   y_decrement <- 0.5
+  
   
   calculate_y_pos <- function(group) {
     group_length <- length(group)
     y_pos <- ymax - seq(0, by = y_decrement, length.out = group_length)
     return(y_pos)
   }
+  
+  #comparisons <- comparisons[-5]
+  
   # Apply the function to calculate y_pos within each group
   point_count_y_axis$y_pos <- unlist(by(point_count_y_axis$fold_change_comp, 
                                         point_count_y_axis$fold_change_comp, calculate_y_pos))
   
+  # Apply the function to calculate y_pos within each group
+  point_count_y_axis_filt$y_pos <- unlist(by(point_count_y_axis_filt$fold_change_comp, 
+                                             point_count_y_axis_filt$fold_change_comp, calculate_y_pos))
   
   col <- RColorBrewer::brewer.pal(n=length(comparisons),name = "Dark2")
-  colors <- c(RColorBrewer::brewer.pal(n=length(comparisons),name = "Dark2"),"#2171b5","#999999")
+  
   labels <- unique(merge_stat_df_final$new_col_coloring)
   
   if (sheet_theo_name == "ISOREF_REF2_Others"){
     
+    colors <- c(RColorBrewer::brewer.pal(n=length(comparisons),name = "Dark2"),"#2171b5","#999999")
     new_comparisons <- c(comparisons,"Unexpected","Fixed_mono")
     
   }else if (sheet_theo_name == "ISO-refOTHER with FC_correct"){
     
     new_comparisons <- c(comparisons,"Unexpected")
+    colors <- c(RColorBrewer::brewer.pal(n=length(comparisons),name = "Dark2"),"#999999")
     
   }else{
     print("Sheet_theo_name could not be found, please make sure that you selected the correct sheet_name.")
@@ -1036,9 +1184,9 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
     }
   }
   
-  
-  
   actual_ratio_col <- actual_ratio_col %>% bind_cols(col)
+  
+  actual_ratio_col_filt <- actual_ratio_col_filt %>% bind_cols(col)
   
   mapped_coloring_dat <- as.data.frame(mapped_coloring)
   
@@ -1046,35 +1194,113 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
     bind_cols(labels) %>%
     rename(colors=1,new_col_coloring=2) %>%
     right_join(point_count_y_axis,by="new_col_coloring")
-
   
-  plot9 <- ggplot(merge_stat_df_final,aes(x =log2(merge_stat_df_final$fold_change_values), y = -log10(merge_stat_df_final$P.Value))) +
-    geom_point(size = 3, aes(color = new_col_coloring,shape=Pool)) + 
-    #scale_shape_identity() +
+  point_count_y_axis_filt <-mapped_coloring_dat %>% 
+    bind_cols(labels) %>%
+    rename(colors=1,new_col_coloring=2) %>%
+    right_join(point_count_y_axis_filt,by="new_col_coloring")
+  
+  plot20 <- ggplot(merge_stat_df_final_filt,aes(x =log2(merge_stat_df_final_filt$fold_change_values), y = -log10(merge_stat_df_final_filt$P.Value))) +
+    geom_point(size = 4, aes(color = new_col_coloring,shape=Pool)) + # Pool_new might be use to 
+    #scale_shape_identity() +                                        # differentiate peptides are found as Unexpected and reference 
+    # in their associated concentration 
+    # Pool can be used to show only difference btw pools same as coloring 'less complex visualization)
     #geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red") +
     #scale_fill_manual(values=setNames(mapped_coloring, labels)) + 
     #geom_line(aes(color =setNames(mapped_coloring, labels)), size = 1) +  # Add color aesthetic to geom_line()
     scale_color_manual(values =setNames(mapped_coloring, labels)) +
     #scale_y_continuous(limits = c(0, max(-log10(merge_stat_df_final$adj.P.Val))), breaks = seq(0, max(-log10(merge_stat_df_final$adj.P.Val)), by = 0.8)) +
     #scale_x_continuous(limits = c(min(log2(merge_stat_df_final$fold_change_values)),max(log2(merge_stat_df_final$fold_change_values)))) +#facet_wrap(~ratio) +
-    scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=1)) +
-    scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=1)) +
+    
+    #scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=2)) +
+    #scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=2)) +
+    scale_y_continuous(
+      limits = c(0,12), 
+      breaks = seq(0, 12,2)
+    ) +
+    scale_x_continuous(
+      limits = c(-9,11), 
+      breaks = seq(-9, 11,2)
+    ) +
+    
     #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
     theme_bw() +
-    theme(legend.text = element_text(size = 30),
-          axis.title.x = element_text(size = 30),
-          axis.title.y = element_text(size = 30),
-          plot.title = element_text(size = 35),
-          legend.title = element_text(size = 30),
-          axis.text.x = element_text(size = 30),
-          axis.title = element_text(size = 30),
-          axis.text.y = element_text(size = 30),
-          plot.subtitle = element_text(size = 30)) +
+    theme(legend.text = element_text(size = 45),
+          axis.title.x = element_text(size = 45),
+          axis.title.y = element_text(size = 45),
+          plot.title = element_text(size = 55),
+          legend.title = element_text(size = 45),
+          axis.text.x = element_text(size = 45),
+          axis.title = element_text(size = 45),
+          axis.text.y = element_text(size = 45),
+          plot.subtitle = element_text(size = 45)) +
+    labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n", subtitle,"\n after filtering outliers")) +
+    geom_vline(data = actual_ratio_col_filt, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=col,size=1.5) +
+    geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=1.5) + 
+    geom_label(data = point_count_y_axis_filt, aes(x = log2(actual_ratio_val), y = y_pos, fill=new_col_coloring,label = n),color="white",size=14,show.legend = FALSE) +
+    scale_fill_manual(values =setNames(mapped_coloring, labels))
+  
+  
+  plot9 <- ggplot(merge_stat_df_final,aes(x =log2(merge_stat_df_final$fold_change_values), y = -log10(merge_stat_df_final$P.Value))) +
+    geom_point(size = 4, aes(color = new_col_coloring,shape=Pool)) + # Pool_new might be use to 
+    #scale_shape_identity() +                                        # differentiate peptides are found as Unexpected and reference 
+    # in their associated concentration 
+    # Pool can be used to show only difference btw pools same as coloring 'less complex visualization)
+    #geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red") +
+    #scale_fill_manual(values=setNames(mapped_coloring, labels)) + 
+    #geom_line(aes(color =setNames(mapped_coloring, labels)), size = 1) +  # Add color aesthetic to geom_line()
+    scale_color_manual(values =setNames(mapped_coloring, labels)) +
+    scale_y_continuous(
+      limits = c(0,12), 
+      breaks = seq(0, 12,2)
+    ) +
+    scale_x_continuous(
+      limits = c(-9,11), 
+      breaks = seq(-9, 11,2)
+    ) +
+    
+    #scale_y_continuous(limits = c(0, max(-log10(merge_stat_df_final$adj.P.Val))), breaks = seq(0, max(-log10(merge_stat_df_final$adj.P.Val)), by = 0.8)) +
+    #scale_x_continuous(limits = c(min(log2(merge_stat_df_final$fold_change_values)),max(log2(merge_stat_df_final$fold_change_values)))) +#facet_wrap(~ratio) +
+    #scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=2)) +
+    #scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=2)) +
+    #scale_y_continuous(limits = c(0, 11), breaks = seq(0,11, by = 2)) +
+    #scale_x_continuous(limits = c(-7,11),breaks = seq(-7,11, by = 2))+
+    #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
+    theme_bw() +
+    theme(legend.text = element_text(size = 45),
+          axis.title.x = element_text(size = 45),
+          axis.title.y = element_text(size = 45),
+          plot.title = element_text(size = 55),
+          legend.title = element_text(size = 45),
+          axis.text.x = element_text(size = 45),
+          axis.title = element_text(size = 45),
+          axis.text.y = element_text(size = 45),
+          plot.subtitle = element_text(size = 45)) +
     labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n", subtitle)) +
     geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=col,size=1.5) +
     geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=1.5) + 
-    geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos, fill=new_col_coloring,label = n),color="white",size=6,show.legend = FALSE) +
+    geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos, fill=new_col_coloring,label = n),color="white",size=14,show.legend = FALSE) +
     scale_fill_manual(values =setNames(mapped_coloring, labels))
+  
+  merge_stat_df_final_text <- merge_stat_df_final %>% mutate(soft_name=paste0(software_name)) %>% mutate(acq_type=paste0(acquisiton_type))
+  
+  write.table(merge_stat_df_final_text,file = paste0(file_path,"volcano_plot_",software_name,"_",acquisiton_type,".txt"),sep = 
+                "\t",col.names = T,row.names = F)
+  
+  merge_stat_df_final_text <- merge_stat_df_final_filt %>% mutate(soft_name=paste0(software_name)) %>% mutate(acq_type=paste0(acquisiton_type))
+  write.table(merge_stat_df_final_text,file = paste0(file_path,"volcano_plot_",software_name,"_",acquisiton_type,"filtered.txt"),sep = 
+                "\t",col.names = T,row.names = F)
+  
+  
+  df_roc_filt <- merge_stat_df_final_filt %>%
+    select(pep_with_pos, Pool,P.Value) %>%
+    mutate(Pool = if_else(grepl("Diluted_isomeric", Pool), "Diluted", Pool)) %>%
+    mutate(Pool = if_else(grepl("Diluted_nonisomeric", Pool), "Diluted", Pool))
+  #filter(!grepl("Unexpected",Pool))
+  ### ROC analysis custom func
+  df_roc_order_filt <- df_roc_filt[order(df_roc_filt$P.Value),]
+  
+  df_roc_func_filt <- compute_roc_curve(df=df_roc_order_filt, flag = "Diluted",expected = length(comparisons)*size_variying_pep_size)
   
   df_roc <- merge_stat_df_final %>%
     select(pep_with_pos, Pool,P.Value) %>%
@@ -1101,8 +1327,9 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
   }
   
   write.table(df_roc_func, file = paste0(new_path,"/new_custom_Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
+  write.table(df_roc_func_filt, file = paste0(new_path,"/new_custom_Roc_analysis_",exp_id,"_",software_name,"_","filtered.txt"),sep = "\t",row.names = F)
   
- 
+  
   plot14 <- ggplot(df_roc_func, aes(y=tpr, x = fdr)) +
     geom_path(size=1.5) +
     #geom_vline(aes(xintercept=fdr)) +
@@ -1122,8 +1349,8 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
          title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), 
          subtitle = paste(subtitle,"including unexpected"), color="Pool Type")
   
-  write.table(df_roc_func, file = paste0(file_path,"new_custom_Roc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
-  #outputs_with_new_script
+  
+  
   #### ROC Analysis using pROC 
   
   df_roc$variant <- ifelse(df_roc$Pool == "Diluted", TRUE, FALSE)
@@ -1142,12 +1369,16 @@ final_diann_pep_quant_analysis_syn <- function(file_path,
                                 "Diluted Pool")
   
   
+  #roc_raw_non_var <- roc(df_roc$non_var, df_roc$P.Value)
+  #tpr_and_fpr_non_var  <- cbind(roc_raw_non_var$sensitivities,
+  #roc_raw_non_var$specificities,
+  #"Non-variant Pool")
+  
   roc_plt_df <- as.data.frame(tpr_and_fpr_variant) %>% 
-    #bind_rows(as.data.frame(tpr_and_fpr_non_var)) %>% 
+    #bind_rows(as.data.frame(tpr_and_fpr_non_var)) 
     bind_cols(software_name)
   
-  colnames(roc_plt_df) <-    c("sensitivity", "fpr","Pool_type","Software_name")
-  
+  colnames(roc_plt_df) <- c("sensitivity", "fpr","Pool_type","Software_name")
   
   plot10 <- roc_plt_df %>% group_by(Pool_type) %>% 
     ggplot( aes(y=as.numeric(sensitivity), x = as.numeric(fpr), color=Pool_type)) +
