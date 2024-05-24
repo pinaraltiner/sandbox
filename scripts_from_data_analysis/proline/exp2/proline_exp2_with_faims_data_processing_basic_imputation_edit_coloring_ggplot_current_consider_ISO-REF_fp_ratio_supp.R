@@ -704,7 +704,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
              )
        ) + scale_color_manual(values = c("#3182bd","#a6bddb"))+
        ggtitle(label = paste("Data completeness of",background_species,"and",selected_spcies)) +
-       labs(x="n Sample", y="% of peptides",subtitle = "")
+       labs(x="n Sample", y="% of peptides",subtitle = paste("Experiment",exp_id,software_name,acquisiton_type,"\n",file_name))
   
     
     #na_phospho_selected <- apply(X = is.na(barplt_df_wide %>% select(sequence, accession,starts_with("E2"))), MARGIN = 2, FUN = sum)
@@ -1146,15 +1146,15 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     #   
     
     
-    df_FC_ratio_after_impt <- df_merge %>% 
-        select(starts_with("exp_") | contains("species"),Pool) %>% #accession
-        #separate(accession, into = c("uniprot_id", "species", "position"), remove = F) %>%
-        tibble() %>% 
-        pivot_longer(cols = starts_with("exp_"),
-                     names_to = "exp_FC",
-                     values_to = "values") %>%
-        mutate_at("Pool", ~replace_na(.,background_species))
-    
+    # df_FC_ratio_after_impt <- df_merge %>% 
+    #     select(starts_with("exp_") | contains("species"),Pool) %>% #accession
+    #     #separate(accession, into = c("uniprot_id", "species", "position"), remove = F) %>%
+    #     tibble() %>% 
+    #     pivot_longer(cols = starts_with("exp_"),
+    #                  names_to = "exp_FC",
+    #                  values_to = "values") %>%
+    #     mutate_at("Pool", ~replace_na(.,background_species))
+    # 
     ##########################################################################
     df_FC_ratio_after_impt <- df_merge %>% 
       select(starts_with("exp_") | contains("species"),Pool) %>% #accession
@@ -1190,7 +1190,9 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                              subtitle_txt=paste("Experiment", exp_id,"data acquired from", acquisiton_type,"processed by ",software_name)
     ) + scale_color_manual(values = c("#08519c","#3182bd","#6baed6","#a6bddb"))
       #+ geom_errorbar(data = test,aes(ymin = test$min_val, ymax=  test$max_val,color=test$exp_FC), width=0.5) 
+    df_FC_ratio_after_impt_final <- df_FC_ratio_after_impt %>% mutate(acquisition=acquisiton_type) %>% mutate(software_name=software_name)
     
+    write.table(df_FC_ratio_after_impt_final,file = paste0(new_path,"/df_FC_ratio_after_impt",software_name,".txt"),sep = "\t",row.names =F )
  #############################################################################
     plot4 <- gg_density(data_set = df_mean_ab_after_impt, 
                      x_df = df_mean_ab_after_impt$values,
@@ -1375,7 +1377,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
        #scale_color_manual(values = c("#7fc97f","#beaed4","#fb8072","#fdc086","#386cb0"))+
        #scale_color_manual(values = c("#6A51A3","#6A51A3","#FD8D3C","#FD8D3C"))+ #"grey68"
        scale_linetype_manual(values = c("solid","dashed","solid","dashed"))+
-       theme_bw() +
+       theme_minimal() +
        scale_y_discrete(expand = expand_scale(mult = c(0, 0)))+
        #facet_wrap(~Pool) +
        theme(legend.text = element_text(size = 45), #aspect.ratio=6.5/11, 
@@ -1564,19 +1566,63 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     
     ### BOX-PLOT: Experimental Quantity Ratio of Phospho Peptides  
     
-    plot6 <- gg_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
-                              x_df = df_FC_ratio_after_impt$exp_FC,
-                              y_df = df_FC_ratio_after_impt$values,
-                              fill_df = df_FC_ratio_after_impt$Pool,
-                              header="Experimental Quantity Ratio of Phospho Peptides",
-                              x_lab="Sample Names",
-                              y_lab="Abundance Ratios",
-                              fill_lab = "Sample Names",
-                              subtitle_txt = paste("Experiment - ",
-                                                   exp_id, acquisiton_type,
-                                                   " data processed by ",
-                                                   software_name)) +
-      scale_fill_manual(values = c("#6A51A3","#6A51A3","#E6550D","#E6550D","cyan3",'grey60')) 
+    # plot6 <- gg_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
+    #                           x_df = df_FC_ratio_after_impt$exp_FC,
+    #                           y_df = df_FC_ratio_after_impt$values,
+    #                           fill_df = df_FC_ratio_after_impt$Pool,
+    #                           header="Experimental Quantity Ratio of Phospho Peptides",
+    #                           x_lab="Sample Names",
+    #                           y_lab="Abundance Ratios",
+    #                           fill_lab = "Sample Names",
+    #                           subtitle_txt = paste("Experiment - ",
+    #                                                exp_id, acquisiton_type,
+    #                                                " data processed by ",
+    #                                                software_name)) +
+    #   scale_fill_manual(values = c("#6A51A3","#6A51A3","#E6550D","#E6550D","cyan3",'grey60')) 
+    #
+    #actual_ratio_col
+    library(ggpattern)
+    df_FC_ratio_plt6 <- df_FC_ratio_after_impt %>%
+      separate(Pool,into = c("Pool_id","isomer"),sep = "_",remove = F) %>%
+      mutate(isomer=ifelse(is.na(isomer),"Wrong Localization",isomer)) %>%
+      mutate(Pool_id=ifelse(Pool_id=="Unexpected","Wrong Localization",Pool_id))
+    
+    hline_df <- data.frame(exp_FC =unique(df_FC_ratio_plt6$exp_FC),log2_act_val =log2(actual_ratio[-length(comparisons)]))
+    #hline_df <- hline_df %>% separate(exp_FC,into = c("tmp","FC"),sep = "_") %>%
+      #mutate(exp_FC=paste("FC isomeric",FC))
+
+     plot6 <-  ggplot(df_FC_ratio_plt6,aes(x=exp_FC,y=log2_exp_val)) +
+      geom_boxplot_pattern(aes(fill=Pool,pattern=isomer),
+                           pattern_fill = "black" ,#pattern = isomer,
+                           pattern_density = 0.1,
+                           pattern_spacing = 0.025,
+                           pattern_key_scale_factor = 0.6,
+                           outlier.shape = NA) +
+       #geom_line(data = hline_df,aes(x=as.factor(hline_df$exp_FC),y=hline_df$log2_act_val,group=1)) +
+       geom_hline(data = hline_df,aes(yintercept=log2_act_val),color="grey",linetype="dashed") +
+       geom_text(data = hline_df,color="grey40",aes(0,log2_act_val,label = paste(hline_df$exp_FC,"=",round(hline_df$log2_act_val)),hjust = -0.05, vjust = -1),size=8)+
+      scale_pattern_manual(values= c("isomeric" = "stripe", 
+                                     "nonisomeric" = "none",
+                                     "Wrong Localization"="none")) + # manually assign pattern
+      #scale_pattern_fill_manual(values=c("isomeric" = "black", "nonisomeric" = "grey90","Wrong Localization"= "cyan3")) + # manually assign colors
+      scale_fill_manual(values = c("#6A51A3","#6A51A3","#E6550D","#E6550D","cyan3")) +
+      theme_minimal() +
+      theme(#legend.text = element_text(size=30), 
+        strip.text = element_text(size=30,colour = "black"),
+        strip.background = element_rect(color="black",fill="white", size=0.65),
+        axis.title = element_text(size=30),
+        #axis.title.y = element_text(size=30),
+        plot.title = element_text(size=35),
+        legend.title=element_text(size=30),
+        legend.text = element_text(size=25),
+        axis.text=element_text(size=30),
+      
+        plot.subtitle = element_text(size = 25)
+      
+      ) +
+      labs(title = "Experimental Quantity Ratio of Phospho Peptides",
+           x="Sample Names",
+           y="Abundance Ratios",subtitle = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
     
    
     
@@ -1986,7 +2032,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     }
     
     point_count_y_axis <- merge_stat_df_final %>%
-        group_by(fold_change_comp, coloring_comp) %>% #new_col_coloring
+        group_by(fold_change_comp, new_col_coloring, coloring_comp) %>% #new_col_coloring
         filter(P.Value < 0.05) %>% 
         count(new_col_coloring) %>% left_join(actual_ratio_col)
     
@@ -2057,12 +2103,26 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
 ###############################################################################
 ######### COLORING STRATEGY BASED ON ONLY RATIO and SAMPLE NAME (coloring_comp) #########
     col_vline <- rep("#000000",4)
-    cols <- c(rep("#E6550D" ,4),"#3F007D","#6A51A3","#807DBA","#BCBDDC",rep("cyan3",4)) #"#FD8D3C" ligther orange ,"#9E9AC8"=lighter purple instead of #807DBA
+     #"#FD8D3C" ligther orange ,"#9E9AC8"=lighter purple instead of #807DBA
     
-    corr_level <-  c("Fixed_A1/A2","Fixed_A1/A3","Fixed_A1/A4","Fixed_A1/A5",
-                     "Diluted_A1/A2","Diluted_A1/A3","Diluted_A1/A4","Diluted_A1/A5",
-                     "Unexpected_A1/A2", "Unexpected_A1/A3", "Unexpected_A1/A4", "Unexpected_A1/A5"
-    )
+    
+    if(length(unique(merge_stat_df_final$coloring_comp)) == 8){
+      cols <- c(rep("#E6550D" ,4),"#3F007D","#6A51A3","#807DBA","#BCBDDC") #"#FD8D3C" ligther orange ,"#9E9AC8"=lighter purple instead of #807DBA
+      
+      corr_level <-  c("Fixed_A1/A2","Fixed_A1/A3","Fixed_A1/A4","Fixed_A1/A5",
+                       "Diluted_A1/A2","Diluted_A1/A3","Diluted_A1/A4","Diluted_A1/A5"
+      )
+    }else if(length(unique(merge_stat_df_final$coloring_comp)) == 12){
+      cols <- c(rep("#E6550D" ,4),"#3F007D","#6A51A3","#807DBA","#BCBDDC",rep("cyan3",4))
+      corr_level <-  c("Fixed_A1/A2","Fixed_A1/A3","Fixed_A1/A4","Fixed_A1/A5",
+                       "Diluted_A1/A2","Diluted_A1/A3","Diluted_A1/A4","Diluted_A1/A5",
+                       "Unexpected_A1/A2", "Unexpected_A1/A3", "Unexpected_A1/A4", "Unexpected_A1/A5"
+      )
+    }else{
+      print("There are some Unexpected peptides found! Then, they don't appear in all samples!")
+    }
+    
+    
     
     labels <- factor(unique(merge_stat_df_final$coloring_comp),levels=corr_level)
     
@@ -2120,7 +2180,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
       labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n")) + #plt_data_type[j], , subtitle,"\n"
       geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE,color=col),size=2) +
       geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "#006D2C",size=2) + 
-      geom_label(data =point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos, fill=coloring_comp ,label = n),color="white",size=22,show.legend = FALSE) + #coloring_comp
+      geom_label(data =point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos, fill=coloring_comp ,label = n),color="white",size=18,show.legend = FALSE) + #coloring_comp
       scale_fill_manual(values =setNames(cols, sorted_labels))
     
     
@@ -2268,12 +2328,12 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     # ))
 
     plt_obj <- ls(pattern="plot")
-    plot_obj <- plt_obj[!is.na(plt_obj)]
-    sapply(1:length(plot_obj),function(x) ggsave(filename = paste0("p",x,".png"),
-                                                 width = 80, height = 60, 
+    plt_obj <- plt_obj[!is.na(plt_obj)]
+    sapply(1:length(plt_obj),function(x) ggsave(filename = paste0("p",x,".png"),
+                                                 width = 90, height = 60, 
                                                  path = paste0(file_path,"/outputs_imputed_mice/"),
                                                  units = "cm",
-                                                 get(plot_obj[x]),
+                                                 get(plt_obj[x]),
                                                  device = "png", #".svg"
     ))
     
