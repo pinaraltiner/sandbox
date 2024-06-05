@@ -25,6 +25,7 @@ library(tibble)
   pep_quant_parser <- function(file_path,
                                file_name,
                                sheet_name,
+                               mapping_file_path,
                                selected_species,
                                background_species,
                                exp_design,
@@ -80,7 +81,7 @@ library(tibble)
       if(create_impute_vals==TRUE){
         # Calculate 5 percent quantile of each sample
         impute_values <- apply(abundances_for_impute, 2 , quantile , probs = 0.05 , na.rm = TRUE )
-        impute_values <- as.numeric(impute_vals$x)
+        #impute_values <- as.numeric(impute_vals$x)
         write.table(impute_values,file=paste0(new_path,"/impute_values",software_name,".txt"),sep = "\t",row.names = F)
         
       }
@@ -620,7 +621,7 @@ library(tibble)
       source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/get_modification_func/getModificationPosition_func_for_all_mods.R")
       
       quant_peptides <- read_tsv(paste0(file_path,file_name),col_names = T)
-      mapping_file <- read.table(mapping,sep = "\t",header = T)
+      mapping_file <- read.table(mapping_file_path,sep = "\t",header = T)
       exp_design <- mapping_file$Experiment
       
       quant_peptides_with_cond <- quant_peptides %>% 
@@ -633,8 +634,9 @@ library(tibble)
           group_by(Experiment) %>% 
           summarise(fifth_quantile=quantile(Intensity,probs=0.05,na.rm=TRUE))
         
-        #imputed_values_vec <- as.vector(imputed_values$first_quantile)
-        write.table(impute_values,file=paste0(new_path,"/impute_values",software_name,".txt"),sep = "\t",row.names = F)
+        imputed_values_vec <- as.numeric(imputed_values$fifth_quantile)
+        
+        write.table(imputed_values_vec,file=paste0(new_path,"/impute_values",software_name,".txt"),sep = "\t",row.names = F)
       }
       
       quant_peptides_refined <- quant_peptides_with_cond %>%
@@ -646,7 +648,6 @@ library(tibble)
                Protein.Names,
                Experiment,
                Intensity)
-      
       
       quant_phospho <- quant_peptides_refined %>% 
         filter(grepl(selected_species, Protein.Names) & !grepl("CON__",Protein.Names)) %>%
@@ -698,7 +699,6 @@ library(tibble)
                "phospho_positions" ="value.x",
                "all_mods_with_mod_type" = "mods.x")
       
-      
       quant_phospho_complete <- mutate(result_with_common_col,quant_phospho) %>%
         group_by(pep_with_pos,Experiment) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
         slice(which.max(Intensity)) %>%
@@ -728,11 +728,25 @@ library(tibble)
         ungroup() %>%
         select(comb_prots)
       
+      df_reversible_mods <- quant_phospho_complete %>%
+        mutate(id=1:nrow(quant_phospho_complete)) %>%
+        select(Experiment,pep_with_pos,Modified.Sequence,id,Protein.Names) %>%
+        mutate(across('Modified.Sequence', str_replace, 'UniMod:21', 'Phospho')) %>%
+        mutate(unique_row_name = paste(id,Protein.Names,sep="@")) %>%
+        select(-id,-Protein.Names) %>%
+        pivot_wider(names_from = "Experiment",values_from = c(unique_row_name,Modified.Sequence)) %>%
+        select(!starts_with("unique_row_name")) %>%
+        #mutate(comb_prots = apply(across(all_of(paste0("Proteins_",exp_design))), 1, paste, collapse = "@"))
+        rowwise() %>%
+        mutate(comb_mod = paste(na.omit(c_across(all_of(paste0("Modified.Sequence_",exp_design)))), collapse = "@")) %>%
+        ungroup() %>%
+        select(comb_mod)
+      
       ### FINAL DF FROM SELECTED SPECIES 
       pepwithpos_pivot_int<- quant_phospho_complete %>%
         select(Experiment,Intensity,pep_with_pos) %>%
         pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
-        bind_cols(df_reversible_loc_val,df_reversible_proteins) %>%
+        bind_cols(df_reversible_loc_val,df_reversible_proteins,df_reversible_mods) %>%
         filter(!is.infinite(ptm_score)) %>%
         mutate(species=selected_species)
       #######TODO: FIX THE PROBLEM HERE: FILTERING OF BACKGROUND SPECIES (every Prot. Name is NA except SELECTED sPECIES)
@@ -748,8 +762,9 @@ library(tibble)
         ungroup()
       
       df_reversible_proteinsECOLI <- quant_peptides_ecoli %>%
+        mutate(id=1:nrow(quant_peptides_ecoli)) %>%
         select(Experiment,pep_with_pos,Protein.Names,id) %>%
-        mutate(unique_row_name = paste(id,`Protein group IDs`,sep="@")) %>%
+        mutate(unique_row_name = paste(id,Protein.Names,sep="@")) %>%
         select(-id) %>%
         pivot_wider(names_from = "Experiment",values_from = c(unique_row_name,Protein.Names)) %>%
         select(!starts_with("unique_row_name")) %>%
@@ -758,16 +773,34 @@ library(tibble)
         mutate(comb_prots = paste(na.omit(c_across(all_of(paste0("Protein.Names_",exp_design)))), collapse = "@")) %>%
         ungroup() %>%
         select(comb_prots)
+      
+      df_reversible_modsECOLI <- quant_peptides_ecoli %>%
+        mutate(id=1:nrow(quant_peptides_ecoli)) %>%
+        select(Experiment,pep_with_pos,Modified.Sequence,id,Protein.Names) %>%
+        mutate(unique_row_name = paste(id,Protein.Names,sep="@")) %>%
+        select(-id,-Protein.Names) %>%
+        pivot_wider(names_from = "Experiment",values_from = c(unique_row_name,Modified.Sequence)) %>%
+        select(!starts_with("unique_row_name")) %>%
+        #mutate(comb_prots = apply(across(all_of(paste0("Proteins_",exp_design))), 1, paste, collapse = "@"))
+        rowwise() %>%
+        mutate(comb_mod = paste(na.omit(c_across(all_of(paste0("Modified.Sequence_",exp_design)))), collapse = "@")) %>%
+        ungroup() %>%
+        select(comb_mod)
+      
       ### FINAL DF FROM BACKGROUND SPECIES
       pepwithpos_pivot_intECOLI<- quant_peptides_ecoli %>%
         select(Experiment,Intensity,pep_with_pos) %>%
-        relocate(exp_design) %>%
         pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
-        bind_cols(df_reversible_proteinsECOLI) %>%
+        #relocate(exp_design) %>%
+        bind_cols(df_reversible_proteinsECOLI,df_reversible_modsECOLI) %>%
         mutate(species=background_species)
       
-      final_df <- pepwithpos_pivot_int %>% bind_rows(pepwithpos_pivot_intECOLI)
-      
+      final_df <- pepwithpos_pivot_int %>% bind_rows(pepwithpos_pivot_intECOLI) %>%
+        relocate(exp_design,.after = ptm_score) %>% 
+        rename(Modifications=comb_mod) %>%
+        rename(Protein=comb_prots) 
+        
+    
     }
     write.table(final_df,file=paste0(new_path,"/refined_input",software_name,".txt"),sep = "\t",row.names = F)
   }
