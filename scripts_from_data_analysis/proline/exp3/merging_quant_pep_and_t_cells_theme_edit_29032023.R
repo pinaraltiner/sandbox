@@ -13,10 +13,12 @@ final_pep_quant_analysis_bio <- function(file_path,
                                              file_name,
                                              sheet_name,
                                          actual_ratio,
+                                         mapping_file_path,
                                          loc_filter_opt,
                                          loc_filter,
                                              selected_species,
                                              acquisiton_type,
+                                         norm_type,
                                              exp_id,
                                              background_species,
                                              numerator,
@@ -24,25 +26,34 @@ final_pep_quant_analysis_bio <- function(file_path,
                                              test_type,
                                              exp_design,
                                              num_reps,
-                                         subtitle){
+                                         subtitle,
+                                         output_dir_name){
   
   source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/ggplot/ggplot_functions.R")
   source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/parser_func.R")
   source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/roc_curve/new_roc_curve_generation_with_custom_threshold.R")
   
-  pep_quant_parser(file_path = file_path,
-                   file_name = file_name,
-                   num_reps=3,
-                   numerator=1,
-                   sheet_name=sheet_name,
-                   selected_species = selected_species,
-                   background_species = background_species,
-                   exp_design = experimental_design,
-                   create_impute_vals = TRUE,
-                   software_name = software_name,output_dir_name = "refined_output")
+  if(file.exists(paste0(file_paths[i],output_dir_name,"/refined_input",software_name,".txt"))){
+    
+  }else{
+    pep_quant_parser(file_path = file_path,
+                     file_name = file_name,
+                     num_reps=3,
+                     numerator=1,
+                     mapping_file_path=mapping_file_path,
+                     sheet_name=sheet_name,
+                     selected_species = selected_species,
+                     background_species = background_species,
+                     exp_design = exp_design, #experimental_design
+                     create_impute_vals = TRUE,
+                     software_name = software_name,
+                     output_dir_name = output_dir_name)
+  }
+  
+  
 
 
-  output_dir_name = "refined_output"
+  
   sample_size <- length(exp_design) / num_reps
   sample_names <- paste0("A",1:sample_size)
   comparisons <- NULL
@@ -53,7 +64,7 @@ final_pep_quant_analysis_bio <- function(file_path,
     rm(tmp)
   }
   #comparisons <- comparisons[-1]
-  comparisons <- comparisons[-numerator]
+  comparisons <- comparisons #-numerator
   
   
   quant_peptides <- read_tsv(paste0(file_path,output_dir_name,"/refined_input",software_name,".txt"))
@@ -80,10 +91,11 @@ final_pep_quant_analysis_bio <- function(file_path,
                                    x_lab = "Sample id",
                                    fill_lab =  "Sample id",
                                    y_lab = "Number of identified sequences",
-                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
+                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +
+    scale_fill_manual(values = c("#636363","#3182bd"))
   
-  write.table(all_seq_dist, file=paste0(file_path,
-                                        "Experiment",
+  write.table(all_seq_dist, file=paste0(file_path,output_dir_name,
+                                        "/Experiment",
                                         exp_id,
                                         software_name,
                                         "_number_of_unique_sequence&peptides",
@@ -121,7 +133,8 @@ final_pep_quant_analysis_bio <- function(file_path,
                                x_lab = "Sample id",
                                fill_lab =  "Sample id",
                                y_lab = "Number of identified peptides",
-                               caption_lab = "Before applying localization filtering \n After removing multiple charages.")
+                               caption_lab = "Before applying localization filtering \n After removing multiple charages.") +
+    scale_fill_manual(values = c("#6baed6","#6baed6","#6baed6"))
   
   
   plot2 <- gg_barplt_id_pep_count(data_set = df_id_pep_ecoli,
@@ -134,7 +147,8 @@ final_pep_quant_analysis_bio <- function(file_path,
                                x_lab = "Sample id",
                                fill_lab =  "Sample id",
                                y_lab = "Number of identified peptides",
-                               subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
+                               subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +
+    scale_fill_manual(values =c("#969696","#969696","#969696"))
                               
   if(loc_filter_opt == TRUE){
     
@@ -162,8 +176,74 @@ final_pep_quant_analysis_bio <- function(file_path,
   filtered_abundances <-  filter_NA(df = quant_phospho_peptides,samp_names = sample_names,num_allowed_NA = 1,num_expected_nonNA = 3)
   filtered_abundances_ecoli <-  filter_NA(df = quant_peptides_ECOLI,samp_names = sample_names,num_allowed_NA = 5,num_expected_nonNA = 1)
   
+  all_data<- filtered_abundances %>% bind_rows(filtered_abundances_ecoli) 
+  all_na_count <- NULL
+  for (i in 1:length(exp_design)){
+    na_val <- as.data.frame(sum(is.na(select(all_data, contains(exp_design[i])))))
+    all_na_count <- bind_rows(all_na_count,na_val)
+    rm(na_val)
+  }
+ 
+  ref_col_indx <- which(all_na_count == min(all_na_count$`sum(is.na(select(all_data, contains(exp_design[i]))))`))
+  ref_col <- all_data %>% select(contains(exp_design[ref_col_indx]))
+  reference_int <- all_data %>% select(contains(exp_design)) %>% select(ref_col_indx) 
+  colnames(reference_int) <- "reference_int"
+  
+  divide_int_cols <- all_data %>% 
+    ungroup() %>%
+    select(contains(exp_design)) %>% 
+    rename(reference_int=ref_col_indx) %>% 
+    mutate(across(everything(), ~ . / reference_int))
+  
+  exp_design_mods <- exp_design
+  exp_design_mods[ref_col_indx] <- "reference_int"
+  
+  library(DescTools)
+  norm_factors <- NULL
+  for (i in 1:length(exp_design)){
+    
+    ratios= as.numeric(na.omit(unlist(divide_int_cols[,exp_design_mods[i]])))
+    
+    if(norm_type=="mod-based"){
+      
+      norm_factors[i] <- 2^ModEstM::ModEstM(log2(ratios))[[1]][1]
+      
+      all_data_exp <- all_data %>% select(contains(exp_design)) 
+      after_norm <- all_data_exp %>%
+        mutate(across(everything(), ~ . / norm_factors[which(names(all_data_exp) == cur_column())]))
+      
+      final_data_aft_norm <- all_data %>% 
+        select(!contains(exp_design)) %>%
+        bind_cols(after_norm) %>%
+        relocate(exp_design,.after = ptm_score)
+      
+      filtered_abundances <- final_data_aft_norm %>% filter(grepl(selected_species,species))
+      filtered_abundances_ecoli <- final_data_aft_norm %>% filter(!grepl(selected_species,species))
+      
+    }else if(norm_type=="median-based"){
+      
+      norm_factors[i] <- median(x=as.numeric(na.omit(unlist(divide_int_cols[,exp_design_mods[i]]))))
+      
+      all_data_exp <- all_data %>% select(contains(exp_design)) 
+      after_norm <- all_data_exp %>%
+        mutate(across(everything(), ~ . / norm_factors[which(names(all_data_exp) == cur_column())]))
+      
+      final_data_aft_norm <- all_data %>% 
+        select(!contains(exp_design)) %>%
+        bind_cols(after_norm) %>%
+        relocate(exp_design,.after = ptm_score)
+      
+      filtered_abundances <- final_data_aft_norm %>% filter(grepl(selected_species,species))
+      filtered_abundances_ecoli <- final_data_aft_norm %>% filter(!grepl(selected_species,species))
+      
+    }else{
+      print("No normalization method was applied.")
+      }
+  }
+  
   filtered_abundances_ecoli_bfr_impt <- filtered_abundances_ecoli
   filtered_abundances_bfr_impt <- filtered_abundances
+  
   ############# PROTEIN COUNT #####################
   barplt_prot_ecoli <- filtered_abundances_ecoli %>% 
     pivot_longer(cols = starts_with("E3"), 
@@ -187,7 +267,9 @@ final_pep_quant_analysis_bio <- function(file_path,
                                    x_lab = "Sample id",
                                    fill_lab =  "Sample id",
                                    y_lab = "Number of identified proteins",
-                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
+                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) + 
+    scale_fill_manual(values =c("#969696","#969696","#969696"))
+    
 
   barplt_prot_phospho <- filtered_abundances %>% 
     pivot_longer(cols = starts_with("E3"), 
@@ -211,7 +293,8 @@ final_pep_quant_analysis_bio <- function(file_path,
                                    x_lab = "Sample id",
                                    fill_lab =  "Sample id",
                                    y_lab = "Number of identified proteins",
-                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
+                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +
+    scale_fill_manual(values = c("#6baed6","#6baed6","#6baed6"))
   
   barplt_prot_all <- barplt_prot_ecoli %>% bind_rows(barplt_prot_phospho) 
   write.table(barplt_prot_all, file=paste0(file_path,output_dir_name,"/Exp",exp_id,software_name,"_number_of_quantified_proteins.txt"),sep = "\t",col.names = T,row.names = F)
@@ -256,7 +339,7 @@ final_pep_quant_analysis_bio <- function(file_path,
   
   plot23 <- ggplot(completeness, aes(x=na_val,y=data_complete,color=species)) + geom_point(size=2.5) +
     geom_line(size=2)+
-    scale_x_reverse(limits=c(18,0),breaks=seq(0, 18, by = 2)) +
+    scale_x_reverse(limits=c(num_reps*sample_size,0),breaks=seq(0, num_reps*sample_size, by = 1)) +
     ## If you look for is.na() in apply function, you should use the one below:
     #### scale_x_continuous(limits=c(0,18),breaks=seq(0, 18, by = 2)) +
     scale_y_continuous(limits = c(0,100), breaks = seq(from =0, to=100,by=10)) +
@@ -272,7 +355,7 @@ final_pep_quant_analysis_bio <- function(file_path,
           strip.text.x = element_text(
             size = 15
           )
-    ) + scale_color_manual(values = c("#3182bd","#a6bddb"))+
+    ) + scale_color_manual(values = c("#636363","#3182bd"))+
     ggtitle(label = paste("Data completeness of",background_species,"and",selected_species)) +
     labs(x="n Sample", y="% of peptides",subtitle = paste("Experiment",exp_id,software_name,acquisiton_type,"\n",file_name))
   
@@ -340,7 +423,7 @@ final_pep_quant_analysis_bio <- function(file_path,
                       x_lab = "log10(intensities)",
                       color_lab= "",
                       fill_lab = "species",
-                      subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +scale_fill_brewer(palette = "Set1")
+                      subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +scale_fill_manual(values = c("#636363","#3182bd"))
 
   ### RATIO SUPPRESION ASSESSMENT ### 
   
@@ -353,7 +436,7 @@ final_pep_quant_analysis_bio <- function(file_path,
                y_lab = " Density of log10(Mean Abundance)",
                fill_lab = "Sample Names",
                caption_lab = "",
-               subtitle_txt = "") + scale_fill_brewer(palette = "Set1")
+               subtitle_txt = "") +scale_fill_manual(values = c("#636363","#3182bd"))
 
   ###################################
   
@@ -372,12 +455,18 @@ final_pep_quant_analysis_bio <- function(file_path,
     mutate(is.imputed=ifelse(is.na(Intensity), TRUE,is.imputed)) 
   
   impute_values <- as.numeric(impute_vals$x)
+  ##REPLAVE ANY ZEROs was assessed by software to NA to enable to impute them
+  
+  filtered_abundances <- replace(filtered_abundances, filtered_abundances==0, NA)
+  filtered_abundances_ecoli <- replace(filtered_abundances_ecoli, filtered_abundances_ecoli==0, NA)
+  
   # Impute missing values
   for (j in 1:length(impute_values)){
     # Number NA
     #num_NA <- length(abundances_for_impute_all[,j+2][is.na(abundances_for_impute_all[,j+2])])
     
     filtered_abundances[,j+2][is.na(filtered_abundances[,j+2])] <- impute_values[j]
+    
     filtered_abundances_ecoli[,j+2][is.na(filtered_abundances_ecoli[,j+2])] <- impute_values[j]
     
     #abundances_for_impute_all[,j+2][is.na(abundances_for_impute_all)[,j+2]] <- impute_values[j]
@@ -411,7 +500,7 @@ final_pep_quant_analysis_bio <- function(file_path,
   
   p21  <- imputed_dataset %>% filter(grepl(selected_species,species.x)) %>% 
     ggplot(aes(x=log2(Intensity.x),fill=is.imputed)) + geom_histogram(bins = 30) +
-    theme_minimal() + scale_fill_brewer(palette = "Set1",direction = -1) +
+    theme_minimal() + scale_fill_manual(values = c("#7fbf7b","#af8dc3")) + #scale_fill_brewer(palette = "Set1",direction = -1) +
     theme(legend.text = element_text(size = 45), #aspect.ratio=6.5/11, 
           axis.title.x = element_text(size = 45),
           axis.title.y = element_text(size = 45),
@@ -427,7 +516,7 @@ final_pep_quant_analysis_bio <- function(file_path,
   
   p22 <- imputed_dataset %>% filter(grepl(background_species,species.x)) %>% 
     ggplot(aes(x=log2(Intensity.x),fill=is.imputed)) + geom_histogram(bins = 30) +
-    theme_minimal() + scale_fill_brewer(palette = "Set1",direction = -1) +
+    theme_minimal() + scale_fill_manual(values = c("#7fbf7b","#af8dc3")) +
     theme(legend.text = element_text(size = 45), #aspect.ratio=6.5/11, 
           axis.title.x = element_text(size = 45),
           axis.title.y = element_text(size = 45),
@@ -542,12 +631,12 @@ final_pep_quant_analysis_bio <- function(file_path,
   
   # Calculate Fold Change by keeping A1 constant (mean(S1)/mean(S2), etc.)
   cols <- ncol(filtered_abundances_rowMeans)
-  for(An in 1:cols){
-    filtered_abundances_rowMeans[,paste0("exp_FC_A1/A",An)] <- filtered_abundances_rowMeans[,1]/filtered_abundances_rowMeans[,An]
+  for(An in 1:sample_size){
+    filtered_abundances_rowMeans[,paste0("exp_FC_A",numerator,"/A",An)] <- filtered_abundances_rowMeans[,1]/filtered_abundances_rowMeans[,An]
     
   }
-  rmv_col <- paste0("exp_FC_A",numerator,"/A",numerator)
-  filtered_abundances_rowMeans <- filtered_abundances_rowMeans %>% select(!rmv_col)
+  #rmv_col <- paste0("exp_FC_A",numerator,"/A",numerator)
+  #filtered_abundances_rowMeans <- filtered_abundances_rowMeans %>% select(!rmv_col)
   
   # To calculate all binary combination in the data frame
   #mat <- do.call(cbind, lapply(cols, function(xj) 
@@ -577,7 +666,8 @@ final_pep_quant_analysis_bio <- function(file_path,
     mutate(actual_ratio_val= case_when(grepl(comparisons[1],exp_FC) ~ actual_ratio[1],
                                        grepl(comparisons[2],exp_FC) ~actual_ratio[2],
                                        grepl(comparisons[3],exp_FC) ~actual_ratio[3],
-                                       grepl(comparisons[4],exp_FC) ~actual_ratio[4])) %>%
+                                       grepl(comparisons[4],exp_FC) ~actual_ratio[4],
+                                       grepl(comparisons[5],exp_FC) ~actual_ratio[5])) %>%
     mutate(log2_act_val=log2(actual_ratio_val)) %>%
     mutate(log2_exp_val=log2(values)) 
     
@@ -587,13 +677,16 @@ final_pep_quant_analysis_bio <- function(file_path,
   median_val <- df_FC_ratio_after_impt_mouse %>% group_by(exp_FC) %>%
     summarise(exp_median=median(log2_exp_val))
   
+  df_FC_ratio_after_impt_mouse_sel_ratio <- df_FC_ratio_after_impt_mouse %>% filter(!grepl("A2/A1",exp_FC) & !grepl("A2/A2",exp_FC))
+  df_FC_ratio_after_impt_sel_ratio <- df_FC_ratio_after_impt  %>% filter(!grepl("A2/A1",exp_FC) & !grepl("A2/A2",exp_FC))
   #test <- df_FC_ratio_after_impt %>% group_by(exp_FC) %>% summarise(min_val=min(log2_exp_val),max_val=max(log2_exp_val))
   
-  plot21 <-gg_quant_ratio_acc(data_set = df_FC_ratio_after_impt_mouse,
-                              x_df = df_FC_ratio_after_impt_mouse$log2_act_val,
-                              y_df = df_FC_ratio_after_impt_mouse$log2_exp_val,
-                              color_df = df_FC_ratio_after_impt_mouse$exp_FC,
+  plot21 <-gg_quant_ratio_acc(data_set = df_FC_ratio_after_impt_mouse_sel_ratio,
+                              x_df = df_FC_ratio_after_impt_mouse_sel_ratio$log2_act_val,
+                              y_df = df_FC_ratio_after_impt_mouse_sel_ratio$log2_exp_val,
+                              color_df = df_FC_ratio_after_impt_mouse_sel_ratio$exp_FC,
                               median_col = "red",
+                              xmin=-2,
                               header="Quantitative Ratio Assessment",
                               x_lab="log2(Actual Ratio)",
                               y_lab="log2(Experimental Ratio",
@@ -616,7 +709,7 @@ final_pep_quant_analysis_bio <- function(file_path,
                    x_lab = "log10(values)",
                    color_lab= "",
                    fill_lab = "Sample Names",
-                   subtitle_txt = "") +scale_fill_brewer(palette = "Set1")
+                   subtitle_txt = "") +scale_fill_manual(values = c("#636363","#3182bd"))
   
   # px <- gg_raincloud(data_set = df_mean_ab_after_impt,
   #                    x_df = df_mean_ab_after_impt$Mean_abundance,
@@ -703,16 +796,16 @@ final_pep_quant_analysis_bio <- function(file_path,
           axis.text.x = element_text(size = 45),
           axis.title = element_text(size = 45),
           axis.text.y = element_text(size = 45),
-          plot.subtitle = element_text(size = 45)
+          plot.subtitle = element_text(size = 45),
+          plot.caption = element_text(size = 30)
     ) +
     labs( y= "Intensity", x="Percentage of CVs",
           #title = paste("Experiment 2 Percentage of CVs", acquisiton_type, " data processed by ", software_name), 
-          subtitle = paste("Before imputation")) +
+          subtitle = paste("Before imputation \n after",norm_type,"normalization"),caption = "X-scale was limited between 0 to 100 \n Outliers were removed.") +
     #xlim(0,100)
-    xlim(0,round(max(df_before_impt_CV$CV_values))) 
-  # scale_y_continuous(
-  # limits = c(0,100),
-  # breaks = seq(0, 100,10))
+    #xlim(0,round(max(df_before_impt_CV$CV_values))) 
+  scale_x_continuous(limits = c(0,100),
+                     breaks = seq(0, 100,10))
   #####################
   p19 <- df_aft_impt_CV %>%
     ggplot(aes(x=CV_values,y=species,
@@ -740,28 +833,29 @@ final_pep_quant_analysis_bio <- function(file_path,
           axis.text.x = element_text(size = 45),
           axis.title = element_text(size = 45),
           axis.text.y = element_text(size = 45),
-          plot.subtitle = element_text(size = 45)) +
+          plot.subtitle = element_text(size = 45),
+          plot.caption = element_text(size = 30)
+    ) +
     labs( y= "Intensity", x="Percentage of CVs",
           #title = paste("Experiment 2 Percentage of CVs", acquisiton_type, " data processed by ", software_name), 
-          subtitle = paste("After imputation")) +
-    xlim(0,round(max(df_before_impt_CV$CV_values)))
-  #scale_y_continuous(
-  #limits = c(0,max(df_aft_impt_CV$CV_values)), 
-  #breaks = seq(0, max(df_aft_impt_CV$CV_values),10))
+          subtitle = paste("After imputation \n after",norm_type,"normalization"),caption = "X-scale was limited between 0 to 100 \n Outliers were removed.") +
+    #xlim(0,100)
+    #xlim(0,round(max(df_before_impt_CV$CV_values))) 
+    scale_x_continuous(limits = c(0,100),
+                       breaks = seq(0, 100,10))
   
   plot18 <- p18/p19
   #############
   p20 <- df_before_impt_CV %>%
     ggplot(aes(x=CV_samples,y=df_before_impt_CV$CV_values,
-               color=CV_samples,fill=species
+               fill=species #color=CV_samples
     )) + 
     geom_boxplot(alpha=0.65)+
     facet_wrap(~species) +
-    scale_fill_brewer(palette ="Set1")+
-    scale_color_manual(values = c("#08519c","#3182bd","#6baed6","#a6bddb","#d0d1e6"))+
-   
+    scale_fill_manual(values = c("#636363","#3182bd"))+
+    #scale_fill_brewer(palette ="Set1")+
+    #scale_color_manual(values = c("#08519c","#3182bd","#6baed6","#a6bddb","#d0d1e6"))+
     theme_minimal() +
-    
     #facet_wrap(~Pool) +
     theme(legend.text = element_text(size = 45), #aspect.ratio=6.5/11, 
           axis.title.x = element_text(size = 45),
@@ -772,25 +866,27 @@ final_pep_quant_analysis_bio <- function(file_path,
           axis.title = element_text(size = 45),
           axis.text.y = element_text(size = 45),
           plot.subtitle = element_text(size = 45),
-          strip.text = element_text(size=30)
+          strip.text = element_text(size=30),
+          plot.caption = element_text(size = 30)
     ) +
     labs( y= "Percentage of CV (%)",x="Sample ID",
           title = paste("Experiment 3 Percentage of CVs", acquisiton_type, " data processed by ", software_name), 
-          subtitle = paste("Before imputation")) +
+          subtitle = paste("Before imputation \n after", norm_type,"normalization"),
+          caption = "X-scale was limited between 0 to 100 \n Outliers were removed.") +
     #xlim(0,100)
-    ylim(0,round(max(df_before_impt_CV$CV_values))) 
-  # scale_y_continuous(
-  # limits = c(0,100),
-  # breaks = seq(0, 100,10))
+    #ylim(0,round(max(df_before_impt_CV$CV_values))) 
+  scale_y_continuous(
+    limits = c(0,100),
+    breaks = seq(0, 100,10))
   #####################
   p21 <- df_aft_impt_CV %>%
     ggplot(aes(x=CV_samples,y=df_aft_impt_CV$CV_values,
-               color=CV_samples,fill=species
+               fill=species #color=CV_samples,
     )) + 
     geom_boxplot(alpha=0.65)+
     facet_wrap(~species) +
-    scale_fill_brewer(palette ="Set1")+
-    scale_color_manual(values = c("#08519c","#3182bd","#6baed6","#a6bddb","#d0d1e6"))+
+    scale_fill_manual(values = c("#636363","#3182bd"))+
+    #scale_color_manual(values = c("#08519c","#3182bd","#6baed6","#a6bddb","#d0d1e6"))+
     
     theme_minimal() +
     
@@ -804,67 +900,73 @@ final_pep_quant_analysis_bio <- function(file_path,
           axis.title = element_text(size = 45),
           axis.text.y = element_text(size = 45),
           plot.subtitle = element_text(size = 45),
-          strip.text = element_text(size=30)
+          strip.text = element_text(size=30),
+          plot.caption = element_text(size = 30)
     ) +
-    labs(y= "Percentage of CV (%)", x="Sample ID",
+    labs( y= "Percentage of CV (%)",x="Sample ID",
           title = paste("Experiment 3 Percentage of CVs", acquisiton_type, " data processed by ", software_name), 
-          subtitle = paste("After imputation")) +
+          subtitle = paste("After imputation \n after",norm_type,"normalization"),
+          caption = "X-scale was limited between 0 to 100 \n Outliers were removed.") +
     #xlim(0,100)
-    ylim(0,round(max(df_aft_impt_CV$CV_values))) 
+    #ylim(0,round(max(df_before_impt_CV$CV_values))) 
+    scale_y_continuous(
+      limits = c(0,100),
+      breaks = seq(0, 100,10))
   
   plot19 <- p20/p21
 ###########
-  plot5 <- gg_density(data_set = df_FC_ratio_after_impt,
-                   x_df = df_FC_ratio_after_impt$values,
-                   fill_df = df_FC_ratio_after_impt$exp_FC,
-                   color_df = df_FC_ratio_after_impt$species,
+  plot5 <- gg_density(data_set = df_FC_ratio_after_impt_sel_ratio,
+                   x_df = df_FC_ratio_after_impt_sel_ratio$values,
+                   fill_df = df_FC_ratio_after_impt_sel_ratio$species, #exp_FC,
+                   color_df = NULL,
                    header="Distribution of Fold change Ratio of every sample after imputation",
                    facet_df = "exp_FC",
                    x_lab = "log10(values)",
                    color_lab= "",
                    fill_lab = "Sample Names",
-                   subtitle_txt = "") + scale_color_brewer(palette = "Set1")
+                   subtitle_txt = "") +scale_fill_manual(values = c("#636363","#3182bd"))
   # 
 
   ### BOX-PLOT: Experimental Quantity Ratio of Phospho Peptides  
   
-  plot6 <- gg_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
-                            x_df = df_FC_ratio_after_impt$exp_FC,
-                            y_df = df_FC_ratio_after_impt$values,
-                            fill_df = df_FC_ratio_after_impt$species,
+  plot6 <- gg_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt_sel_ratio, 
+                            x_df = df_FC_ratio_after_impt_sel_ratio$exp_FC,
+                            y_df = df_FC_ratio_after_impt_sel_ratio$values,
+                            fill_df = df_FC_ratio_after_impt_sel_ratio$species,
                             header="Experimental Quantity Ratio of T-cell Phospho Peptides",
                             x_lab="Sample Names",
                             y_lab="Abundance Ratios",
                             fill_lab = "Sample Names",
-                            subtitle_txt = "") +scale_fill_brewer(palette = "Set1")
+                            subtitle_txt = "") +scale_fill_manual(values = c("#636363","#3182bd"))
   
   
   ### HALF-BOX-PLOT & HALF-SCATTER-PLOT: Experimental Quantity Ratio of Synthetic Peptides  
   library(gghalves)
   
-  plot7 <- gg_half_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
-                                 x_df = df_FC_ratio_after_impt$exp_FC,
-                                 y_df = df_FC_ratio_after_impt$values,
-                                 fill_df = df_FC_ratio_after_impt$species,
+  plot7 <- gg_half_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt_sel_ratio, 
+                                 x_df = df_FC_ratio_after_impt_sel_ratio$exp_FC,
+                                 y_df = df_FC_ratio_after_impt_sel_ratio$values,
+                                 fill_df = df_FC_ratio_after_impt_sel_ratio$species,
                                  header="Experimental Quantity Ratio of T-cell Phospho Peptides with Background",
                                  x_lab="Sample Names",
                                  y_lab="Abundance Ratios",
                                  fill_lab = "Sample Names",
-                                 subtitle_txt = "") +scale_fill_brewer(palette = "Set1")
+                                 subtitle_txt = "") +scale_fill_manual(values = c("#636363","#3182bd")) +
+    scale_color_manual(values = c("#636363","#3182bd"))
   
   ### VIOLIN-PLOT: Experimental Quantity Ratio of Synthetic Peptides   
   
   ### TODO: fix y scaling without trimming 
-  plot8 <- gg_violin_exp_ratio(data_set = df_FC_ratio_after_impt, 
-                            x_df = df_FC_ratio_after_impt$exp_FC,
-                            y_df = df_FC_ratio_after_impt$values,
-                            fill_df = df_FC_ratio_after_impt$species,
+  plot8 <- gg_violin_exp_ratio(data_set = df_FC_ratio_after_impt_sel_ratio, 
+                            x_df = df_FC_ratio_after_impt_sel_ratio$exp_FC,
+                            y_df = df_FC_ratio_after_impt_sel_ratio$values,
+                            fill_df = df_FC_ratio_after_impt_sel_ratio$species,
                             header="Experimental Quantity Ratio of T-cell Phospho Peptides with Background",
                             x_lab="Sample Names",
                             y_lab="Abundance Ratios",
                             fill_lab = "Sample Names",
                             trim=TRUE,
-                            subtitle_txt = "") +scale_fill_brewer(palette = "Set1")
+                            subtitle_txt = "") +scale_fill_manual(values = c("#636363","#3182bd"))
   
   
   
@@ -973,12 +1075,12 @@ final_pep_quant_analysis_bio <- function(file_path,
       library(multtest)
         # Pre-allocate memory for results
         
-        num_iterations <- sample_size - 1
+        num_iterations <- sample_size #- 1
         all_pvalues <- matrix(NA, nrow(stat_analysis), num_iterations)
         all_adjust_pval <- matrix(NA, nrow(stat_analysis), num_iterations)
         
         # Loop through iterations using lapply
-        for (i in 2:sample_size) {
+        for (i in 1:sample_size) {
           p_values_tmp <- lapply(1:dim(stat_analysis)[1], function(j) {
             if (test_type == "t.test") {
               ttest_func(select(stat_analysis, contains(paste0("A",numerator,"-")) & contains("log10_"))[j,],
@@ -993,21 +1095,21 @@ final_pep_quant_analysis_bio <- function(file_path,
           p_values_tmp <- sapply(p_values_tmp, function(x) x)
           
           # Store p-values in the pre-allocated matrix
-          all_pvalues[, i - 1] <- p_values_tmp
+          all_pvalues[, i] <- p_values_tmp # - 1
           
           # Perform adjustment
           adjust_pval_tmp <- mt.rawp2adjp(p_values_tmp, proc = "BH", alpha = 0.05)
           qval <- data.frame(adjust_pval_tmp$adjp, adjust_pval_tmp$index)[order(adjust_pval_tmp$index), 2]
           
           # Store adjusted p-values in the pre-allocated matrix
-          all_adjust_pval[, i - 1] <- qval
+          all_adjust_pval[, i ] <- qval #- 1
         }
         
         all_pvalues <- as.data.frame(all_pvalues)
         all_adjust_pval <- as.data.frame(all_adjust_pval)
         
-        colnames(all_pvalues) <- paste0("pvalues_A1/A", 2:sample_size)
-        colnames(all_adjust_pval) <- paste0("adjust_pval_A1/A", 2:sample_size)
+        colnames(all_pvalues) <- paste0("pvalues_A",numerator,"/A", 1:sample_size)
+        colnames(all_adjust_pval) <- paste0("adjust_pval_A",numerator,"/A", 1:sample_size)
         
         rownames(all_pvalues) <- row.names(stat_analysis)
         rownames(all_adjust_pval) <- row.names(stat_analysis)
@@ -1032,21 +1134,43 @@ final_pep_quant_analysis_bio <- function(file_path,
       rename_with(.col=7, ~ "pvalues") #%>%
       #separate(accession, into = c("prot_id","species"),sep = "_")
     
-    
-    
     actual_ratio_col <- merge_stat_df %>%
       select(ratio1) %>% distinct() %>%
       mutate(actual_ratio_val= case_when(grepl(comparisons[1],ratio1) ~ actual_ratio[1],
                                          grepl(comparisons[2],ratio1) ~actual_ratio[2],
                                          grepl(comparisons[3],ratio1) ~actual_ratio[3],
-                                         grepl(comparisons[4],ratio1) ~actual_ratio[4]))
-    col_vline <- rep("#000000",4)
-    actual_ratio_col <- as.data.frame(actual_ratio_col %>% bind_cols(col_vline)) %>% rename(col=3)
+                                         grepl(comparisons[4],ratio1) ~actual_ratio[4],
+                                         grepl(comparisons[5],ratio1) ~actual_ratio[5]))
+    col_vline <- rep("#000000",length(comparisons))
+    actual_ratio_col <- as.data.frame(actual_ratio_col %>%
+                                        bind_cols(col_vline)) %>% rename(col=3)
     
     merge_stat_df_final <- merge_stat_df
     
+    plot_pval_hist <- merge_stat_df_final %>% 
+      filter(!grepl("A2/A2",ratio)) %>% 
+      filter(grepl("MOUSE",species)) %>% 
+      ggplot(aes(x=log10(pvalues))) + geom_histogram(aes(y = cumsum(..count..))) +
+      theme_bw() +
+      theme(legend.text = element_text(size = 45),
+            axis.title.x = element_text(size = 45),
+            axis.title.y = element_text(size = 45),
+            plot.title = element_text(size = 55),
+            legend.title = element_text(size = 45),
+            axis.text.x = element_text(size = 45),
+            axis.title = element_text(size = 45),
+            axis.text.y = element_text(size = 45),
+            plot.subtitle = element_text(size = 45)) +
+      labs(title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = "T-test was used")+
+      geom_vline(xintercept = log10(0.05), linetype = "dashed", color = "#006D2C",size=2) 
+    
+    cum_sum_data <- ggplot_build(plot_pval_hist)$data[[1]]
+    
+    write.table(cum_sum_data,file = paste0(file_path,output_dir_name,"/Cumulative_sum_pvalues_",software_name,".txt"),sep = "\t",row.names = F,col.names = T)
+    
+    
     plot9_t_test <- ggplot(merge_stat_df_final ,aes(x =log2(fold_change_values), y = -log10(merge_stat_df$pvalues))) +
-      geom_point(size = 9,aes(shape=species,color=species)) + #, aes(shape=merge_stat_df_final$species)
+      geom_point(size =2,aes(shape=species,color=species)) + #, aes(shape=merge_stat_df_final$species)
       facet_wrap(~ratio) +
       #scale_y_continuous(limits = c(0, 8), breaks = seq(0, 8, by = 0.8)) +
       #scale_x_continuous(limits = c(-3,3),breaks = seq(-3, 3, by = 0.8)) +
@@ -1064,8 +1188,8 @@ final_pep_quant_analysis_bio <- function(file_path,
             plot.subtitle = element_text(size = 45)) +
       labs(title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = "T-test was used")+
       scale_x_continuous(limits = c(-5, 10),breaks = seq(from = -5, to = 10, by = 2)) +
-      geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "#006D2C",size=2) +
-      geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),size=2) 
+      geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "#006D2C",size=2) 
+      #geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),size=2) 
     #expand_limits(x = 0, y = 0) +
     #geom_vline(data = actual_ratio, aes(xintercept = actual_ratio$X.1....log2.c.2..10..20..100..., size = 1, show.legend = FALSE)) + #color=c("#CC79A7","#E69F00","#56B4E9","#009E73")
     #geom_hline(data = log10_p_thresholds, aes(yintercept = log10_p_thresholds$X.log10.p_thresholds.),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"), size = 1, linetype = 2, show.legend = FALSE)+ 
@@ -1153,6 +1277,111 @@ final_pep_quant_analysis_bio <- function(file_path,
   #         axis.text.y = element_text(size = 15)) +
   #   labs(title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = "Limma was used")
   # 
+  ################ VOLCANO PLOT By COMBINING ALL RATIOS in ONE FIGURE  ################ 
+  
+  comparisons <- comparisons[-c(1:2)]
+  actual_ratio=actual_ratio[-c(1:2)]
+  #actual_ratio=c(2,10,20,100)
+  #colors <- c("#0868ac","#43a2ca","#7bccc4","#a8ddb5")
+  colors <- c("#0868ac","#43a2ca","#a8ddb5")
+  colors_ecoli <- rep("#bdbdbd",length(comparisons))
+  ## Generation of df -> expected abundance ratio for volcano plot
+  actual_ratio_col <- merge_stat_df_final %>%
+    select(ratio) %>% distinct() %>% filter(!grepl("A2/A1",ratio) & !grepl("A2/A2",ratio)) %>%
+    bind_cols(colors) %>%
+    rename(sel_cols=`...2`) %>%
+    mutate(actual_ratio_val = case_when(grepl(comparisons[1],ratio) ~actual_ratio[1],
+                                        grepl(comparisons[2],ratio) ~actual_ratio[2],
+                                        grepl(comparisons[3],ratio) ~actual_ratio[3]))
+  
+  actual_ratio_col_ecoli <- data.frame(actual_ratio_val=rep(1,length(comparisons)))
+  #grepl(comparisons[4],ratio) ~actual_ratio[4]))
+  
+  volcano_sel_spe <- merge_stat_df_final %>% filter(grepl(selected_species,species)) %>%
+    filter(!grepl("A2/A1",ratio) & !grepl("A2/A2",ratio)) 
+  
+  volcano_sel_speECOLI <- merge_stat_df_final %>% filter(!grepl(selected_species,species)) %>%
+    filter(!grepl("A2/A1",ratio) & !grepl("A2/A2",ratio)) 
+  
+  point_count_y_axis <- volcano_sel_spe %>%
+    group_by(ratio) %>%
+    filter(pvalues < 0.05) %>% 
+    dplyr::count(ratio) %>% left_join(actual_ratio_col)
+  
+  point_count_y_axisECOLI <- volcano_sel_speECOLI %>%
+    group_by(ratio) %>%
+    filter(pvalues < 0.05) %>% 
+    dplyr::count(ratio) %>% bind_cols(actual_ratio_col_ecoli) %>%
+    bind_cols(colors_ecoli) %>%
+    rename(sel_cols=`...4`)
+    
+  
+  point_count_y_axis$y_pos <- rep(c(10,9.5,9)) #8.5 #,times=3
+  point_count_y_axisECOLI$y_pos <- rep(c(10,8.5,7)) #8.5 #,times=3
+  
+  mouse_plot <- ggplot(data= volcano_sel_spe, aes(x =log2(fold_change_values), y = -log10(pvalues))) +
+    geom_point(size = 2, aes(color = ratio)) +
+    geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),linetype="dashed", color=c("#980043"),size=2) +
+    geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "#980043",size=2) +
+    geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos, label = n,fill=sel_cols), 
+               size=15, show.legend = FALSE) +
+    #facet_wrap(~instrument_type) +
+    scale_color_manual(values = c("#0868ac","#43a2ca","#a8ddb5")) + #"#7bccc4",
+    scale_fill_manual(values = c("#0868ac","#43a2ca","#a8ddb5")) + #"#7bccc4",
+    theme_minimal()+
+    scale_x_continuous(limits = c(-10, 20),breaks = seq(from = -10, to = 10, by = 2)) +  # Set the ticks for the x-axis
+    scale_y_continuous(limits = c(0, 10),breaks = seq(from = 0, to = 10, by = 2))+  # Set the ticks for the y-axis
+    # theme(strip.text = element_text(size = 25),
+    #       legend.text = element_text(size = 25),
+    #       axis.title.x = element_text(size = 25),
+    #       axis.title.y = element_text(size = 25),
+    #       plot.title = element_text(size = 30),
+    #       legend.title = element_text(size = 25),
+    #       axis.text.x = element_text(size = 25),
+    #       axis.title = element_text(size = 25),
+    #       axis.text.y = element_text(size = 25),
+    #       plot.subtitle = element_text(size = 25)) +
+    theme(legend.text = element_text(size = 45),
+          axis.title.x = element_text(size = 45),
+          axis.title.y = element_text(size = 45),
+          plot.title = element_text(size = 55),
+          legend.title = element_text(size = 45),
+          axis.text.x = element_text(size = 45),
+          axis.title = element_text(size = 45),
+          axis.text.y = element_text(size = 45),
+          plot.subtitle = element_text(size = 45)) +
+    labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - 3 data processed by ", software_name),
+          subtitle = paste("t-test was used.")) +
+    guides(color = guide_legend(override.aes = list(size = 10))) 
+  
+  
+ ecoli_plot <- ggplot(data= volcano_sel_speECOLI, aes(x = log2(fold_change_values), y = -log10(pvalues))) +
+    geom_point(size = 2, aes(color = ratio)) +
+   geom_vline(data = actual_ratio_col_ecoli, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),linetype="dashed", color=c("#980043"),size=2) +
+   geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "#980043",size=2) +
+    geom_label(data = point_count_y_axisECOLI, aes(x = log2(actual_ratio_val), y = y_pos, label = n,fill=sel_cols), color="white",
+               size=15, show.legend = FALSE) +
+    #facet_wrap(~instrument_type) +
+    scale_color_manual(values =  c("#252525","#737373","#bdbdbd")) + #"#ef3b2c", "#99000d","#cb181d","#fb6a4a"
+    scale_fill_manual(values = c("#252525","#737373","#bdbdbd")) + #"#ef3b2c", "#99000d","#cb181d","#fb6a4a"
+    theme_minimal()+
+    scale_x_continuous(limits = c(-10, 20),breaks = seq(from = -10, to = 10, by = 2)) +  # Set the ticks for the x-axis
+    scale_y_continuous(limits = c(0, 10),breaks = seq(from = 0, to = 10, by = 2))+  # Set the ticks for the y-axis
+   theme(legend.text = element_text(size = 45),
+         axis.title.x = element_text(size = 45),
+         axis.title.y = element_text(size = 45),
+         plot.title = element_text(size = 55),
+         legend.title = element_text(size = 45),
+         axis.text.x = element_text(size = 45),
+         axis.title = element_text(size = 45),
+         axis.text.y = element_text(size = 45),
+         plot.subtitle = element_text(size = 45)) +
+    labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - 3 data processed by ", software_name),
+          subtitle = paste("t-test was used. ECOLI")) +
+    guides(color = guide_legend(override.aes = list(size = 10))) 
+  
+  #####################################################################################
+
   merge_stat_df_final_text <- merge_stat_df_final %>% 
     mutate(soft_name=paste0(software_name)) %>%
     mutate(acq_type=paste0(acquisiton_type))
@@ -1265,7 +1494,7 @@ final_pep_quant_analysis_bio <- function(file_path,
   plt_obj <- plt_obj[!is.na(plt_obj)]
   sapply(1:length(plt_obj),function(x) ggsave(filename = paste0("p",x,".png"),
                                               width = 90, height = 60, 
-                                              path = paste0(file_path,"/refined_output/"),
+                                              path = paste0(file_path,output_dir_name,"/"),
                                               units = "cm",
                                               get(plt_obj[x]),
                                               device = "png", #".svg"
