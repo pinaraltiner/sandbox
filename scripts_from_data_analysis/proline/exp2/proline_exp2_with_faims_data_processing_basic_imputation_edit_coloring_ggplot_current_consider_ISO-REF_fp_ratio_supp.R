@@ -154,8 +154,8 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     #################################################
     pep_list_w_theo_unique <- pep_list_w_theo %>% 
       distinct(Phosphopeptide.sequence,.keep_all = TRUE) %>%
-      rename(sequence = Phosphopeptide.sequence) %>% 
-      select(sequence,Pool) %>%
+      rename(Sequence = Phosphopeptide.sequence) %>% 
+      select(Sequence,Pool) %>%
       rename(Pool_for_seq_merge=Pool) %>%
       mutate(situation="Correct")
     
@@ -1120,117 +1120,216 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                  caption_lab = "",
                  subtitle_txt = "Spiked Pool")
     
+
     # abundances_for_before_impt <- barplt_df_wide %>%
     #     bind_rows(barplt_df_ecoli_wide) %>% select(exp_design)
     # 
-    # Calculate 1 percent quantile of each sample
-    #impute_values <- apply(abundances_for_impute, 2 , quantile , probs = 0.01 , na.rm = TRUE )
+    # Calculate 5 percent quantile of each sample
+    impute_values <- apply(abundances_for_impute, 2 , quantile , probs = 0.05 , na.rm = TRUE )
     
-    # Impute missing values
-    #for (j in 1:length(impute_values)){
-        # Number NA
-        #num_NA <- length(abundances_for_impute_all[,j+2][is.na(abundances_for_impute_all[,j+2])])
-        
-        #barplt_df_wide[,j+2][is.na(barplt_df_wide[,j+2])] <- impute_values[j]
-        #barplt_df_ecoli_wide[,j+2][is.na(barplt_df_ecoli_wide[,j+2])] <- impute_values[j]
-        
-        #abundances_for_impute_all[,j+2][is.na(abundances_for_impute_all)[,j+2]] <- impute_values[j]
-        # After imputation number of imputed values
-        #num_imp <-length(abundances_for_impute_all[,j+2][(abundances_for_impute_all[,j+2]==impute_values[j])])
-        
-        # This is verification of imputation is done successfully
-        # Because we expect to see that number of imputed values should be the same amount as number of NA
-        #print(setequal(num_NA,num_imp))
-        #print(num_NA)
-        #print(num_imp)
-    #}
-    
+    ###########################################################################
     ## ADDITIONAL IMPUTATION METHOD with MICE()
-    library(tidyverse)
-    library(tidyr)
-    library(mice)
+    #library(tidyverse)
+    #library(tidyr)
+    #library(mice)
     
-   
+    
     is.imputed_df_syn <- barplt_df_wide %>%  pivot_longer(cols = starts_with(exp_design),
-                                            names_to = "Experiment",
-                                            values_to = "Intensity",
-                                            values_drop_na = F) %>%
-      mutate(is.imputed=FALSE) %>%
-      mutate(is.imputed=ifelse(is.na(Intensity), TRUE,is.imputed)) 
-      
-    
-    barplt_df_wide <- as.data.frame(barplt_df_wide)
-    rownames(barplt_df_wide) <- paste0(barplt_df_wide$pep_with_pos,"@",barplt_df_wide$species,"@",1:nrow(barplt_df_wide))
-    
-    intensities <- barplt_df_wide %>%
-      select(starts_with(exp_design))
-    
-    #intensities_short <- intensities[1:10,]
-    barplt_df_ecoli_wide <- as.data.frame(barplt_df_ecoli_wide)
-    rownames(barplt_df_ecoli_wide) <- paste0(barplt_df_ecoli_wide$sequence,"@",barplt_df_ecoli_wide$species,"@",1:nrow(barplt_df_ecoli_wide))
-    
-    is.imputed_df_ecoli <- barplt_df_ecoli_wide %>%  pivot_longer(cols = starts_with(exp_design),
                                                           names_to = "Experiment",
                                                           values_to = "Intensity",
                                                           values_drop_na = F) %>%
       mutate(is.imputed=FALSE) %>%
       mutate(is.imputed=ifelse(is.na(Intensity), TRUE,is.imputed)) 
     
-    intensitiesECOLI <- barplt_df_ecoli_wide %>%
-      select(starts_with(exp_design))
     
-    new_experiment_name <-c("E2_A1_R1",
-                            "E2_A1_R2",
-                            "E2_A1_R3",
-                            "E2_A2_R1",
-                            "E2_A2_R2",
-                            "E2_A2_R3",
-                            "E2_A3_R1",
-                            "E2_A3_R2",
-                            "E2_A3_R3",
-                            "E2_A4_R1",
-                            "E2_A4_R2",
-                            "E2_A4_R3",
-                            "E2_A5_R1",
-                            "E2_A5_R2",
-                            "E2_A5_R3",
-                            "E2_A6_R1",
-                            "E2_A6_R2",
-                            "E2_A6_R3")
-    colnames(intensities) <- new_experiment_name
-    colnames(intensitiesECOLI) <- new_experiment_name
+    #barplt_df_wide <- as.data.frame(barplt_df_wide)
+    #rownames(barplt_df_wide) <- paste0(barplt_df_wide$pep_with_pos,"@",barplt_df_wide$species,"@",1:nrow(barplt_df_wide))
     
-    imp_intensities <-  mice(intensities,m=5,maxit=10,meth='cart',seed=500)
+    #intensities <- barplt_df_wide %>%
+    # select(starts_with(exp_design))
+    
+    #intensities_short <- intensities[1:10,]
+    # barplt_df_ecoli_wide <- as.data.frame(barplt_df_ecoli_wide)
+    #rownames(barplt_df_ecoli_wide) <- paste0(barplt_df_ecoli_wide$sequence,"@",barplt_df_ecoli_wide$species,"@",1:nrow(barplt_df_ecoli_wide))
+    
+    is.imputed_df_ecoli <- barplt_df_ecoli_wide %>%  pivot_longer(cols = starts_with(exp_design),
+                                                                  names_to = "Experiment",
+                                                                  values_to = "Intensity",
+                                                                  values_drop_na = F) %>%
+      mutate(is.imputed=FALSE) %>%
+      mutate(is.imputed=ifelse(is.na(Intensity), TRUE,is.imputed)) 
+    
+    #intensitiesECOLI <- barplt_df_ecoli_wide %>%
+    # select(starts_with(exp_design))
+    
+    # new_experiment_name <-c("E2_A1_R1",
+    #                         "E2_A1_R2",
+    #                         "E2_A1_R3",
+    #                         "E2_A2_R1",
+    #                         "E2_A2_R2",
+    #                         "E2_A2_R3",
+    #                         "E2_A3_R1",
+    #                         "E2_A3_R2",
+    #                         "E2_A3_R3",
+    #                         "E2_A4_R1",
+    #                         "E2_A4_R2",
+    #                         "E2_A4_R3",
+    #                         "E2_A5_R1",
+    #                         "E2_A5_R2",
+    #                         "E2_A5_R3",
+    #                         "E2_A6_R1",
+    #                         "E2_A6_R2",
+    #                         "E2_A6_R3")
+    # colnames(intensities) <- new_experiment_name
+    # colnames(intensitiesECOLI) <- new_experiment_name
+    
+    #imp_intensities <-  mice(intensities,m=5,maxit=10,meth='cart',seed=500)
     #imp_intensities_norm <-  mice(intensities,m=5,maxit=10,method ='norm.nob',seed=500)
     
-    imp_intensitiesECOLI <- mice(intensitiesECOLI,m=5,maxit=5,meth='cart',seed=500) #maxit=10
+    #imp_intensitiesECOLI <- mice(intensitiesECOLI,m=5,maxit=5,meth='cart',seed=500) #maxit=10
     
-    completeData <- complete(imp_intensities,2)
-    colnames(completeData) <- exp_design
+    #completeData <- complete(imp_intensities,2)
+    #colnames(completeData) <- exp_design
     
-    completeDataECOLI <- complete(imp_intensitiesECOLI,2)
-    colnames(completeDataECOLI) <- exp_design
+    #completeDataECOLI <- complete(imp_intensitiesECOLI,2)
+    #colnames(completeDataECOLI) <- exp_design
     #pattern <- md.pattern(select(quant_phospho_peptides,starts_with(exp_design)))
+    
     #library(VIM)
     #aggr_plot <- aggr(intensities, col=c('navyblue','red'),
     #numbers=TRUE, sortVars=TRUE,
     #labels=names(intensities), cex.axis=.7,
     #gap=3, ylab=c("Histogram of missing data","Pattern"))
     
-    completeDataECOLIs <-completeDataECOLI %>%
-      mutate(tmp=rownames(completeDataECOLI)) %>%
-      separate(tmp,into=c("pep_with_pos","species","indx"),sep="@") %>%
-      select(!indx)
+    #completeDataECOLIs <-completeDataECOLI %>%
+    #mutate(tmp=rownames(completeDataECOLI)) %>%
+    #separate(tmp,into=c("pep_with_pos","species","indx"),sep="@") %>%
+    #select(!indx)
+    ##########################################################################
     
-    # UNNECESSARY TO KEEP DATA BEFORE IMPUTATION
-    abundances_all_aft_imputation <- completeData %>% 
-      mutate(tmp=rownames(completeData)) %>%
-      separate(tmp, into = c("pep_with_pos","species","indx"),sep = "@") %>%
-      select(!indx) %>% 
-      #separate(pep_with_pos, into = c("pep","pos","species"),sep = "_") %>%
-      #mutate(pep_with_pos=paste0(pep,"_",pos)) %>%
-      #select(!c(pep,pos)) %>%
-      bind_rows(completeDataECOLIs)
+    # # Impute missing values
+    for (j in 1:length(impute_values)){
+      # # Number NA
+      # #num_NA <- length(abundances_for_impute_all[,j+2][is.na(abundances_for_impute_all[,j+2])])
+      # 
+      barplt_df_wide[,j+2][is.na(barplt_df_wide[,j+2])] <- impute_values[j]
+      barplt_df_ecoli_wide[,j+2][is.na(barplt_df_ecoli_wide[,j+2])] <- impute_values[j]
+      # 
+      #abundances_for_impute_all[,j+2][is.na(abundances_for_impute_all)[,j+2]] <- impute_values[j]
+      # After imputation number of imputed values
+      #num_imp <-length(abundances_for_impute_all[,j+2][(abundances_for_impute_all[,j+2]==impute_values[j])])
+      
+      # This is verification of imputation is done successfully
+      # Because we expect to see that number of imputed values should be the same amount as number of NA
+      #print(setequal(num_NA,num_imp))
+      #print(num_NA)
+      #print(num_imp)
+    }
+    
+    #barplt_df_wide <- as.data.frame(barplt_df_wide)
+    #rownames(barplt_df_wide) <- paste0(barplt_df_wide$pep_with_pos,"@",barplt_df_wide$species,"@",1:nrow(barplt_df_wide))
+    
+    #intensities <- barplt_df_wide %>%
+    # select(starts_with(exp_design))
+    
+    #intensities_short <- intensities[1:10,]
+    #barplt_df_ecoli_wide <- as.data.frame(barplt_df_ecoli_wide)
+    #rownames(barplt_df_ecoli_wide) <- paste0(barplt_df_ecoli_wide$sequence,"@",barplt_df_ecoli_wide$species,"@",1:nrow(barplt_df_ecoli_wide))
+    
+    abundances_all_aft_imputation <- barplt_df_ecoli_wide %>%
+      rename_with(~ paste0("pep_with_pos"), matches("^seq")) %>%
+      bind_rows(barplt_df_wide) 
+    
+    # conditional_imputation <- function(df,impute_val,samp_names,num_NA_imputed){
+    #   all_complete_df <- NULL
+    #   for (i in 1:length(samp_names)){
+    #     assign(paste0("df_",samp_names[i]), df %>% 
+    #              mutate(impute=ifelse(rowSums(is.na(select(df,contains(samp_names[i]))))>=num_NA_imputed,TRUE,FALSE)) %>% 
+    #              select(contains(samp_names[i]) | contains("impute")))
+    #     
+    #     sel_for_impt <- get(paste0("df_",samp_names[i])) %>% 
+    #       filter(grepl(TRUE,impute)) %>% 
+    #       select(!impute)
+    #     
+    #     nonimp_df <- get(paste0("df_",samp_names[i])) %>% 
+    #       filter(!grepl(TRUE,impute)) %>% 
+    #       select(!impute)
+    #     
+    #     #for(j in 0:5){
+    #     sel_impute_values <- impute_val[(3*(i-1)+1):(3*(i-1)+3)]
+    #     
+    #     for(k in 1:length(sel_impute_values)){
+    #       sel_for_impt[,k]<-sel_impute_values[k]
+    #     }
+    #     
+    #     assign(paste0("df_complete",samp_names[i]),bind_rows(nonimp_df, sel_for_impt))
+    #     all_complete_df <- bind_cols(all_complete_df, get(paste0("df_complete",samp_names[i])))
+    #     #}
+    #     
+    #     rm(sel_for_impt,nonimp_df)
+    #   }
+    #   return(all_complete_df)
+    # }
+    # 
+    # barplt_df_wide <- conditional_imputation(df=barplt_df_wide,samp_names = sample_names,num_NA_imputed = 2,impute_val = impute_values)
+    # barplt_df_ecoli_wide <- conditional_imputation(df=barplt_df_ecoli_wide,samp_names = sample_names,num_NA_imputed = 2,impute_val = impute_values)
+    # 
+    # new_experiment_name <-c("E2_A1_R1",
+    #                         "E2_A1_R2",
+    #                         "E2_A1_R3",
+    #                         "E2_A2_R1",
+    #                         "E2_A2_R2",
+    #                         "E2_A2_R3",
+    #                         "E2_A3_R1",
+    #                         "E2_A3_R2",
+    #                         "E2_A3_R3",
+    #                         "E2_A4_R1",
+    #                         "E2_A4_R2",
+    #                         "E2_A4_R3",
+    #                         "E2_A5_R1",
+    #                         "E2_A5_R2",
+    #                         "E2_A5_R3",
+    #                         "E2_A6_R1",
+    #                         "E2_A6_R2",
+    #                         "E2_A6_R3")
+    # 
+    # colnames(barplt_df_wide) <- new_experiment_name
+    # colnames(barplt_df_ecoli_wide) <- new_experiment_name
+    # 
+    # library(mice)
+    # imp_intensities <-  mice(barplt_df_wide,m=5,maxit=10,meth='cart',seed=500)
+    # imp_intensitiesECOLI <- mice(barplt_df_ecoli_wide,m=5,maxit=1,meth='cart',seed=500) #maxit=10
+    # 
+    # completeData <- complete(imp_intensities,2)
+    # colnames(completeData) <- exp_design
+    # 
+    # completeDataECOLI <- complete(imp_intensitiesECOLI,2)
+    # colnames(completeDataECOLI) <- exp_design
+    # 
+    # 
+    # barplt_df_wide_rowname <- barplt_df_wide %>%
+    #   mutate(tmp=rownames(barplt_df_wide))
+    #   
+    # abundances_all_aft_imputation <- barplt_df_ecoli_wide %>%
+    #   mutate(tmp=rownames(barplt_df_ecoli_wide)) %>%
+    #   bind_rows(barplt_df_wide_rowname) %>%
+    #   separate(tmp,into = c("pep_with_pos","species","indx"),sep = "@") %>%
+    #   select(!indx)
+    # #   
+    # completeDataECOLIs <-completeDataECOLI %>%
+    # mutate(tmp=rownames(completeDataECOLI)) %>%
+    # separate(tmp,into=c("pep_with_pos","species","indx"),sep="@") %>%
+    # select(!indx)
+    #  
+    # abundances_all_aft_imputation <- completeData %>%
+    #   mutate(tmp=rownames(completeData)) %>%
+    #   separate(tmp, into = c("pep_with_pos","species","indx"),sep = "@") %>%
+    #   select(!indx) %>%
+    #   #separate(pep_with_pos, into = c("pep","pos","species"),sep = "_") %>%
+    #   #mutate(pep_with_pos=paste0(pep,"_",pos)) %>%
+    #   #select(!c(pep,pos)) %>%
+    #   bind_rows(completeDataECOLIs)
+    ############################################################################
     
     ### DISTRIBUTION OF IMPUTED VALUES ACROSS non-NA values
     is.imputed_df <- is.imputed_df_ecoli %>% 
@@ -1245,8 +1344,10 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
       left_join(is.imputed_df,by=c("pep_with_pos","Experiment")) %>%
       mutate(Intensity.y=ifelse(is.na(Intensity.y),0,Intensity.y))
     
-    p21  <- imputed_dataset %>% filter(grepl(selected_species,species.x)) %>% 
-      ggplot(aes(x=Intensity.x,fill=is.imputed)) + geom_histogram(bins = 30) +
+    write.table(imputed_dataset,file=paste0(new_path,"/imputed_dataset",software_name,".txt"),sep = "\t",row.names = F)
+    
+    p21  <- imputed_dataset %>% filter(grepl(selected_spcies,species.x)) %>% 
+      ggplot(aes(x=log2(Intensity.x),fill=is.imputed)) + geom_histogram(bins = 30) +
       theme_minimal() + scale_fill_brewer(palette = "Set1",direction = -1) +
       theme(legend.text = element_text(size = 45), #aspect.ratio=6.5/11, 
             axis.title.x = element_text(size = 45),
@@ -1258,11 +1359,11 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
             axis.text.y = element_text(size = 45),
             plot.subtitle = element_text(size = 45)) +
       labs( y= "Count of Intensity", x="Intenisity",
-            title = paste("Distribution of imputed values \n",selected_species), 
+            title = paste("Distribution of imputed values \n",selected_spcies), 
             subtitle = paste('Experiment 2 ', acquisiton_type, " data processed by ", software_name))
     
     p22 <- imputed_dataset %>% filter(grepl(background_species,species.x)) %>% 
-      ggplot(aes(x=Intensity.x,fill=is.imputed)) + geom_histogram(bins = 30) +
+      ggplot(aes(x=log2(Intensity.x),fill=is.imputed)) + geom_histogram(bins = 30) +
       theme_minimal() + scale_fill_brewer(palette = "Set1",direction = -1) +
       theme(legend.text = element_text(size = 45), #aspect.ratio=6.5/11, 
             axis.title.x = element_text(size = 45),
@@ -1275,13 +1376,11 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
             plot.subtitle = element_text(size = 45)) +
       labs( y= "Count of Intensity", x="Intenisity",
             title = paste(background_species)) 
-            #subtitle = paste('Experiment 2 ', acquisiton_type, " data processed by ", software_name))
+    #subtitle = paste('Experiment 2 ', acquisiton_type, " data processed by ", software_name))
     
     plot22 <- p21/p22
-    #abundances_all_aft_imputation <- barplt_df_ecoli_wide %>%
-        #rename_with(~ paste0("pep_with_pos"), matches("^seq")) %>%
-        #bind_rows(barplt_df_wide) 
     
+  
     filtered_abundances_rowMeans <- NULL
     filtered_abundances_log10 <- NULL
     filtered_abundances_log10_rowMeans <- NULL
@@ -1574,7 +1673,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     filtered_abundances_ecoli_bef_impt <- barplt_df_ecoli_wide %>% 
       #separate(accession, into = c("uniprot_id", "species", "position"), remove = T) %>%
       rename(Pool=species) %>%
-      rename(pep_with_pos=sequence) %>%
+      rename(pep_with_pos=Sequence) %>%
       #select(!c(uniprot_id,position)) %>% 
       drop_na()
     
