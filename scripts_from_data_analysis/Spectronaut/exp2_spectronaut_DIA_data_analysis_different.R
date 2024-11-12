@@ -36,7 +36,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
                                                  actual_ratio,
                                                  subtitle){
   
-  intended_dir <-paste0(file_path,"5thpercent_one_sample_nonNA_fin_diff_map/")
+  intended_dir <-paste0(file_path,"diffLocFilt_5thpercent1nonNAdiffmap/")
   
   if(dir.exists(intended_dir)){
     new_path <- intended_dir
@@ -289,9 +289,13 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
       pivot_wider(names_from = "Experiment",
                   values_from = "ptm_score") %>% 
       relocate(exp_design) %>%
-      rowwise() %>%
-      mutate(max_value = max(c_across(all_of(exp_design)), na.rm = TRUE)) %>%
-      select(!exp_design)
+      #rowwise() %>%
+      select(starts_with('E2-')) %>% 
+      is.na %>% 
+      rowSums
+    
+      #mutate(max_value = max(c_across(all_of(exp_design)), na.rm = TRUE)) %>%
+      #select(!exp_design)
     #mutate(max_value=ifelse(!is.numeric(max_value),NA,max_value))
     #filter(!grepl(-Inf,max_value))
     ####################
@@ -306,10 +310,10 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     #   select(!exp_design)
     
     barplt_df_wide_all_col <- barplt_df_mapped_pep %>%
-      select(PEP.GroupingKey,Experiment,Intensity,pep_with_pos,PG.ProteinLabel) %>%
+      select(PEP.GroupingKey,Experiment,Intensity,pep_with_pos,ptm_score) %>% #PG.ProteinLabel
       pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
       relocate(exp_design,.after = where(is.character)) %>%
-      left_join(site_prob, by="pep_with_pos") %>%
+      #left_join(site_prob, by="pep_with_pos") %>%
       mutate(species=selected_spcies) %>%
       relocate(pep_with_pos, .after = PEP.GroupingKey) 
     
@@ -555,21 +559,24 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
       #   mutate(max_value = max(c_across(all_of(exp_design)), na.rm = TRUE)) %>%
       #   select(!exp_design)
       
-      barplt_df_wide <- barplt_df_new%>%  ## If you select "charge" column, it will bring multiple rows for one seq
-        select(PEP.GroupingKey,Experiment,Intensity,pep_with_pos,PG.ProteinLabel) %>%
+      barplt_df_wide <- barplt_df_mapped_pep %>% #barplt_df_new %>%  ## If you select "charge" column, it will bring multiple rows for one seq
+        select(PEP.GroupingKey,Experiment,Intensity,pep_with_pos,ptm_score,PG.ProteinLabel) %>%
+        
+        #left_join(site_prob, by="pep_with_pos") %>%
+        group_by(pep_with_pos,Experiment) %>%
+        filter(ptm_score >= loc_filter) %>%
         pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
-        left_join(site_prob, by="pep_with_pos") %>%
         mutate(species=selected_spcies) %>%
-        filter(max_value >= loc_filter) #%>%
-        #select(!PEP.GroupingKey) #%>%
+        #select(!PEP.GroupingKey) %>%
         #relocate(pep_with_pos, .after = Sequence) 
-        #relocate(exp_design,.after = "pep_with_pos")
+        relocate(exp_design,.after = "pep_with_pos")
       
     }else{
       barplt_df_wide <- barplt_df_new%>%  ## If you select "charge" column, it will bring multiple rows for one seq
-        select(PEP.GroupingKey,Experiment,Intensity,pep_with_pos,PG.ProteinLabel) %>%
+        select(PEP.GroupingKey,Experiment,Intensity,pep_with_pos,ptm_score, PG.ProteinLabel) %>%
         pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
         mutate(species=selected_spcies) %>% 
+        relocate() %>%
         #relocate(pep_with_pos, .after = Sequence)
        relocate(exp_design,.after = "pep_with_pos")
     }
@@ -578,7 +585,12 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     barplt_df_ecoli_wide <- barplt_df_ecoli %>%
       select(PEP.GroupingKey,Experiment,Intensity,PG.ProteinLabel)%>%
       pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
-      mutate(species=background_species) %>% relocate(exp_design,.after = "PG.ProteinLabel")
+      mutate(species=background_species) %>% relocate(exp_design,.after = "PEP.GroupingKey")
+    
+    
+    write.table(barplt_df_wide,file = paste0(new_path,"/barplt_df_wide",
+                                           software_name,"_Experiment",exp_id,".txt"),
+                sep = "\t",row.names = F)
     
     ######################################################################
     
@@ -595,7 +607,9 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     filtered_abundances <-  filter_NA(df = barplt_df_wide,samp_names = sample_names,num_allowed_NA = 1,num_expected_nonNA = 3)
     filtered_abundances_ecoli <-  filter_NA(df = barplt_df_ecoli_wide,samp_names = sample_names,num_allowed_NA = 5,num_expected_nonNA = 1)
     
-    
+    write.table(filtered_abundances,file = paste0(new_path,"/filtered_abundances",
+                                             software_name,"_Experiment",exp_id,".txt"),
+                sep = "\t",row.names = F)
     #filtered_abundances <- barplt_df_wide
    # filtered_abundances_ecoli <- barplt_df_ecoli_wide
     #############################################################################################
@@ -735,12 +749,19 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     for (k in 1:sample_size){
       # If separate version of row means is not needed, it can be commented later.
       # Separate row Means can be collected in temp object to merge in "log_10_filtered_abundances_rowMeans"
-      assign(paste0("abundances_A",k),as.data.frame(rowMeans(filtered_abundances  %>%
-                                                               select(contains(paste0("A",k)))))) #%>%
+      assign(paste0("abundances_A",k),
+             filtered_abundances %>% ungroup() %>% select(contains(paste0("A",k))) %>% mutate(mean = rowMeans(across(everything()))) %>% select(mean))
+      
+      #assign(paste0("abundances_A",k),as.data.frame(rowMeans(filtered_abundances  %>%
+                                                               #select(contains(paste0("A",k)))))) #%>%
       #select(starts_with("abundance_")))))
       abundances_rowMeans<- bind_cols(abundances_rowMeans,get(paste0("abundances_A",k)))
-      assign(paste0("ecoli_abundances_A",k),as.data.frame(rowMeans(filtered_abundances_ecoli  %>%
-                                                                     select(contains(paste0("A",k))))))# %>%
+      
+      assign(paste0("ecoli_abundances_A",k),
+             filtered_abundances_ecoli %>% select(contains(paste0("A",k))) %>% mutate(mean = rowMeans(across(everything()))) %>% select(mean))
+      
+      #assign(paste0("ecoli_abundances_A",k),as.data.frame(rowMeans(filtered_abundances_ecoli  %>%
+                                                                     #select(contains(paste0("A",k))))))# %>%
       #select(starts_with("abundance_")))))
       abundances_ecoli_rowMeans<- bind_cols(abundances_ecoli_rowMeans,get(paste0("ecoli_abundances_A",k)))
     }
@@ -752,7 +773,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
       select(!starts_with("E")) %>%
       bind_cols(abundances_ecoli_rowMeans) %>%
       tibble() %>%
-      rename_with(~ paste0("mean abundance",1:sample_size), matches("^row")) %>%
+      rename_with(~ paste0("mean abundance",1:sample_size), matches("^mean")) %>%
       pivot_longer(cols = starts_with("mean"),
                    values_to = "Intensity",
                    names_to = "sample_ids",
@@ -988,8 +1009,8 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     for (j in 1:length(imputed_values_vec)){
     #   # Number NA
     #   #num_NA <- length(abundances_for_impute_all[,j+2][is.na(abundances_for_impute_all[,j+2])])
-       filtered_abundances[,j+2][is.na(filtered_abundances[,j+2])] <- imputed_values_vec[j]
-       filtered_abundances_ecoli[,j+2][is.na(filtered_abundances_ecoli[,j+2])] <- imputed_values_vec[j]
+       filtered_abundances[,j+1][is.na(filtered_abundances[,j+1])] <- imputed_values_vec[j]
+       filtered_abundances_ecoli[,j+1][is.na(filtered_abundances_ecoli[,j+1])] <- imputed_values_vec[j]
     #   #abundances_for_impute_all[,j+2][is.na(abundances_for_impute_all)[,j+2]] <- impute_values[j]
     #   # After imputation number of imputed values
     #   #num_imp <-length(abundances_for_impute_all[,j+2][(abundances_for_impute_all[,j+2]==impute_values[j])])
@@ -1385,13 +1406,13 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     abundances_all_before_impt <- NULL
     
     for (k in 1:(sample_size-1)){
-      assign(paste0("df_merge_before_imp_A",k),as.data.frame(rowMeans(df_merge_before_imp  %>% select(contains(paste0("A",k))))))
+      assign(paste0("df_merge_before_imp_A",k),as.data.frame(rowMeans(df_merge_before_imp  %>% ungroup() %>% select(contains(paste0("A",k))))))
       
       abundances_all_before_impt<- bind_cols(abundances_all_before_impt,get(paste0("df_merge_before_imp_A",k)))
     }
     colnames(abundances_all_before_impt) <- paste0("mean_abundance_A",1:(sample_size-1))
     
-    df_merge_before_imp_all <- df_merge_before_imp %>% bind_cols(abundances_all_before_impt) %>% select(!contains("A6"))
+    df_merge_before_imp_all <- df_merge_before_imp %>% ungroup() %>% bind_cols(abundances_all_before_impt) %>% select(!contains("A6"))
     
     df_before_impt_CV <- CV_calculator(data = df_merge_before_imp_all,
                                        exp_id = 2,
@@ -2345,7 +2366,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
       right_join(point_count_y_axis,by="coloring_comp")
     
     plot9 <- ggplot(merge_stat_df_final, aes(x =log2(merge_stat_df_final$fold_change_values), y = -log10(P.Value))) +
-      geom_point(size = 9, aes(color = coloring_comp,shape=isomericity)) + # Pool_new might be use to 
+      geom_point(size = 9, aes(color = coloring_comp,shape=isomericity)) + # Pool_new might be use to 9
       
       #geom_point(shape = 21, colour = "black", fill = "white", size = 5, stroke = 5)
       
@@ -2382,10 +2403,11 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
             axis.title = element_text(size = 45),
             axis.text.y = element_text(size = 45),
             plot.subtitle = element_text(size = 45)) +
-      labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n 5th percentile imputation only 2NAs and 3NAs \n and mice imputation for 1NA \n with 1nonNA sample filtering")) + #plt_data_type[j], , subtitle,"\n"
+      labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name),
+            subtitle = paste("5th percentile imputation with 0.75 loc. filt. and 1 nonNA sample filtering \n Limma was used")) + #plt_data_type[j], , subtitle,"\n"
       geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE,color=col),size=2) +
       geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "#006D2C",size=2) + 
-      geom_label(data =point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos, fill=coloring_comp ,label = n),color="white",size=18,show.legend = FALSE) + #coloring_comp
+      geom_label(data =point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos, fill=coloring_comp ,label = n),color="white",size=18,show.legend = FALSE) + #18 coloring_comp
       scale_fill_manual(values =setNames(cols, sorted_labels))
     
     merge_stat_df_final_text <- merge_stat_df_final %>% mutate(soft_name=paste0(software_name)) %>% mutate(acq_type=paste0(acquisiton_type))
@@ -2480,7 +2502,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     plt_obj <- plt_obj[!is.na(plt_obj)]
     sapply(1:length(plt_obj),function(x) ggsave(filename = paste0("p",x,".png"),
                                                  width = 90, height = 60, 
-                                                 path = paste0(file_path,"/5thpercent_one_sample_nonNA_fin_diff_map/"), #/outputs_imputed_5thpercent_one_sample_nonNA/"),
+                                                 path = paste0(file_path,"/diffLocFilt_5thpercent1nonNAdiffmap/"), #/outputs_imputed_5thpercent_one_sample_nonNA/"),
                                                  units = "cm",
                                                  get(plt_obj[x]),
                                                  device = "png", #".svg"
