@@ -42,10 +42,11 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
                                                  test_type,
                                                  num_reps,
                                                  actual_ratio,
-                                                 subtitle){
+                                                 subtitle,
+                                            dir_name){
   
   
-  intended_dir <-paste0(file_path,"outputs_imputed_5thpercent_median")#"outputs_imputed_5thpercent_one_sample_nonNA_fin")
+  intended_dir <-paste0(file_path,dir_name,"/")#"outputs_imputed_5thpercent_one_sample_nonNA_fin")
   
   if(dir.exists(intended_dir)){
     new_path <- intended_dir
@@ -105,84 +106,14 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
     rename(Pool_for_seq_merge=Pool) %>%
     mutate(situation="Correct")
   
-  ecoli_seq <- quant_peptides %>% 
-    select(Sequence,Modifications,Proteins) %>%
-    filter(!grepl(selected_species, Proteins) & !grepl("CON__", Proteins)) %>%
-    #pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
-    #filter(grepl(background_species,Proteins)) %>%
-    #distinct(Sequence,.keep_all = T) %>%
-    mutate(species=background_species) 
   
-  ecoli_seq_dist <- quant_peptides %>% 
-    select(Sequence,Modifications,Proteins) %>%
-    filter(!grepl(selected_species, Proteins) & !grepl("CON__", Proteins)) %>%
-    #pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
-    #filter(grepl(background_species,Proteins)) %>%
-    distinct(Sequence,.keep_all = T) %>%
-    mutate(species=background_species) 
+  pep_list_w_theo_seq_map <- pep_list_w_theo %>% select(Sequence,Neutral.mass.SH.Cys) %>%
+    rename(Neutral_mass=Neutral.mass.SH.Cys) %>%
+    mutate(Neutral_mass = round(Neutral_mass, 0)) %>%
+    mutate(Neutral_mass_theo=Neutral_mass)
   
-  all_seq <- quant_peptides %>% 
-    filter(grepl("Phospho",Modifications)) %>%
-    filter(grepl(selected_species,Proteins) & !grepl("CON__",Proteins)) %>%
-    mutate(species=selected_species) %>%
-    full_join(pep_list_w_theo_unique,by="Sequence") %>%
-    mutate_at("Pool_for_seq_merge", ~replace_na(.,"Unexpected")) %>%
-    mutate(Pool_for_seq_merge= ifelse(is.na(species),"missing",Pool_for_seq_merge)) %>%
-    filter(!grepl("Unexpected",Pool_for_seq_merge)) %>%
-    bind_rows(ecoli_seq) %>% 
-    mutate(Pool_for_seq_merge= ifelse(is.na(Pool_for_seq_merge),background_species,Pool_for_seq_merge))
-  
-  ########## ########## ########## ########## ########## ########## ########## ##########
-  all_corr_seq <- quant_peptides %>% 
-    filter(grepl("Phospho",Modifications)) %>%
-    filter(grepl(selected_species,Proteins) & !grepl("CON__",Proteins)) %>%
-    mutate(species=selected_species) %>% 
-    group_by(Experiment) %>%
-    distinct(Sequence,.keep_all = T) %>%
-    full_join(pep_list_w_theo_unique,by="Sequence") %>%
-    mutate_at("situation", ~replace_na(.,"Unexpected")) %>%
-    mutate(situation= ifelse(is.na(species),"missing",situation)) %>%
-    filter(!grepl("Unexpected",situation) & !grepl("missing",situation) ) %>%
-    select(Sequence,Modifications,Experiment,situation,Pool_for_seq_merge) %>%
-    separate(Experiment, into = c("exp_id","samp_id","rep_id"),sep = "-")
-  
-  plot15 <- gg_barplt_id_pep_count(data_set = all_corr_seq,
-                                   x_df = all_corr_seq$samp_id,
-                                   fill_df = all_corr_seq$rep_id,
-                                   ymax = nrow(all_corr_seq),
-                                   size_num=10,
-                                   header = paste("Total number of correctly identified ",selected_species,"phospho-sequence","across each sample",sep=" "),
-                                   caption_lab = "Mapping was done without considering phospho-positions.",
-                                   x_lab = "Sample id",
-                                   fill_lab =  "Sample id",
-                                   y_lab = "Number of identified peptides",
-                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +
-    theme(axis.text.x = element_text(angle = 90))
-  
-  ########## ########## ########## ########## ########## ########## ########## ##########
-  
-  all_seq_syn <- all_seq %>%
-    select(Sequence,Modifications,Proteins,Pool_for_seq_merge) %>% 
-    distinct(Sequence, .keep_all = T) %>%
-    bind_rows(ecoli_seq_dist) %>%
-    mutate(Pool_for_seq_merge= ifelse(is.na(Pool_for_seq_merge),background_species,Pool_for_seq_merge)) %>%
-    mutate(acq_type=acquisiton_type) %>%
-    mutate(soft_name=software_name)
-  
-  plot13 <- gg_barplt_id_pep_count(data_set = all_seq_syn,
-                                x_df = all_seq_syn$Pool_for_seq_merge,
-                                fill_df = all_seq_syn$Pool_for_seq_merge,
-                                ymax = nrow(all_seq_syn),
-                                size_num=10,
-                                header = paste("Total number of identified phosphorylated", selected_species,"and", background_species,"sequences across each sample",sep=" "),
-                                caption_lab = "NA values are removed.",
-                                x_lab = "Sample id",
-                                fill_lab =  "Sample id",
-                                y_lab = "Number of identified sequences",
-                                subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
-  
-  write.table(all_seq_syn, file=paste0(new_path,"/",software_name,"_num_unique_seq_each_species.txt"),sep = "\t",col.names = T,row.names = F)
-  #################################################
+  pep_list_w_theo_pep_map <- pep_list_w_theo %>%
+    select(pep_with_pos,Pool,isomericity)
   
   ### IMPUTATION
   # Calculate 1 percent quantile of each sample
@@ -221,10 +152,13 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
   #   #filter(grepl(9606,`Taxonomy IDs`))%>%
   #   filter(grepl(selected_species,Proteins)) %>% 
   #   filter(grepl("Phospho",Modifications)) %>% drop_na(`Modified sequence`)
-  
+   
   # # IN THIS STEP PHOSPHO-PROBABILITIES WERE EXTRACTED FROM ITS ASSOCIATED COLUMN 
   # # AND SELECTED ONLY PHOSPHO-HUMAN PEPTIDES
-  quant_phospho <- all_seq %>% 
+  quant_phospho <- quant_peptides %>% 
+    filter(grepl("Phospho",Modifications)) %>%
+    filter(grepl(selected_species,Proteins) & !grepl("CON__",Proteins)) %>%
+    mutate(species=selected_species) %>%
     mutate(
       extracted_values = sapply(str_extract_all(`Phospho (STY) Probabilities`, "\\(\\d+(\\.\\d+)?\\)"), function(x) {
         values <- as.numeric(str_extract_all(x, "\\d+(\\.\\d+)?"))
@@ -282,50 +216,67 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
     rename("mods_id" = "name.x",
            "phospho_positions" ="value.x",
            "all_mods_with_mod_type" = "mods.x")
-  
-  
   #getModificationPosition_MQ(mod_seq = id_syn_pep$`Modified sequence`,F)
   
   final_results_with_common_col <- mutate(result_with_common_col,quant_phospho)
   
   barplt_df <- final_results_with_common_col %>%
-    select(Sequence,Experiment,Intensity,pep_with_pos,Proteins,extracted_values) %>%
+    select(Sequence,Experiment,Intensity,pep_with_pos,`Modified sequence`,Proteins,extracted_values) %>%
     separate(Experiment, into = c("Exp_id","Sample_id","Rep_id"),sep = "-",remove = F) %>%
     #mutate(sample_rep_id_seq = paste(pep_with_pos, Sample_id,Rep_id, sep = "_")) %>%
     group_by(pep_with_pos,Experiment) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
     slice(which.max(Intensity)) %>%
-    ungroup()
+    ungroup() %>%
+    separate(pep_with_pos,into = c("seq","Positions"),sep = "_",remove = F)
   
-  #######################################################################
-  barplt_phospho_seq <- final_results_with_common_col %>%
-    select(Sequence,Experiment,Intensity,Proteins,extracted_values) %>%
-    separate(Experiment, into = c("Exp_id","Sample_id", "Rep_id"), sep = "-",remove = F) %>%
-    mutate(sample_rep_id_seq = paste(Sequence, Sample_id,Rep_id, sep = "_")) %>%
-    group_by(sample_rep_id_seq) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
+  ### Mapping by precursor mass + phospho  and sequence ####
+  amino_acid_table <- read.delim("D:/dev/Pinar/PHD/wet_lab_experiments/Eyers_syn_peptides_experiment/amino_acid_table.txt")
+  mapping_df <- as.data.frame(cbind(amino_acid_table$X1.letter.code,amino_acid_table$Monoisotopic.Mass))
+  colnames(mapping_df) <- c("letters","mono_isotopic")
+  
+  mapping_df$mono_isotopic <- as.numeric(mapping_df$mono_isotopic)
+  # Apply the function to each sequence in the sequences data frame
+  barplt_df$Sum <- mapply(calculate_sum, barplt_df$Sequence, barplt_df$Positions, MoreArgs = list(mapping_df = mapping_df))
+  
+  barplt_df_mapped_seq <- barplt_df %>% 
+    mutate(Neutral_mass = round(Sum, 0)) %>%
+    mutate(Neutral_mass_res=Neutral_mass) %>%
+    full_join(pep_list_w_theo_seq_map,by=c("Neutral_mass","Sequence")) %>% # #pep_with_pos
+    
+    mutate(map_seq = ifelse(is.na(Neutral_mass_res), "missing", NA)) %>%
+    mutate(map_seq = ifelse(is.na(Neutral_mass_theo), "wrong seq", map_seq)) %>%
+    mutate(map_seq = ifelse(!is.na(Neutral_mass_res) & !is.na(Neutral_mass_theo) & Neutral_mass_res == Neutral_mass_theo, 
+                            "correct seq", 
+                            map_seq)) %>%
+    filter(grepl("correct seq",map_seq)) %>%
+    select(!c(Positions,seq,Sum)) %>%
+    group_by(pep_with_pos,Experiment) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
     slice(which.max(Intensity)) %>%
-    ungroup() %>% 
-    mutate(Software_name=software_name) %>%
-    mutate(Acquisition_type=acquisiton_type)
+    ungroup() 
   
-  write.table(barplt_phospho_seq, file = paste0(new_path,"/Number_of_human_phospho_sequences_",
-                                                software_name,"_Experiment",exp_id,".txt"),
-              sep = "\t",row.names = F)
+  barplt_df_mapped_pep <- barplt_df %>% 
+    mutate(Neutral_mass = round(Sum, 0)) %>%
+    mutate(Neutral_mass_res=Neutral_mass) %>%
+    full_join(pep_list_w_theo_seq_map,by=c("Neutral_mass","Sequence")) %>% # #pep_with_pos
+    
+    mutate(map_seq = ifelse(is.na(Neutral_mass_res), "missing", NA)) %>%
+    mutate(map_seq = ifelse(is.na(Neutral_mass_theo), "wrong seq", map_seq)) %>%
+    mutate(map_seq = ifelse(!is.na(Neutral_mass_res) & !is.na(Neutral_mass_theo) & Neutral_mass_res == Neutral_mass_theo, 
+                            "correct seq", 
+                            map_seq)) %>%
+    filter(grepl("correct seq",map_seq)) %>%
+    left_join(pep_list_w_theo_pep_map,by="pep_with_pos") %>%
+    mutate(Pool=ifelse(Pool=="Diluted",paste0(Pool,"_",isomericity),Pool)) %>%
+    mutate(map_loc=ifelse(is.na(Pool),"Wrong Localization","Correct")) %>%
+    mutate(Pool=ifelse(Pool=="Diluted_nonisomeric","Diluted_non-isomeric",Pool)) %>%
+    select(!c(Positions,seq,Sum)) %>%
+    group_by(pep_with_pos,Experiment) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
+    slice(which.max(Intensity)) %>%
+    ungroup() 
+  #distinct(pep_with_pos,.keep_all = T) %>%
+  #count(map_loc)
   
-  plot12 <- gg_barplt_id_pep_count(data_set = barplt_phospho_seq,
-                                x_df = barplt_phospho_seq$Sample_id,
-                                fill_df = barplt_phospho_seq$Rep_id,
-                                ymax = 20000,
-                                size_num=10,
-                                header = "Total number of quantified phospho-sequence across each sample",
-                                caption_lab = "NA values and multiple sequences are removed. \n In the case of muultiple PSMs, max. intensity was selected.",
-                                x_lab = "Sample id",
-                                fill_lab =  "Sample id",
-                                y_lab = "Number of identified peptides",
-                                subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) + scale_fill_manual(values = c("#6baed6","#6baed6","#6baed6"))
-  
-  ######################################################################
-  
-  site_prob <- barplt_df %>% 
+  site_prob <- barplt_df_mapped_pep %>% 
     select(extracted_values, pep_with_pos,Experiment) %>% 
     pivot_wider(names_from = "Experiment",
                 values_from = "extracted_values") %>% 
@@ -335,6 +286,162 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
     select(!exp_design)
   #mutate(max_value=ifelse(!is.numeric(max_value),NA,max_value))
   #filter(!grepl(-Inf,max_value))
+  
+  
+  barplt_df_wide_all_col <- barplt_df_mapped_pep %>%  ## If you select "charge" column, it will bring multiple rows for one seq
+    select(Sequence,Experiment,Intensity,pep_with_pos,Proteins) %>%
+    pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
+    relocate(exp_design,.after = where(is.character)) %>%
+    left_join(site_prob, by="pep_with_pos") %>%
+    mutate(species=selected_species) %>%
+    relocate(pep_with_pos, .after = Sequence) 
+  
+  write.table(barplt_df_wide_all_col, file=paste0(new_path,"/Count_of_missing_unexpected_correct_phospho-sites_with_all_col_",
+                                                  software_name,"_Experiment",exp_id,".txt"),
+              sep = "\t",col.names = T,row.names = F)
+  #"/MQ_transposed_data_all_pep_list.txt")
+  
+  #######################################################################
+  ecoli_seq <- quant_peptides %>% 
+    select(Sequence,Modifications,Proteins) %>%
+    filter(!grepl(selected_species, Proteins) & !grepl("CON__", Proteins)) %>%
+    #pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
+    #filter(grepl(background_species,Proteins)) %>%
+    #distinct(Sequence,.keep_all = T) %>%
+    mutate(species=background_species) 
+  
+  ecoli_seq_dist <- quant_peptides %>% 
+    select(Sequence,Modifications,Modifications,Proteins) %>%
+    filter(!grepl(selected_species, Proteins) & !grepl("CON__", Proteins)) %>%
+    #pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
+    #filter(grepl(background_species,Proteins)) %>%
+    distinct(Sequence,.keep_all = T) %>%
+    mutate(species=background_species) 
+  
+   #################################################
+  all_seq <- barplt_df_mapped_seq %>% 
+    select(Sequence,
+           pep_with_pos,
+           `Modified sequence`,map_seq,
+           extracted_values,
+           Experiment,Sample_id,Rep_id) %>%
+    
+    #full_join(pep_list_w_theo_unique,by="Sequence") %>%
+    #mutate_at("Pool_for_seq_merge", ~replace_na(.,"Unexpected")) %>%
+    #mutate(Pool_for_seq_merge= ifelse(is.na(species),"missing",Pool_for_seq_merge)) %>%
+    #filter(!grepl("Unexpected",Pool_for_seq_merge)) %>%
+    bind_rows(ecoli_seq) %>% 
+    rename(Pool_for_seq_merge=map_seq) %>%
+    mutate(Pool_for_seq_merge= ifelse(is.na(Pool_for_seq_merge),background_species,Pool_for_seq_merge)) %>%
+    mutate(species=is.na(species),selected_species,species)
+  
+  
+  write.table(all_seq, file=paste0(new_path,"/Experiment2",software_name,"_number_of_unique_sequence_for_each_species.txt"),sep = "\t",col.names = T,row.names = F)
+  
+  ########## ########## ########## ########## ########## ########## ########## ##########
+  all_seq_syn <- all_seq %>%
+    filter(!grepl(background_species,Pool_for_seq_merge)) %>%
+    select(Sequence,`Modified sequence`,Proteins,Pool_for_seq_merge,extracted_values,Experiment,Sample_id,Rep_id) %>% 
+    
+    #bind_rows(ecoli_seq_dist) %>%
+    #mutate(Pool_for_seq_merge= ifelse(is.na(Pool_for_seq_merge),background_species,Pool_for_seq_merge)) %>%
+    mutate(acq_type=acquisiton_type) %>%
+    mutate(soft_name=software_name) %>%
+    group_by(Experiment) %>%
+    distinct(Sequence, .keep_all = T)
+  
+  write.table(all_seq_syn, file=paste0(new_path,"/Number_of_human_phospho_sequences_",
+                                       software_name,"_Experiment",exp_id,".txt"),sep = "\t",col.names = T,row.names = F)
+  #paste0(new_path,"/",software_name,"_num_unique_seq_each_species.txt")
+  
+  all_pep_syn <- barplt_df_mapped_pep %>%
+    #filter(!grepl(background_species,Pool_for_seq_merge)) %>%
+    select(pep_with_pos, `Modified sequence`,map_loc,extracted_values,Experiment,Sample_id,Rep_id) %>%
+    rename(Pool_for_pep_merge=map_loc) %>%
+    #distinct(Sequence, .keep_all = T) %>%
+    #bind_rows(ecoli_seq_dist) %>%
+    #mutate(Pool_for_seq_merge= ifelse(is.na(Pool_for_seq_merge),background_species,Pool_for_seq_merge)) %>%
+    mutate(acq_type=acquisiton_type) %>%
+    mutate(soft_name=software_name) %>% 
+    group_by(Experiment) %>%
+    distinct(pep_with_pos,.keep_all = T)
+  
+  all_corr_pep_syn <- all_pep_syn %>% filter(grepl("Correct",Pool_for_pep_merge))
+  
+  # all_corr_seq <- quant_peptides %>% 
+  #   filter(grepl("Phospho",Modifications)) %>%
+  #   filter(grepl(selected_species,Proteins) & !grepl("CON__",Proteins)) %>%
+  #   mutate(species=selected_species) %>% 
+  #   group_by(Experiment) %>%
+  #   distinct(Sequence,.keep_all = T) %>%
+  #   full_join(pep_list_w_theo_unique,by="Sequence") %>%
+  #   mutate_at("situation", ~replace_na(.,"Unexpected")) %>%
+  #   mutate(situation= ifelse(is.na(species),"missing",situation)) %>%
+  #   filter(!grepl("Unexpected",situation) & !grepl("missing",situation) ) %>%
+  #   select(Sequence,Modifications,Experiment,situation,Pool_for_seq_merge) %>%
+  # separate(Experiment, into = c("exp_id","samp_id","rep_id"),sep = "-")
+  
+  plot15 <- gg_barplt_id_pep_count(data_set = all_seq_syn,
+                                   x_df = all_seq_syn$Sample_id,
+                                   fill_df = all_seq_syn$Rep_id,
+                                   ymax = nrow(all_seq_syn),
+                                   size_num=10,
+                                   header = paste("Total number of correctly identified ",selected_species,"phospho-sequence","across each sample",sep=" "),
+                                   caption_lab = "Mapping was done without considering phospho-positions.",
+                                   x_lab = "Sample id",
+                                   fill_lab =  "Sample id",
+                                   y_lab = "Number of identified peptides",
+                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +
+    theme(axis.text.x = element_text(angle = 90))
+  
+  plot12 <- gg_barplt_id_pep_count(data_set = all_corr_pep_syn,
+                                   x_df = all_corr_pep_syn$Sample_id,
+                                   fill_df = all_corr_pep_syn$Rep_id,
+                                   ymax = length(unique(all_corr_pep_syn$pep_with_pos)),
+                                   size_num=10,
+                                   header = paste("Total number of identified & localized phosphorylated", selected_species,"across each sample",sep=" "),
+                                   caption_lab = "NA values and multiple sequences are removed. \n In the case of muultiple PSMs, max. intensity was selected.",
+                                   x_lab = "Sample id",
+                                   fill_lab =  "Sample id",
+                                   y_lab = "Number of identified peptides",
+                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) 
+  #+ scale_fill_manual(values = c("#6baed6","#6baed6","#6baed6"))
+  
+  
+  ########## ########## ########## ########## ########## ########## ########## ##########
+  # plot13 <- gg_barplt_id_pep_count(data_set = all_seq_syn,
+  #                                  x_df = all_seq_syn$Pool_for_seq_merge,
+  #                                  fill_df = all_seq_syn$Pool_for_seq_merge,
+  #                                  ymax = nrow(all_seq_syn),
+  #                                  size_num=10,
+  #                                  header = paste("Total number of identified phosphorylated", selected_species,"and", background_species,"sequences across each sample",sep=" "),
+  #                                  caption_lab = "NA values are removed.",
+  #                                  x_lab = "Sample id",
+  #                                  fill_lab =  "Sample id",
+  #                                  y_lab = "Number of identified sequences",
+  #                                  subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
+  # 
+  #################################################
+  
+  
+# 
+#   barplt_phospho_seq <- final_results_with_common_col %>%
+#     select(Sequence,Experiment,Intensity,Proteins,extracted_values) %>%
+#     separate(Experiment, into = c("Exp_id","Sample_id", "Rep_id"), sep = "-",remove = F) %>%
+#     mutate(sample_rep_id_seq = paste(Sequence, Sample_id,Rep_id, sep = "_")) %>%
+#     group_by(sample_rep_id_seq) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
+#     slice(which.max(Intensity)) %>%
+#     ungroup() %>% 
+#     mutate(Software_name=software_name) %>%
+#     mutate(Acquisition_type=acquisiton_type)
+#   
+#   write.table(barplt_phospho_seq, file = paste0(new_path,"/Number_of_human_phospho_sequences_",
+#                                                 software_name,"_Experiment",exp_id,".txt"),
+#               sep = "\t",row.names = F)
+#   
+#   
+  ######################################################################
+  
   
   #############################################################################
   ### COMPARED TO pd AND proline, MQ DOES NOT HAVE ANY QUERY THAT CONTAINS BACKGROUND SPECIES.
@@ -356,13 +463,13 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
                                fill_df = barplt_df$Rep_id,
                                ymax = 20000,
                                size_num=10,
-                               header = "Total number of quantified phospho-site across each sample",
-                               caption_lab = "NA values are removed.",
+                               header = "Total number of phospho-peptides across each sample",
+                               caption_lab = "NA values are removed. \n Mapping with the theoretical list was not done yet.",
                                x_lab = "Sample id",
                                fill_lab =  "Sample id",
                                y_lab = "Number of identified peptides",
-                               subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +
-    scale_fill_manual(values = c("#6baed6","#6baed6","#6baed6"))
+                               subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) #+
+    #scale_fill_manual(values = c("#6baed6","#6baed6","#6baed6"))
   
   
   plot2 <- gg_barplt_id_pep_count(data_set = barplt_df_ecoli,
@@ -375,8 +482,8 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
                                x_lab = "Sample id",
                                fill_lab =  "Sample id",
                                y_lab = "Number of identified peptides",
-                               subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +
-    scale_fill_manual(values =c("#969696","#969696","#969696"))
+                               subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) 
+  #+#scale_fill_manual(values =c("#969696","#969696","#969696"))
   
   barplt_prot_ecoli <- quant_peptides %>% 
     filter(!grepl(selected_species, Proteins) & !grepl("CON__", Proteins)) %>%
@@ -398,29 +505,20 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
                                    x_lab = "Sample id",
                                    fill_lab =  "Sample id",
                                    y_lab = "Number of identified proteins",
-                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +
-    scale_fill_manual(values =c("#969696","#969696","#969696"))
+                                   subtitle_txt = paste("Experiment - ", exp_id, 
+                                                        acquisiton_type, " data processed by ", software_name)) 
+    #scale_fill_manual(values =c("#969696","#969696","#969696"))
   
   
   write.table(barplt_prot_ecoli, file=paste0(new_path,"/Exp2",software_name,"_number_of_unique_",background_species,"proteins_",".txt"),sep = "\t",col.names = T,row.names = F)
   
-  
-  barplt_df_wide_all_col <- barplt_df %>%  ## If you select "charge" column, it will bring multiple rows for one seq
-    select(Sequence,Experiment,Intensity,pep_with_pos,Proteins) %>%
-    pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
-    relocate(exp_design,.after = where(is.character)) %>%
-    left_join(site_prob, by="pep_with_pos") %>%
-    mutate(species=selected_species) %>%
-    relocate(pep_with_pos, .after = Sequence) 
-  
-  write.table(barplt_df_wide_all_col, file=paste0(new_path,"/MQ_transposed_data_all_pep_list.txt"),sep = "\t",col.names = T,row.names = F)
-  
+ 
   ## THIS RESHAPING IS ONLY FOR ELIMINATION OF MULTIPLE PHOSPHO-SITES and ECOLI PEPTIDES
   ## ELIMINATION STEP IS NOT NECESSARY FOR ECOLI, 1st STRATEGY can be used only (this will decrease lines of code)
   
   if(loc_filter_opt == TRUE){
     
-    barplt_df_wide <- barplt_df %>%  ## If you select "charge" column, it will bring multiple rows for one seq
+    barplt_df_wide <- barplt_df_mapped_pep %>%  ## If you select "charge" column, it will bring multiple rows for one seq
       select(Sequence,Experiment,Intensity,pep_with_pos,Proteins) %>%
       pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
       relocate(exp_design,.after = where(is.character)) %>%
@@ -430,7 +528,7 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
       relocate(pep_with_pos, .after = Sequence) 
     #relocate(exp_design,.after = "Proteins")
   }else{
-    barplt_df_wide <- barplt_df %>%  ## If you select "charge" column, it will bring multiple rows for one seq
+    barplt_df_wide <- barplt_df_mapped_pep %>%  ## If you select "charge" column, it will bring multiple rows for one seq
       select(Sequence,Experiment,Intensity,pep_with_pos,Proteins) %>%
       pivot_wider(names_from = "Experiment",values_from = "Intensity") %>%
       left_join(site_prob, by="pep_with_pos") %>%
@@ -564,11 +662,11 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
   
 
   
-  extract_df <- filtered_abundances %>% full_join(pep_list_w_theo,by="pep_with_pos")
+  #extract_df <- filtered_abundances %>% full_join(pep_list_w_theo,by="pep_with_pos")
+  #write.table(extract_df,file=paste0(new_path,"/MQ_transposed_data_corr_pep_list.txt"),sep = "\t",col.names = T,row.names = F)
   
-  write.table(extract_df,file=paste0(new_path,"/MQ_transposed_data_corr_pep_list.txt"),sep = "\t",col.names = T,row.names = F)
   ###############################################
-  library(kableExtra)
+  
   filtered_abundances[,"na_val"] <- apply(X = !is.na(select(filtered_abundances,contains(exp_design))), MARGIN = 1, FUN = sum)
   
   phospho_completeness <- filtered_abundances %>% 
@@ -1956,7 +2054,7 @@ final_mq_pep_quant_analysis_syn <- function(file_path,
   plt_obj <- plt_obj[!is.na(plt_obj)]
   sapply(1:length(plt_obj),function(x) ggsave(filename = paste0("p",x,".png"),
                                                width = 90, height = 60, 
-                                               path = paste0(file_path,"/outputs_imputed_5thpercent_median/"), #outputs_imputed_5thpercent_one_sample_nonNA_fin/
+                                               path = paste0(file_path,"/",dir_name,"/"), #outputs_imputed_5thpercent_one_sample_nonNA_fin/
                                                units = "cm",
                                                get(plt_obj[x]),
                                                device = "png", #".svg"
