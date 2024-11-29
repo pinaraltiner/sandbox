@@ -30,6 +30,17 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                                                  mapping_file){
   
   
+  intended_dir <-paste0(file_path,curr_dir,"/output_final")
+  
+  if(dir.exists(intended_dir)){
+    new_path <- intended_dir
+    
+  }else{
+    dir.create(intended_dir)
+    new_path <- list.dirs(intended_dir)
+    
+  }
+  
   map_df <- read.table(file = mapping_file,sep = "\t",header = T)
   
   # sample_size <- length(map_df$pool_id) / num_reps
@@ -133,9 +144,9 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
                                     size_num=7) + 
       scale_fill_brewer(palette = "Dark2") + theme(axis.text.x = element_text(angle = 90))
     
-    write.table(comb_ecoli_dist,file=paste0(file_path,curr_dir,"/", software_name,
+    write.table(comb_ecoli_dist,file=paste0(new_path,"/", software_name, #file_path,curr_dir
                                       "experiment",
-                                      exp_id,acquisiton_type,
+                                      exp_id,#acquisiton_type,
                                       "merge_identified_ecoli_sequences.tsv"),
                 sep = "\t",col.names = T,row.names = F)
     
@@ -225,23 +236,23 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
   
   ## READ THEO LIST
   pep_list_w_theo <- read.xlsx(paste0(theo_file_path, theo_file_name), sheet = sheet_theo_name)
-  pep_list_w_theo_quant <- pep_list_w_theo[,-1]
-  common_col_theo_quant <- as.data.frame(paste(pep_list_w_theo_quant$Phosphopeptide.sequence,
-                                               pep_list_w_theo_quant$modified.position.in.peptide, sep = "_"))
+  #pep_list_w_theo_quant <- pep_list_w_theo[,-1]
+  #common_col_theo_quant <- as.data.frame(paste(pep_list_w_theo_quant$Phosphopeptide.sequence,
+                                               #pep_list_w_theo_quant$modified.position.in.peptide, sep = "_"))
   
   ## ADD COMMON COLUMN TO MERGE WITH EXP. DATA
-  colnames(common_col_theo_quant) <- "pep_with_pos"
-  pep_list_w_theo_quant_new <- cbind(common_col_theo_quant,pep_list_w_theo_quant)
+  #colnames(common_col_theo_quant) <- "pep_with_pos"
+  #pep_list_w_theo_quant_new <- cbind(common_col_theo_quant,pep_list_w_theo_quant)
   
-  pep_list_w_theo_pep_comp <- pep_list_w_theo_quant_new %>% 
+  pep_list_w_theo_pep_comp <- pep_list_w_theo %>% 
     select(!Phosphopeptide.sequence) %>%
     #rename(Sequence = Phosphopeptide.sequence) %>% 
     rename(pool_id_theo_list=pool_id) 
   
-  pep_list_w_theo_seq_comp <- pep_list_w_theo_quant_new %>% 
-    select(Phosphopeptide.sequence,pool_id) %>%
+  pep_list_w_theo_seq_comp <- pep_list_w_theo %>% 
+    select(Sequence,pool_id) %>%
     #select(!pep_with_pos) %>%
-    rename(sequence = Phosphopeptide.sequence) %>% 
+    rename(sequence = Sequence) %>% 
     mutate(pool_id_theo_list=pool_id) 
   
   #### TOTAL NUM. OF PHOSPHO-SEQUENCES ####
@@ -268,8 +279,6 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     mutate(acq_type=acquisiton_type) %>%
     mutate(soft_name=software_name)
   
-
-  
     ### Duplicate sequences were removed.
   comb_result_dist <- comb_result_seq %>%
     relocate(pool_id_map_df,pool_id_theo_list,Pool_for_seq_merge,.after = sequence) %>% #
@@ -278,11 +287,19 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     ungroup() 
   
   #### WRITE THE OBJECT AS TSV ####
-  write.table(comb_result_seq,file=paste0(file_path,curr_dir,"/", software_name,
+  write.table(comb_result_seq,file=paste0(new_path,"/", software_name, #file_path,curr_dir
                                                 "experiment",
-                                                exp_id,acquisiton_type,
-                                                "merge_theo_list_with_identified_phospho_sequences.tsv"),
+                                                exp_id,#acquisiton_type,
+                                                "merge_theo_list_with_identified_phospho_seq.tsv"),
               sep = "\t",col.names = T,row.names = F)
+  
+  
+  write.table(comb_result_dist,file=paste0(new_path,"/", software_name, #file_path,curr_dir
+                                          "experiment",
+                                          exp_id,#acquisiton_type,
+                                          "merge_theo_list_with_identified_phospho_seq_unique_ones.tsv"),
+              sep = "\t",col.names = T,row.names = F)
+  
   #### VISUALIZATION OF TOTAL NUM. OF PHOSPHO-SEQ ####
   plt3 <- gg_barplt_id_pep_count_stack(data_set = comb_result_dist,
                                   x_df = comb_result_dist$sample_name,
@@ -300,7 +317,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
   
   #### EXTRACTION OF CORRECT SEQ. ####
     comb_result_seq_dist_cor <- comb_result_dist %>%
-    filter(!grepl("Unexpected Seq.",Pool_for_seq_merge) & !grepl("Missing Seq.",Pool_for_seq_merge))
+    filter(!grepl("Wrong Seq.",Pool_for_seq_merge) & !grepl("Missing Seq.",Pool_for_seq_merge))
   
   #### VISUALIZATION OF TOTAL NUM. OF CORRECTLY IDENTIFIED PHOSPHO-SEQ ####
   
@@ -338,7 +355,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     mutate(acq_type=acquisiton_type) %>%
     mutate(soft_name=software_name) 
   
-  write.table(comb_result_pep ,file=paste0(file_path,curr_dir,"/merge_theo_list_id_phospho_sites_max_int.tsv"),
+  write.table(comb_result_pep ,file=paste0(new_path,"/merge_theo_list_id_phospho_sites_only_unique_ones.tsv"), #file_path,curr_dir
               sep = "\t",col.names = T,row.names = F)
     
   #### VISUALIZATION OF TOTAL NUM. OF IDENTIFIED & LOCALIZED PHOSPHO-PEP ####
@@ -412,6 +429,9 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
 
   }else{}
   
+  write.table(comb_result_pep_filtered ,file=paste0(new_path,"/merge_theo_list_id_phospho_sites_max_ptm_score.tsv"), #file_path,curr_dir
+              sep = "\t",col.names = T,row.names = F)
+  
   #### LOCALIZATION ACCURACY ASSESSMENT (ROC LIKE PLOT GENERATION) #### 
      ### Column selection
   comb_result_pep_rmv_miss <- comb_result_pep_filtered %>% 
@@ -432,13 +452,13 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     rm(df)
   }
   
-  write.table(final_df, file=paste0(file_path,curr_dir,"/","Experiment",exp_id,software_name,"_number_of_sites_with_scores.tsv"),sep = "\t",col.names = T,row.names = F)
+  write.table(final_df, file=paste0(new_path,"/","Experiment",exp_id,software_name,"_num_sites_with_scores.tsv"),sep = "\t",col.names = T,row.names = F) #file_path,curr_dir
   
   #wrong_df <- final_df %>% filter(grepl("Wrong",Pool_for_pep_merge))
   
   ### Filtering only the correct ones
   correct_df <- final_df %>% filter(grepl("Correct",Pool_for_pep_merge))
-  
+  wrong_df <- final_df %>% filter(!grepl("Correct",Pool_for_pep_merge) & grepl("Wrong Loc.within theo list",Pool_for_pep_merge))
   ### Visualization
   plt6 <- ggplot(correct_df,aes(y=n, x=threshold_val)) + geom_line(size=2) +
     scale_fill_brewer(palette = "Dark2") +
@@ -458,6 +478,26 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
           axis.title=element_text(size=30)) + 
   #scale_x_continuous(limits = c(0, 100),breaks = seq(from = 0, to = 100, by = 10)) +  # Set the ticks for the x-axis
   scale_y_continuous(limits = c(0, 180),breaks = seq(from = 0, to = 180, by = 10))
+  
+  
+  plt10 <- ggplot(wrong_df,aes(y=n, x=threshold_val)) + geom_line(size=2) +
+    scale_fill_brewer(palette = "Dark2") +
+    labs(title=paste("Number of Correctly identified but wrong localized phospho-peptides at various thresholds \n","Experiment",
+                     exp_id, acquisiton_type),x="Sample id",y="Number of identified Sequence",
+         subtitle = acquisiton_type) + 
+    theme_minimal() +
+    theme(legend.text = element_text(size=30), 
+          axis.title.x = element_text(size=30),
+          axis.title.y = element_text(size=30),
+          plot.title = element_text(size=35),
+          plot.subtitle = element_text(size = 25),
+          plot.caption = element_text(size = 25),
+          legend.title=element_text(size=30),
+          axis.text.x = element_text(size=20,angle = 90),
+          axis.text.y = element_text(size = 30),
+          axis.title=element_text(size=30)) + 
+    #scale_x_continuous(limits = c(0, 100),breaks = seq(from = 0, to = 100, by = 10)) +  # Set the ticks for the x-axis
+    scale_y_continuous(limits = c(0, 180),breaks = seq(from = 0, to = 180, by = 10))
   
   ##################  ADJACENT SEQ ASSESSMENT ####################
   
@@ -560,6 +600,10 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
               comb_result_pep_adj_3,
               comb_result_pep_adj_2) %>%
     select(sequence,
+           S_count,
+           T_count,
+           Y_count,
+           row_sum,
            STY_adj,
            STY_len,
            Pool_for_pep_merge,
@@ -568,6 +612,9 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
            pool_id_map_df,
            sample_name,
            raw_file,is_adj) 
+  
+ 
+  write.table(comb_result_pep_adj_all,file = paste0(new_path,"/all_adj&nonadj_corr_wrong_loc_nolocthreshold.txt"),sep = "\t",col.names = T,row.names = F)
  
   ### TOTAL COUNT OF ALL SEQUENCES WITHOUT CONSIDERING ADJ_COUNT
   plt7 <- comb_result_pep_adj_all %>% tibble() %>%
@@ -582,7 +629,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
        title = "Comparison of accuracy of phospho-peptides with number of holding adjacent amino acids",
        caption = paste(software_name,"Experiment",exp_id,acquisiton_type,sep = " ")) +
     theme_minimal() +
-    scale_fill_manual(values = c("#377EB8", "#4DAF4A"))+ 
+    scale_fill_manual(values = c("#a1d76a", "#e9a3c9"))+ 
     theme(legend.text = element_text(size=30), 
           axis.title.x = element_text(size=30),
           axis.title.y = element_text(size=30),
@@ -633,6 +680,69 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
           #axis.text.y = element_text(size = 30),
           axis.title=element_text(size=30)) +
     geom_text(aes(label =n_label), position = position_stack(vjust = 0.5),size=15)
+  
+  
+  
+  plt11 <- comb_result_pep_adj_all %>% mutate(Pool_for_pep_merge=ifelse(Pool_for_pep_merge!="Correct","Wrong",Pool_for_pep_merge)) %>%
+    #filter(!grepl("Wrong Loc. out of theo. list",Pool_for_pep_merge)) %>%
+    #filter(ptm_score > 0.75) %>%
+    count(row_sum,is_adj,Pool_for_pep_merge) %>% mutate(n_label=n) %>%
+    mutate(n=ifelse(is_adj =="non_adjacent", (n* (-1)),n)) %>%
+    mutate(STY_len= ifelse(row_sum < 0, (-1*row_sum),row_sum)) %>%
+    ggplot(aes(x=STY_len,y=n,fill=Pool_for_pep_merge,pattern=is_adj)) +
+    geom_col_pattern(alpha=0.8,
+                     color = "white", 
+                     pattern_fill = "white",
+                     pattern_angle = 45,
+                     pattern_density = 0.1,
+                     pattern_spacing = 0.025,
+                     pattern_key_scale_factor = 0.6) +
+    scale_pattern_manual(values = c(adjacent = "stripe", non_adjacent = "none")) +
+    geom_text(aes(label =n_label), position = position_stack(vjust = 0.5),size=5) +
+    scale_fill_manual(values = c("#a1d76a", "#e9a3c9")) + 
+    theme_minimal()+
+    theme(legend.text = element_text(size=30), 
+          axis.title.x = element_text(size=30),
+          axis.title.y = element_text(size=30),
+          strip.text = element_text(size=30),
+          plot.title = element_text(size=35),
+          plot.subtitle = element_text(size = 25),
+          plot.caption = element_text(size = 25),
+          legend.title=element_text(size=30),
+          axis.text.x = element_text(size=20),
+          axis.text.y = element_text(size = 30),
+          axis.title=element_text(size=30)) +
+    ggtitle("Count of peptides having adjacent STYs or not as a function of total number of STY amino acids") +
+    labs(subtitle = "No Localization filter was applied.",x="Length of STY a.a in the sequence",y="Count",fill="Is correctly localized?")
+  
+  
+  
+  plt12 <- comb_result_pep_adj_all %>% filter(!grepl("non_adjacent",is_adj)) %>%
+    mutate(Pool_for_pep_merge=ifelse(Pool_for_pep_merge!="Correct","Wrong",Pool_for_pep_merge)) %>%
+    #filter(!grepl("Wrong Loc. out of theo. list",Pool_for_pep_merge)) %>%
+    #filter(ptm_score > 0.75) %>%
+    count(STY_len,is_adj,Pool_for_pep_merge) %>% mutate(n_label=n) %>%
+    mutate(n=ifelse(Pool_for_pep_merge =="Wrong", (n* (-1)),n)) %>%
+    mutate(STY_len= ifelse(STY_len < 0, (-1*STY_len),STY_len)) %>%
+    ggplot(aes(x=STY_len,y=n,fill=Pool_for_pep_merge)) +
+    geom_col() +
+    geom_text(aes(label =n_label), position = position_stack(vjust = 0.5),size=5) +
+    scale_fill_manual(values = c("#a1d76a", "#e9a3c9")) + 
+    theme_minimal()+
+    theme(legend.text = element_text(size=30), 
+          axis.title.x = element_text(size=30),
+          axis.title.y = element_text(size=30),
+          strip.text = element_text(size=30),
+          plot.title = element_text(size=35),
+          plot.subtitle = element_text(size = 25),
+          plot.caption = element_text(size = 25),
+          legend.title=element_text(size=30),
+          axis.text.x = element_text(size=20),
+          axis.text.y = element_text(size = 30),
+          axis.title=element_text(size=30)) + 
+    ggtitle("Count of peptides having adjacent STYs as a function of length of the STY pattern") +
+    labs(subtitle = "No Localization filter was applied.",x="Length of STY pattern",y="Count",fill="Is correctly localized?")
+  
 
   ### DISTRIBUTION OF ALL SEQUENCES WITH CONSIDERING ADJ_COUNT AND ACCURACY 
   plt9 <- comb_result_pep_adj_all %>%
@@ -647,7 +757,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
     facet_wrap(~pep_class) +
     theme_minimal() +
     #scale_fill_brewer(palette = "Paired")+
-    scale_fill_manual(values = c("#377EB8", "#4DAF4A"))+ 
+    scale_fill_manual(values = c("#a1d76a", "#e9a3c9"))+ 
     theme(legend.text = element_text(size=30), 
           axis.title.x = element_text(size=30),
           axis.title.y = element_text(size=30),
@@ -665,7 +775,7 @@ final_proline_pep_quant_analysis_syn <- function(file_path,
   plot_obj <- plot_obj[!is.na(plot_obj)]
   sapply(1:length(plot_obj),function(x) ggsave(filename = paste0("p",x,".png"),
                                                width = 60, height = 45, 
-                                               path = paste0(file_path,curr_dir,"/outputs_after_mapping_change/"),
+                                               path = paste0(file_path,curr_dir,"/output_final/"), #outputs_after_mapping_change
                                                units = "cm",
                                                get(plot_obj[x]),
                                                device = "png", #".svg"
