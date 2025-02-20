@@ -20,6 +20,7 @@ final_pep_quant_analysis_bio <- function(file_path,
                                              acquisiton_type,
                                          norm_type,
                                              exp_id,
+                                         create_impute_vals,
                                              background_species,
                                              numerator,
                                              software_name,
@@ -51,7 +52,7 @@ final_pep_quant_analysis_bio <- function(file_path,
   }
   
   
-
+  create_impute_vals_parser = create_impute_vals
 
   
   sample_size <- length(exp_design) / num_reps
@@ -68,8 +69,12 @@ final_pep_quant_analysis_bio <- function(file_path,
   
   
   quant_peptides <- read_tsv(paste0(file_path,output_dir_name,"/refined_input",software_name,".txt"))
-  impute_vals <- read_tsv(paste0(file_path,output_dir_name,"/impute_values",software_name,".txt"))
   
+  if (create_impute_vals_parser==TRUE){
+    impute_vals <- read_tsv(paste0(file_path,output_dir_name,"/impute_values",software_name,".txt"))
+    
+  }else{}
+ 
   quant_peptides_ECOLI <- quant_peptides %>% 
       filter(grepl(background_species,species)) #%>%
       #relocate(exp_design,.after = id)
@@ -363,7 +368,7 @@ final_pep_quant_analysis_bio <- function(file_path,
 
   abundances_rowMeans <- NULL
   abundances_ecoli_rowMeans <- NULL
-  for (k in 1:sample_size){
+  for (k in 2:sample_size){
     # If separate version of row means is not needed, it can be commented later.
     # Separate row Means can be collected in temp object to merge in "log_10_filtered_abundances_rowMeans"
     assign(paste0("abundances_A",k),as.data.frame(rowMeans(filtered_abundances  %>%
@@ -380,9 +385,9 @@ final_pep_quant_analysis_bio <- function(file_path,
     
   }
   
-  colnames(abundances_rowMeans) <- paste0("Mean Abundance of A",1:sample_size)
+  colnames(abundances_rowMeans) <- paste0("Mean Abundance of A",2:sample_size)
   
-  colnames(abundances_ecoli_rowMeans) <- paste0("Mean Abundance of A",1:sample_size)
+  colnames(abundances_ecoli_rowMeans) <- paste0("Mean Abundance of A",2:sample_size)
   
   quant_peptides_ECOLI_density_plt <- filtered_abundances_ecoli %>%
     select(!starts_with("E")) %>%
@@ -439,99 +444,116 @@ final_pep_quant_analysis_bio <- function(file_path,
                subtitle_txt = "") +scale_fill_manual(values = c("#636363","#3182bd"))
 
   ###################################
-  
-  is.imputed_df_syn <- filtered_abundances %>%  pivot_longer(cols = starts_with(exp_design),
-                                                        names_to = "Experiment",
-                                                        values_to = "Intensity",
-                                                        values_drop_na = F) %>%
-    mutate(is.imputed=FALSE) %>%
-    mutate(is.imputed=ifelse(is.na(Intensity), TRUE,is.imputed)) 
-
-  is.imputed_df_ecoli <- filtered_abundances_ecoli %>%  pivot_longer(cols = starts_with(exp_design),
-                                                                names_to = "Experiment",
-                                                                values_to = "Intensity",
-                                                                values_drop_na = F) %>%
-    mutate(is.imputed=FALSE) %>%
-    mutate(is.imputed=ifelse(is.na(Intensity), TRUE,is.imputed)) 
-  
-  impute_values <- as.numeric(impute_vals$x)
-  ##REPLAVE ANY ZEROs was assessed by software to NA to enable to impute them
-  
-  filtered_abundances <- replace(filtered_abundances, filtered_abundances==0, NA)
-  filtered_abundances_ecoli <- replace(filtered_abundances_ecoli, filtered_abundances_ecoli==0, NA)
-  
-  # Impute missing values
-  for (j in 1:length(impute_values)){
-    # Number NA
-    #num_NA <- length(abundances_for_impute_all[,j+2][is.na(abundances_for_impute_all[,j+2])])
+  if (create_impute_vals_parser==TRUE){
     
-    filtered_abundances[,j+2][is.na(filtered_abundances[,j+2])] <- impute_values[j]
+    impute_vals <- read_tsv(paste0(file_path,output_dir_name,"/impute_values",software_name,".txt"))
     
-    filtered_abundances_ecoli[,j+2][is.na(filtered_abundances_ecoli[,j+2])] <- impute_values[j]
     
-    #abundances_for_impute_all[,j+2][is.na(abundances_for_impute_all)[,j+2]] <- impute_values[j]
-    # After imputation number of imputed values
-    #num_imp <-length(abundances_for_impute_all[,j+2][(abundances_for_impute_all[,j+2]==impute_values[j])])
     
-    # This is verification of imputation is done successfully
-    # Because we expect to see that number of imputed values should be the same amount as number of NA
-    #print(setequal(num_NA,num_imp))
-    #print(num_NA)
-    #print(num_imp)
+    is.imputed_df_syn <- filtered_abundances %>%  pivot_longer(cols = starts_with(exp_design),
+                                                               names_to = "Experiment",
+                                                               values_to = "Intensity",
+                                                               values_drop_na = F) %>%
+      mutate(is.imputed=FALSE) %>%
+      mutate(is.imputed=ifelse(is.na(Intensity), TRUE,is.imputed)) 
+    
+    is.imputed_df_ecoli <- filtered_abundances_ecoli %>%  pivot_longer(cols = starts_with(exp_design),
+                                                                       names_to = "Experiment",
+                                                                       values_to = "Intensity",
+                                                                       values_drop_na = F) %>%
+      mutate(is.imputed=FALSE) %>%
+      mutate(is.imputed=ifelse(is.na(Intensity), TRUE,is.imputed)) 
+    
+    impute_values <- as.numeric(impute_vals$x)
+    
+    ##REPLAVE ANY ZEROs was assessed by software to NA to enable to impute them
+    
+    filtered_abundances <- replace(filtered_abundances, filtered_abundances==0, NA)
+    filtered_abundances_ecoli <- replace(filtered_abundances_ecoli, filtered_abundances_ecoli==0, NA)
+    
+    # Impute missing values
+    for (j in 1:length(impute_values)){
+      # Number NA
+      #num_NA <- length(abundances_for_impute_all[,j+2][is.na(abundances_for_impute_all[,j+2])])
+      
+      filtered_abundances[,j+2][is.na(filtered_abundances[,j+2])] <- impute_values[j]
+      
+      filtered_abundances_ecoli[,j+2][is.na(filtered_abundances_ecoli[,j+2])] <- impute_values[j]
+      
+      #abundances_for_impute_all[,j+2][is.na(abundances_for_impute_all)[,j+2]] <- impute_values[j]
+      # After imputation number of imputed values
+      #num_imp <-length(abundances_for_impute_all[,j+2][(abundances_for_impute_all[,j+2]==impute_values[j])])
+      
+      # This is verification of imputation is done successfully
+      # Because we expect to see that number of imputed values should be the same amount as number of NA
+      #print(setequal(num_NA,num_imp))
+      #print(num_NA)
+      #print(num_imp)
+      
+      ### DISTRIBUTION OF IMPUTED VALUES ACROSS non-NA values
+      is.imputed_df <- is.imputed_df_ecoli %>% 
+        bind_rows(is.imputed_df_syn)
+      
+      
+      abundances_all_aft_imputation <- filtered_abundances %>%
+        #rename_with(~ paste0("pep_with_pos"), matches("^seq")) %>%
+        bind_rows(filtered_abundances_ecoli) 
+    
+      imputed_dataset <- abundances_all_aft_imputation %>% 
+        pivot_longer(cols = starts_with(exp_design),
+                     names_to = "Experiment",
+                     values_to = "Intensity",
+                     values_drop_na = F) %>%
+        left_join(is.imputed_df,by=c("pep_with_pos","Experiment")) %>%
+        mutate(Intensity.y=ifelse(is.na(Intensity.y),0,Intensity.y))
+      
+      write.table(imputed_dataset,file=paste0(file_path,output_dir_name,"/imputed_dataset",software_name,".txt"),sep = "\t",row.names = F)
+      
+      p21  <- imputed_dataset %>% filter(grepl(selected_species,species.x)) %>% 
+        ggplot(aes(x=log2(Intensity.x),fill=is.imputed)) + geom_histogram(bins = 30) +
+        theme_minimal() + scale_fill_manual(values = c("#7fbf7b","#af8dc3")) + #scale_fill_brewer(palette = "Set1",direction = -1) +
+        theme(legend.text = element_text(size = 45), #aspect.ratio=6.5/11, 
+              axis.title.x = element_text(size = 45),
+              axis.title.y = element_text(size = 45),
+              plot.title = element_text(size = 55),
+              legend.title = element_text(size = 45),
+              axis.text.x = element_text(size = 45),
+              axis.title = element_text(size = 45),
+              axis.text.y = element_text(size = 45),
+              plot.subtitle = element_text(size = 45)) +
+        labs( y= "Count of Intensity", x="Intenisity",
+              title = paste("Distribution of imputed values \n",selected_species), 
+              subtitle = paste('Experiment 2 ', acquisiton_type, " data processed by ", software_name))
+      
+      p22 <- imputed_dataset %>% filter(grepl(background_species,species.x)) %>% 
+        ggplot(aes(x=log2(Intensity.x),fill=is.imputed)) + geom_histogram(bins = 30) +
+        theme_minimal() + scale_fill_manual(values = c("#7fbf7b","#af8dc3")) +
+        theme(legend.text = element_text(size = 45), #aspect.ratio=6.5/11, 
+              axis.title.x = element_text(size = 45),
+              axis.title.y = element_text(size = 45),
+              plot.title = element_text(size = 55),
+              legend.title = element_text(size = 45),
+              axis.text.x = element_text(size = 45),
+              axis.title = element_text(size = 45),
+              axis.text.y = element_text(size = 45),
+              plot.subtitle = element_text(size = 45)) +
+        labs( y= "Count of Intensity", x="Intenisity",
+              title = paste(background_species)) 
+      #subtitle = paste('Experiment 2 ', acquisiton_type, " data processed by ", software_name))
+      
+      plot22 <- p21/p22
+      
+    }
+    
+  }else{
+    abundances_all_aft_imputation <- filtered_abundances %>%
+      #rename_with(~ paste0("pep_with_pos"), matches("^seq")) %>%
+      bind_rows(filtered_abundances_ecoli) %>%
+      drop_na(contains(exp_design))
+    
   }
-  
-  abundances_all_aft_imputation <- filtered_abundances %>%
-    #rename_with(~ paste0("pep_with_pos"), matches("^seq")) %>%
-    bind_rows(filtered_abundances_ecoli) 
-  
-  ### DISTRIBUTION OF IMPUTED VALUES ACROSS non-NA values
-  is.imputed_df <- is.imputed_df_ecoli %>% 
-    bind_rows(is.imputed_df_syn)
-  
-  imputed_dataset <- abundances_all_aft_imputation %>% 
-    pivot_longer(cols = starts_with(exp_design),
-                 names_to = "Experiment",
-                 values_to = "Intensity",
-                 values_drop_na = F) %>%
-    left_join(is.imputed_df,by=c("pep_with_pos","Experiment")) %>%
-    mutate(Intensity.y=ifelse(is.na(Intensity.y),0,Intensity.y))
-  
-  write.table(imputed_dataset,file=paste0(file_path,output_dir_name,"/imputed_dataset",software_name,".txt"),sep = "\t",row.names = F)
-  
-  p21  <- imputed_dataset %>% filter(grepl(selected_species,species.x)) %>% 
-    ggplot(aes(x=log2(Intensity.x),fill=is.imputed)) + geom_histogram(bins = 30) +
-    theme_minimal() + scale_fill_manual(values = c("#7fbf7b","#af8dc3")) + #scale_fill_brewer(palette = "Set1",direction = -1) +
-    theme(legend.text = element_text(size = 45), #aspect.ratio=6.5/11, 
-          axis.title.x = element_text(size = 45),
-          axis.title.y = element_text(size = 45),
-          plot.title = element_text(size = 55),
-          legend.title = element_text(size = 45),
-          axis.text.x = element_text(size = 45),
-          axis.title = element_text(size = 45),
-          axis.text.y = element_text(size = 45),
-          plot.subtitle = element_text(size = 45)) +
-    labs( y= "Count of Intensity", x="Intenisity",
-          title = paste("Distribution of imputed values \n",selected_species), 
-          subtitle = paste('Experiment 2 ', acquisiton_type, " data processed by ", software_name))
-  
-  p22 <- imputed_dataset %>% filter(grepl(background_species,species.x)) %>% 
-    ggplot(aes(x=log2(Intensity.x),fill=is.imputed)) + geom_histogram(bins = 30) +
-    theme_minimal() + scale_fill_manual(values = c("#7fbf7b","#af8dc3")) +
-    theme(legend.text = element_text(size = 45), #aspect.ratio=6.5/11, 
-          axis.title.x = element_text(size = 45),
-          axis.title.y = element_text(size = 45),
-          plot.title = element_text(size = 55),
-          legend.title = element_text(size = 45),
-          axis.text.x = element_text(size = 45),
-          axis.title = element_text(size = 45),
-          axis.text.y = element_text(size = 45),
-          plot.subtitle = element_text(size = 45)) +
-    labs( y= "Count of Intensity", x="Intenisity",
-          title = paste(background_species)) 
-  #subtitle = paste('Experiment 2 ', acquisiton_type, " data processed by ", software_name))
-  
-  plot22 <- p21/p22
-  
+ 
+ 
   ## ADDITIONAL IMPUTATION METHOD with MICE()
   # library(tidyverse)
   # library(tidyr)
@@ -598,7 +620,7 @@ final_pep_quant_analysis_bio <- function(file_path,
   filtered_abundances_log10_rowMeans <- NULL
   
   
-  for (k in 1:sample_size){
+  for (k in 2:sample_size){
     # If separate version of row means is not needed, it can be commented later.
     # Separate row Means can be collected in temp object to merge in "log_10_filtered_abundances_rowMeans"
     
@@ -624,15 +646,15 @@ final_pep_quant_analysis_bio <- function(file_path,
     
   }
 
-  colnames(filtered_abundances_rowMeans) <- paste0("mean_abundances_aft_imp_A",1:sample_size)
-  colnames(filtered_abundances_log10_rowMeans) <- paste0("mean_log10_abundances_A",1:sample_size)
+  colnames(filtered_abundances_rowMeans) <- paste0("mean_abundances_aft_imp_A",2:sample_size)
+  colnames(filtered_abundances_log10_rowMeans) <- paste0("mean_log10_abundances_A",2:sample_size)
   filtered_abundances_log10 <- filtered_abundances_log10 %>%
     rename_with(~ paste0("log10_", .x), everything())
   
   # Calculate Fold Change by keeping A1 constant (mean(S1)/mean(S2), etc.)
   cols <- ncol(filtered_abundances_rowMeans)
-  for(An in 1:sample_size){
-    filtered_abundances_rowMeans[,paste0("exp_FC_A",numerator,"/A",An)] <- filtered_abundances_rowMeans[,1]/filtered_abundances_rowMeans[,An]
+  for(An in 2:sample_size){
+    filtered_abundances_rowMeans[,paste0("exp_FC_A",numerator,"/A",An)] <- filtered_abundances_rowMeans[,1]/filtered_abundances_rowMeans[,(An-1)]
     
   }
   #rmv_col <- paste0("exp_FC_A",numerator,"/A",numerator)
@@ -663,7 +685,7 @@ final_pep_quant_analysis_bio <- function(file_path,
     pivot_longer(cols = starts_with("exp_"),
                  names_to = "exp_FC",
                  values_to = "values") %>%
-    mutate(actual_ratio_val= case_when(grepl(comparisons[1],exp_FC) ~ actual_ratio[1],
+    mutate(actual_ratio_val= case_when(#grepl(comparisons[1],exp_FC) ~ actual_ratio[1],
                                        grepl(comparisons[2],exp_FC) ~actual_ratio[2],
                                        grepl(comparisons[3],exp_FC) ~actual_ratio[3],
                                        grepl(comparisons[4],exp_FC) ~actual_ratio[4],
@@ -1075,12 +1097,12 @@ final_pep_quant_analysis_bio <- function(file_path,
       library(multtest)
         # Pre-allocate memory for results
         
-        num_iterations <- sample_size #- 1
+        num_iterations <- sample_size - 1
         all_pvalues <- matrix(NA, nrow(stat_analysis), num_iterations)
         all_adjust_pval <- matrix(NA, nrow(stat_analysis), num_iterations)
         
         # Loop through iterations using lapply
-        for (i in 1:sample_size) {
+        for (i in 2:sample_size) {
           p_values_tmp <- lapply(1:dim(stat_analysis)[1], function(j) {
             if (test_type == "t.test") {
               ttest_func(select(stat_analysis, contains(paste0("A",numerator,"-")) & contains("log10_"))[j,],
@@ -1092,24 +1114,24 @@ final_pep_quant_analysis_bio <- function(file_path,
           })
           
           # Extract p-values from the list
-          p_values_tmp <- sapply(p_values_tmp, function(x) x)
+          p_values_tmp1 <- sapply(p_values_tmp, function(x) x)
           
           # Store p-values in the pre-allocated matrix
-          all_pvalues[, i] <- p_values_tmp # - 1
+          all_pvalues[, (i-1)] <- p_values_tmp1  
           
           # Perform adjustment
-          adjust_pval_tmp <- mt.rawp2adjp(p_values_tmp, proc = "BH", alpha = 0.05)
+          adjust_pval_tmp <- mt.rawp2adjp(p_values_tmp1, proc = "BH", alpha = 0.05)
           qval <- data.frame(adjust_pval_tmp$adjp, adjust_pval_tmp$index)[order(adjust_pval_tmp$index), 2]
           
           # Store adjusted p-values in the pre-allocated matrix
-          all_adjust_pval[, i ] <- qval #- 1
+          all_adjust_pval[, (i-1)] <- qval 
         }
         
         all_pvalues <- as.data.frame(all_pvalues)
         all_adjust_pval <- as.data.frame(all_adjust_pval)
         
-        colnames(all_pvalues) <- paste0("pvalues_A",numerator,"/A", 1:sample_size)
-        colnames(all_adjust_pval) <- paste0("adjust_pval_A",numerator,"/A", 1:sample_size)
+        colnames(all_pvalues) <- paste0("pvalues_A",numerator,"/A", 2:sample_size)
+        colnames(all_adjust_pval) <- paste0("adjust_pval_A",numerator,"/A", 2:sample_size)
         
         rownames(all_pvalues) <- row.names(stat_analysis)
         rownames(all_adjust_pval) <- row.names(stat_analysis)
@@ -1120,7 +1142,7 @@ final_pep_quant_analysis_bio <- function(file_path,
       pivot_longer(cols = starts_with("pvalues_"), values_to = "pvalues", names_to ="p_ratios") %>%
       separate(p_ratios, into = c("tmp","ratio"),sep = "_") %>%
       select(!tmp) %>%
-      mutate(common_col = paste(pep_with_pos,species,ratio,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) #spectrum_title accession
+      mutate(common_col = paste(pep_with_pos,species,ratio,((sample_size-1)*nrow(stat_analysis)),sep="@")) #spectrum_title accession
     
     ## THE BEST WAY TO DO is this:
     merge_stat_df <- final_imputed_data %>%
@@ -1128,7 +1150,7 @@ final_pep_quant_analysis_bio <- function(file_path,
       pivot_longer(cols = starts_with("exp_FC"), values_to = "fold_change_values", names_to ="fold_change_ratios") %>%
       separate(fold_change_ratios, into = c("tmp","tmp1","ratio"),sep = "_") %>%
       select(!c(tmp,tmp1)) %>%
-      mutate(common_col = paste(pep_with_pos,species,1:((sample_size-1)*nrow(final_imputed_data)),sep="@")) %>% #accession
+      mutate(common_col = paste(pep_with_pos,species,((sample_size-1)*nrow(final_imputed_data)),sep="@")) %>% #accession
       bind_cols(all_pvalues_common_col$ratio,all_pvalues_common_col$pvalues) %>%
       rename_with(.col =6 , ~"ratio1") %>%
       rename_with(.col=7, ~ "pvalues") #%>%
@@ -1136,12 +1158,12 @@ final_pep_quant_analysis_bio <- function(file_path,
     
     actual_ratio_col <- merge_stat_df %>%
       select(ratio1) %>% distinct() %>%
-      mutate(actual_ratio_val= case_when(grepl(comparisons[1],ratio1) ~ actual_ratio[1],
+      mutate(actual_ratio_val= case_when(#grepl(comparisons[1],ratio1) ~ actual_ratio[1],
                                          grepl(comparisons[2],ratio1) ~actual_ratio[2],
                                          grepl(comparisons[3],ratio1) ~actual_ratio[3],
                                          grepl(comparisons[4],ratio1) ~actual_ratio[4],
                                          grepl(comparisons[5],ratio1) ~actual_ratio[5]))
-    col_vline <- rep("#000000",length(comparisons))
+    col_vline <- rep("#000000",length(comparisons)-1)
     actual_ratio_col <- as.data.frame(actual_ratio_col %>%
                                         bind_cols(col_vline)) %>% rename(col=3)
     
@@ -1149,7 +1171,7 @@ final_pep_quant_analysis_bio <- function(file_path,
     
     plot_pval_hist <- merge_stat_df_final %>% 
       filter(!grepl("A2/A2",ratio)) %>% 
-      filter(grepl("MOUSE",species)) %>% 
+      filter(grepl(selected_species,species)) %>% 
       ggplot(aes(x=log10(pvalues))) + geom_histogram(aes(y = cumsum(..count..))) +
       theme_bw() +
       theme(legend.text = element_text(size = 45),
