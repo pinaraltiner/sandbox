@@ -313,9 +313,9 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
            Modifications,Number.of.PSMs,
            Master.Protein.Descriptions,
            Protein.Accessions,
-           starts_with("Abundances.Normalized"))%>%#, #Marked.as, 
-           #starts_with("Abundance.Ratio.P.Value"),
-           #starts_with("Abundance.Ratio.log2")) %>%
+           starts_with("Abundances.Normalized"), #Marked.as, 
+           starts_with("Abundance.Ratio.P.Value"),
+           starts_with("Abundance.Ratio.log2")) %>%
     rename_with(~ exp_design, starts_with("Abundances.Normalized")) %>%
     mutate(species=background_species)
   
@@ -599,12 +599,12 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   
   if(loc_filter_opt == TRUE){
     
-    quant_phospho_peptides <-quant_phospho_aft_inner_map_pep %>%
+    quant_phospho_peptides <-df_merge_all_col_wide %>% #quant_phospho_aft_inner_map_pep %>%
       
       filter(as.numeric(phospho_score) >= loc_filter)  
     
   }else{
-    quant_phospho_peptides <-quant_phospho_aft_inner_map_pep 
+    quant_phospho_peptides <-df_merge_all_col_wide #quant_phospho_aft_inner_map_pep 
     
   }
   
