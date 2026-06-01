@@ -2,6 +2,7 @@
 library(stringr)
 library(dplyr)
 library(tibble)
+library(tibble)
 #library(data.table) # REMOVED: unused
 library(openxlsx)
 library(tidyr)
@@ -12,87 +13,87 @@ library(gtools)
 library(ggpattern)
 library(nanoparquet)
 ###############################################
-"D:/dev/Pinar/PHD/wet_lab_experiments/DIA_analysis/Exp_1/Exp1_with_Ecoli/DIANN_v1.9/noMBR/"
+# CONTAINER_DISABLED: "D:/dev/Pinar/PHD/wet_lab_experiments/DIA_analysis/Exp_1/Exp1_with_Ecoli/DIANN_v1.9/noMBR/"
+# CONTAINER_DISABLED: 
+source("/home/claude/post_processing_parquet/additional_functions/ggplot_functions.R")
+source("/home/claude/post_processing_parquet/additional_functions/get_modification_func/getModificationPosition_func_for_all_mods_fixed.R")
+# CONTAINER_DISABLED: 
+# CONTAINER_DISABLED: file_paths <- paste0("D:/dev/Pinar/PHD/wet_lab_experiments/DIA_analysis/Exp_1/Exp1_with_Ecoli/DIANN_v1.9/noMBR/",
+# CONTAINER_DISABLED:                c("using_PD_Exp1_DDA_speclib_MaxVarMod4/",
+# CONTAINER_DISABLED:                  "misclv2_MaxVarMod4_charge14_FDR1/",
+# CONTAINER_DISABLED:                  "maxVarMod3_wrong_speclib_naming/misclv2_MaxVarMod3_charge14_FDR100/",
+# CONTAINER_DISABLED:                  "misclv2_MaxVarMod4_charge14_FDR100/",
+# CONTAINER_DISABLED:                  "misclv2_MaxVarMod5_charge14_FDR100/","run_dir_comb_fasta_msclv2_MaxVarMod3Charge14/"))
+# CONTAINER_DISABLED: #"D:/dev/Pinar/PHD/wet_lab_experiments/DIA_analysis/Exp_1/DIANN/Exp1_with_Ecoli/DIANN_v1.9/noMBR/misclv2_MaxVarMod5_charge14/")
+# CONTAINER_DISABLED: #"D:/dev/Pinar/PHD/wet_lab_experiments/DIA_analysis/Exp_1/DIANN/Exp1_with_Ecoli/DIANN_v1.9/withMBR/") #noMBR
+# CONTAINER_DISABLED: file_names <- c("report.parquet","misclv2_MaxVarMod4_charge14_FDR1_report.parquet",
+# CONTAINER_DISABLED:                 "misclv2_MaxVarMod3_charge14_FDR100report.parquet",
+# CONTAINER_DISABLED:                 "report.parquet",
+# CONTAINER_DISABLED:                 "Exp1_with_ecoli_misclv2_MaxVarMod5_charge14_FDR100.parquet",
+# CONTAINER_DISABLED:                 "comb_fasta_msclv2_MaxVarMod3Charge14_report.parquet")#) "Exp1_with_ecoli_misclv2_MaxVarMod5_charge14_FDR100.parquet"
+# CONTAINER_DISABLED: #"misclv2_MaxVarMod5_charge14_Exploris_report.tsv")#"same_params_and_lib_exp2_redesigned_MaxVarMods4_FDR1_Misclgvg2_MBR.tsv")
+# CONTAINER_DISABLED: #"same_params_and_lib_exp2_redesigned_MaxVarMods4_FDR1_Misclgvg2_noMBR.tsv")
+# CONTAINER_DISABLED: mapping <- "D:/dev/Pinar/PHD/data_analysis/DIA_mapping/exp1_batch2_mapping_btw_rawfile_pool_id.txt"
+# CONTAINER_DISABLED: 
+# CONTAINER_DISABLED: #"D:\dev\Pinar\PHD\wet_lab_experiments\DIA_data_analysis\experiment_1\DIANN\Exp1_with_Ecoli"
+# CONTAINER_DISABLED: 
+# CONTAINER_DISABLED: selected_spcies="HUMAN"
+# CONTAINER_DISABLED: background_species= "ECOLI"
+# CONTAINER_DISABLED: theo_file_path="D:/dev/Pinar/PHD/wet_lab_experiments/Eyers_syn_peptides_experiment/"
+# CONTAINER_DISABLED: theo_file_name="Synthetic peptides list_theo_conc_corrected_isomericity_new_with_plates.xlsx"
+# CONTAINER_DISABLED: sheet_theo_name ="ISOREF_REF2_Others" #"ISO-refOTHER with FC_correct"
+# CONTAINER_DISABLED: acquisiton_type="DIA no FAIMS Exploris"
+# CONTAINER_DISABLED: subtitle = #"version 1.9 & no MBR charge 1 & 4 MaxVarMod 5 "
+# CONTAINER_DISABLED: #fdr_threshold = 0.05
+# CONTAINER_DISABLED: 
+# CONTAINER_DISABLED: #exp_design=experiment_name
+# CONTAINER_DISABLED: exp_id=1
+# CONTAINER_DISABLED: software_name="DIA-NN"
+# CONTAINER_DISABLED: num_reps=3
+# CONTAINER_DISABLED: #test_type="limma"
+# CONTAINER_DISABLED: file_path <- file_paths[6]
+# CONTAINER_DISABLED: file_name <- file_names[6]
+# CONTAINER_DISABLED: 
+# CONTAINER_DISABLED: final_diann_pep_quant_analysis_syn_exp1(file_path = file_path,
+# CONTAINER_DISABLED:                                         file_name = file_name,
+# CONTAINER_DISABLED:                                         sheet_name="",
+# CONTAINER_DISABLED:                                         theo_file_path=theo_file_path,
+# CONTAINER_DISABLED:                                         theo_file_name=theo_file_name,
+# CONTAINER_DISABLED:                                         sheet_theo_name=sheet_theo_name,
+# CONTAINER_DISABLED:                                         background_species="ECOLI",
+# CONTAINER_DISABLED:                                         selected_spcies="HUMAN",
+# CONTAINER_DISABLED:                                         exp_id=1,
+# CONTAINER_DISABLED:                                         mapping=mapping,
+# CONTAINER_DISABLED:                                         #exp_design,
+# CONTAINER_DISABLED:                                         #fdr_threshold,
+# CONTAINER_DISABLED:                                         acquisiton_type=acquisiton_type,
+# CONTAINER_DISABLED:                                         software_name="DIA-NN",
+# CONTAINER_DISABLED:                                         #test_type,
+# CONTAINER_DISABLED:                                         num_reps=3,
+# CONTAINER_DISABLED:                                         #actual_ratio,
+# CONTAINER_DISABLED:                                         subtitle="version 1.9 & no MBR charge 1 & 4 MaxVarMod 3 FDR 1% using comb. FASTA")
 
-source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/ggplot/ggplot_functions.R")
-source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/get_modification_func/getModificationPosition_func_for_all_mods.R")
 
-file_paths <- paste0("D:/dev/Pinar/PHD/wet_lab_experiments/DIA_analysis/Exp_1/Exp1_with_Ecoli/DIANN_v1.9/noMBR/",
-               c("using_PD_Exp1_DDA_speclib_MaxVarMod4/",
-                 "misclv2_MaxVarMod4_charge14_FDR1/",
-                 "maxVarMod3_wrong_speclib_naming/misclv2_MaxVarMod3_charge14_FDR100/",
-                 "misclv2_MaxVarMod4_charge14_FDR100/",
-                 "misclv2_MaxVarMod5_charge14_FDR100/","run_dir_comb_fasta_msclv2_MaxVarMod3Charge14/"))
-#"D:/dev/Pinar/PHD/wet_lab_experiments/DIA_analysis/Exp_1/DIANN/Exp1_with_Ecoli/DIANN_v1.9/noMBR/misclv2_MaxVarMod5_charge14/")
-#"D:/dev/Pinar/PHD/wet_lab_experiments/DIA_analysis/Exp_1/DIANN/Exp1_with_Ecoli/DIANN_v1.9/withMBR/") #noMBR
-file_names <- c("report.parquet","misclv2_MaxVarMod4_charge14_FDR1_report.parquet",
-                "misclv2_MaxVarMod3_charge14_FDR100report.parquet",
-                "report.parquet",
-                "Exp1_with_ecoli_misclv2_MaxVarMod5_charge14_FDR100.parquet",
-                "comb_fasta_msclv2_MaxVarMod3Charge14_report.parquet")#) "Exp1_with_ecoli_misclv2_MaxVarMod5_charge14_FDR100.parquet"
-#"misclv2_MaxVarMod5_charge14_Exploris_report.tsv")#"same_params_and_lib_exp2_redesigned_MaxVarMods4_FDR1_Misclgvg2_MBR.tsv")
-#"same_params_and_lib_exp2_redesigned_MaxVarMods4_FDR1_Misclgvg2_noMBR.tsv")
-mapping <- "D:/dev/Pinar/PHD/data_analysis/DIA_mapping/exp1_batch2_mapping_btw_rawfile_pool_id.txt"
-
-#"D:\dev\Pinar\PHD\wet_lab_experiments\DIA_data_analysis\experiment_1\DIANN\Exp1_with_Ecoli"
-
-selected_spcies="HUMAN"
-background_species= "ECOLI"
-theo_file_path="D:/dev/Pinar/PHD/wet_lab_experiments/Eyers_syn_peptides_experiment/"
-theo_file_name="Synthetic peptides list_theo_conc_corrected_isomericity_new_with_plates.xlsx"
-sheet_theo_name ="ISOREF_REF2_Others" #"ISO-refOTHER with FC_correct"
-acquisiton_type="DIA no FAIMS Exploris"
-subtitle = #"version 1.9 & no MBR charge 1 & 4 MaxVarMod 5 "
-#fdr_threshold = 0.05
-
-#exp_design=experiment_name
-exp_id=1
-software_name="DIA-NN"
-num_reps=3
-#test_type="limma"
-file_path <- file_paths[6]
-file_name <- file_names[6]
-
-#final_diann_pep_quant_analysis_syn_exp1_buggy(file_path = file_path,
-#                                        file_name = file_name,
-#                                        sheet_name="",
-#                                        theo_file_path=theo_file_path,
-#                                        theo_file_name=theo_file_name,
-#                                        sheet_theo_name=sheet_theo_name,
-#                                        background_species="ECOLI",
-#                                        selected_spcies="HUMAN",
-#                                        exp_id=1,
-#                                        mapping=mapping,
-#                                        #exp_design,
-#                                        #fdr_threshold,
-#                                        acquisiton_type=acquisiton_type,
-#                                        software_name="DIA-NN",
-#                                        #test_type,
-#                                        num_reps=3,
-#                                        #actual_ratio,
-#                                        subtitle="version 1.9 & no MBR charge 1 & 4 MaxVarMod 3 FDR 1% using comb. FASTA")
-
-
-final_diann_pep_quant_analysis_syn_exp1_buggy <- function(file_path,
-                                               file_name,
-                                               sheet_name,
-                                               theo_file_path,
-                                               theo_file_name,
-                                               sheet_theo_name,
-                                               background_species,
-                                               selected_spcies,
-                                               exp_id,
-                                               mapping,
-                                               #exp_design,
-                                               #fdr_threshold,
-                                               acquisiton_type,
-                                               software_name,
-                                               #test_type,
-                                               num_reps,
-                                               #actual_ratio,
-                                               subtitle){
+final_diann_pep_quant_analysis_syn_exp1_fixed <- function(file_path,
+                                                          file_name,
+                                                          sheet_name,
+                                                          theo_file_path,
+                                                          theo_file_name,
+                                                          sheet_theo_name,
+                                                          background_species,
+                                                          selected_spcies,
+                                                          exp_id,
+                                                          mapping,
+                                                          #exp_design,
+                                                          #fdr_threshold,
+                                                          acquisiton_type,
+                                                          software_name,
+                                                          #test_type,
+                                                          num_reps,
+                                                          #actual_ratio,
+                                                          subtitle){
   
-  intended_dir <-paste0(file_path,"output_buggy/")
+  intended_dir <-paste0(file_path,"output_final_aft_mapp_func/")
   
   if(dir.exists(intended_dir)){
     new_path <- intended_dir
@@ -128,7 +129,7 @@ final_diann_pep_quant_analysis_syn_exp1_buggy <- function(file_path,
     left_join(mapping_file,by="raw_file") %>%
     mutate(pool_id_map_df=pool_id) %>%
     rename("Sequence"="Stripped.Sequence") %>%
-    rename("Intensity"= "PG.Normalised")# %>%
+    rename("Intensity"= "Precursor.Normalised")# %>%
   #filter(Global.Q.Value < 0.05)
   
   ## PHOSPHO-FILTERING
@@ -169,7 +170,7 @@ final_diann_pep_quant_analysis_syn_exp1_buggy <- function(file_path,
     rename(Neutral_mass=Neutral.mass.SH.Cys) %>%
     mutate(Neutral_mass = round(Neutral_mass, 0)) %>%
     mutate(Neutral_mass_theo=Neutral_mass) #%>%
-    #mutate(pool_id_theo_list_seq=pool_id) 
+  #mutate(pool_id_theo_list_seq=pool_id) 
   
   
   pep_list_w_theo_seq_map_pool <-  pep_list_w_theo %>%
@@ -186,7 +187,7 @@ final_diann_pep_quant_analysis_syn_exp1_buggy <- function(file_path,
   # 
   ## input sequence will be like this: (UniMod:1)AGGKPS(UniMod:21)QS(UniMod:21)PSQEAAGEAVLGAK
   
-  df2 <- apply(quant_phospho[,"Modified.Sequence"],1,getModificationPosition_)
+  df2 <- apply(quant_phospho[,"Modified.Sequence",drop=FALSE],1,getModificationPosition_)
   
   #apply(X = as.data.frame(quant_phospho[,"Modified.Sequence"]),1,function(x){getModificationPosition_general(mod_seq = x,software_name = )})
   
@@ -256,13 +257,13 @@ final_diann_pep_quant_analysis_syn_exp1_buggy <- function(file_path,
   ##################################################################################################################
   ### Mapping by precursor mass + phospho  and sequence ####
   
-  amino_acid_table <- read.delim("D:/dev/Pinar/PHD/wet_lab_experiments/Eyers_syn_peptides_experiment/amino_acid_table.txt")
+  amino_acid_table <- read.delim("/home/claude/post_processing_parquet/amino_acid_table.txt")
   mapping_df <- as.data.frame(cbind(amino_acid_table$X1.letter.code,amino_acid_table$Monoisotopic.Mass))
   colnames(mapping_df) <- c("letters","mono_isotopic")
   
   mapping_df$mono_isotopic <- as.numeric(mapping_df$mono_isotopic)
   # Apply the function to each sequence in the sequences data frame
- 
+  
   comb_result_pos$Sum <- mapply(calculate_sum,
                                 comb_result_pos$Sequence,
                                 comb_result_pos$Positions, MoreArgs = list(mapping_df = mapping_df))
@@ -281,7 +282,7 @@ final_diann_pep_quant_analysis_syn_exp1_buggy <- function(file_path,
     slice(which.max(Intensity)) %>%
     ungroup() 
   
-
+  
   comb_result_seq_pool <- comb_result_mz_seq_map %>% 
     full_join(pep_list_w_theo_seq_map_pool,by=c("Sequence","pool_id")) %>% # #pep_with_pos
     mutate(map_seq_pool=ifelse(map_seq!='Subset or different mz' & pool_id_theo_list_seq==pool_id_map_df, "Correct Seq. & mz & pool",NA)) %>%
@@ -289,8 +290,8 @@ final_diann_pep_quant_analysis_syn_exp1_buggy <- function(file_path,
     
     mutate(map_seq_pool=ifelse(map_seq== "Subset or different mz",map_seq,map_seq_pool)) %>%
     mutate(map_seq_pool = ifelse(is.na(Experiment), "missing", map_seq_pool))
-
-
+  
+  
   #
   ##################################################################################################################
   ##################################################################################################################
@@ -322,9 +323,9 @@ final_diann_pep_quant_analysis_syn_exp1_buggy <- function(file_path,
   
   #### WRITE THE OBJECT AS TSV ####
   write.table(comb_result_seq_pool,file=paste0(new_path,"/", #file_path,curr_dir
-                                          "exp",
-                                          exp_id,#acquisiton_type,
-                                          "merge_theo_list_with_identified_phospho_seq.tsv"),
+                                               "exp",
+                                               exp_id,#acquisiton_type,
+                                               "merge_theo_list_with_identified_phospho_seq.tsv"),
               sep = "\t",col.names = T,row.names = F)
   
   write.table(comb_result_dist,file=paste0(new_path,"/", software_name, #file_path,curr_dir
@@ -347,8 +348,8 @@ final_diann_pep_quant_analysis_syn_exp1_buggy <- function(file_path,
                                         subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +
     
     scale_fill_brewer(palette = "Dark2") + theme(axis.text.x = element_text(angle = 90))
- 
-   #### EXTRACTION OF CORRECT SEQ. ####
+  
+  #### EXTRACTION OF CORRECT SEQ. ####
   comb_result_seq_dist_cor <- comb_result_dist %>%
     filter(!grepl("Subset or different mz",map_seq) & !grepl("Missing",map_seq))
   
@@ -429,9 +430,9 @@ final_diann_pep_quant_analysis_syn_exp1_buggy <- function(file_path,
                                         y_lab = "Number of Localized Phospho-peptides",
                                         subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +
     scale_fill_brewer(palette = "Dark2") + theme(axis.text.x = element_text(angle = 90))
-
-   comb_result_pep_filt <- comb_result_pep_poolwise  %>%
-     filter(ptm_score >= 0.75)
+  
+  comb_result_pep_filt <- comb_result_pep_poolwise  %>%
+    filter(ptm_score >= 0.75)
   
   plot10 <- gg_barplt_id_pep_count_stack(data_set =comb_result_pep_filt,
                                          x_df =comb_result_pep_filt$Experiment,
@@ -466,16 +467,16 @@ final_diann_pep_quant_analysis_syn_exp1_buggy <- function(file_path,
                                         subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +
     scale_fill_brewer(palette = "Dark2") + theme(axis.text.x = element_text(angle = 90))
   
-
-    comb_result_pep_filtered <- comb_result_pep_poolwise %>% 
-      separate(Experiment,into = c("exp","samp","inj"),sep = "_",remove = F) %>%
-      #filter(!grepl("Missing",map_seq_pool)) %>%
-      mutate(samp_name_wo_inj=paste(exp,samp,sep = "-")) %>%
-      group_by(samp_name_wo_inj,pep_with_pos) %>%
-      slice(which.max(ptm_score)) %>%
-      ungroup()
-    
- 
+  
+  comb_result_pep_filtered <- comb_result_pep_poolwise %>% 
+    separate(Experiment,into = c("exp","samp","inj"),sep = "_",remove = F) %>%
+    #filter(!grepl("Missing",map_seq_pool)) %>%
+    mutate(samp_name_wo_inj=paste(exp,samp,sep = "-")) %>%
+    group_by(samp_name_wo_inj,pep_with_pos) %>%
+    slice(which.max(ptm_score)) %>%
+    ungroup()
+  
+  
   
   write.table(comb_result_pep_filtered ,file=paste0(new_path,"/merge_theo_list_id_phospho_sites_max_ptm_score.tsv"), #file_path,curr_dir
               sep = "\t",col.names = T,row.names = F)
@@ -523,8 +524,8 @@ final_diann_pep_quant_analysis_syn_exp1_buggy <- function(file_path,
           axis.text.x = element_text(size=20,angle = 90),
           axis.text.y = element_text(size = 30),
           axis.title=element_text(size=30)) #+ 
-    #scale_x_continuous(limits = c(0, 100),breaks = seq(from = 0, to = 100, by = 10)) +  # Set the ticks for the x-axis
-    #scale_y_continuous(limits = c(0, 420),breaks = seq(from = 0, to = 420, by = 50))
+  #scale_x_continuous(limits = c(0, 100),breaks = seq(from = 0, to = 100, by = 10)) +  # Set the ticks for the x-axis
+  #scale_y_continuous(limits = c(0, 420),breaks = seq(from = 0, to = 420, by = 50))
   
   
   barplt_df <- comb_result_pep_filtered  %>%
@@ -539,29 +540,29 @@ final_diann_pep_quant_analysis_syn_exp1_buggy <- function(file_path,
   ####### ADDITIONAL PLOT TO DISPLAY MISSING and UNEXPECTED PEPTIDES ########
   
   plot12 <- gg_barplt_id_pep_count(data_set = barplt_df,
-                                x_df = barplt_df$map_seq_pool,
-                                fill_df = barplt_df$map_seq_pool,
-                                ymax = 20000,
-                                size_num = 10,
-                                header = "Total number of phospho-site across each sample before filtering",
-                                caption_lab = "NA values are removed.",
-                                x_lab = "Sample id",
-                                fill_lab =  "Sample id",
-                                y_lab = "Number of identified peptides",
-                                subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
+                                   x_df = barplt_df$map_seq_pool,
+                                   fill_df = barplt_df$map_seq_pool,
+                                   ymax = 20000,
+                                   size_num = 10,
+                                   header = "Total number of phospho-site across each sample before filtering",
+                                   caption_lab = "NA values are removed.",
+                                   x_lab = "Sample id",
+                                   fill_lab =  "Sample id",
+                                   y_lab = "Number of identified peptides",
+                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
   
   barplt_df_filt <-barplt_df  %>% filter(ptm_score >= 0.75)
   plot13 <- gg_barplt_id_pep_count(data_set = barplt_df_filt,
-                                x_df = barplt_df_filt$map_seq_pool,
-                                fill_df = barplt_df_filt$map_seq_pool,
-                                ymax = 20000,
-                                size_num = 10,
-                                header = "Total number of phospho-site across each sample after loc. filtering",
-                                caption_lab = "NA values are removed.",
-                                x_lab = "Sample id",
-                                fill_lab =  "Sample id",
-                                y_lab = "Number of identified peptides",
-                                subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
+                                   x_df = barplt_df_filt$map_seq_pool,
+                                   fill_df = barplt_df_filt$map_seq_pool,
+                                   ymax = 20000,
+                                   size_num = 10,
+                                   header = "Total number of phospho-site across each sample after loc. filtering",
+                                   caption_lab = "NA values are removed.",
+                                   x_lab = "Sample id",
+                                   fill_lab =  "Sample id",
+                                   y_lab = "Number of identified peptides",
+                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
   
   
   
@@ -575,16 +576,16 @@ final_diann_pep_quant_analysis_syn_exp1_buggy <- function(file_path,
     ungroup()
   
   plot1 <- gg_barplt_id_pep_count(data_set = barplt_df_ecoli,
-                               x_df = barplt_df_ecoli$Sample_id,
-                               fill_df = barplt_df_ecoli$Rep_id,
-                               ymax = 20000,
-                               size_num = 10,
-                               header = "Total number of quantified phospho-site across each sample",
-                               caption_lab = "NA values are removed.",
-                               x_lab = "Sample id",
-                               fill_lab =  "Sample id",
-                               y_lab = "Number of identified peptides",
-                               subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
+                                  x_df = barplt_df_ecoli$Sample_id,
+                                  fill_df = barplt_df_ecoli$Rep_id,
+                                  ymax = 20000,
+                                  size_num = 10,
+                                  header = "Total number of quantified phospho-site across each sample",
+                                  caption_lab = "NA values are removed.",
+                                  x_lab = "Sample id",
+                                  fill_lab =  "Sample id",
+                                  y_lab = "Number of identified peptides",
+                                  subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name))
   
   
   ### This regex was designed to check every S,T and Y in each sequence
@@ -670,9 +671,9 @@ final_diann_pep_quant_analysis_syn_exp1_buggy <- function(file_path,
     select(!c(STY_adj)) %>%
     rename(STY_adj = STY_adj_new) %>%
     bind_rows(#comb_result_pep_adj_5 disabled for withMBR
-              comb_result_pep_adj_4,
-              comb_result_pep_adj_3,
-              comb_result_pep_adj_2) %>%
+      comb_result_pep_adj_4,
+      comb_result_pep_adj_3,
+      comb_result_pep_adj_2) %>%
     left_join(pep_list_w_theo_adj_map,by = "pep_with_pos") %>%
     select(Sequence,
            S_count,
@@ -847,13 +848,15 @@ final_diann_pep_quant_analysis_syn_exp1_buggy <- function(file_path,
   #################################################
   plt_obj <- ls(pattern="plot")
   plt_obj <- plt_obj[!is.na(plt_obj)]
-  sapply(1:length(plt_obj),function(x) ggsave(filename = paste0("p",x,".png"),
-                                              width = 60, height = 45, 
-                                              path = paste0(new_path),
-                                              units = "cm",
-                                              get(plt_obj[x]),
-                                              device = "png", #".svg"
+  sapply(1:length(plt_obj),function(x) tryCatch(
+    ggsave(filename = paste0("p",x,".png"),
+           width = 60, height = 45, 
+           path = paste0(new_path),
+           units = "cm",
+           get(plt_obj[x]),
+           device = "png", dpi = 150,
+    ),
+    error = function(e) message("Warning: plot ", plt_obj[x], " failed to render: ", e$message)
   ))
   
 }
-  
