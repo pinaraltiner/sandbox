@@ -31,27 +31,27 @@ source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis
 # 
 
 final_pd_pep_quant_analysis_redesigned <- function(file_path,
-                                             file_name,
-                                             #sheet_name,
-                                             theo_file_path,
-                                             theo_file_name,
-                                             sheet_theo_name,
-                                             selected_spcies,
-                                             background_species,
-                                             acquisiton_type,
-                                             exp_id,
-                                             loc_filter_opt,
-                                             size_variying_pep_size,
-                                             numerator,
-                                             loc_filter,
-                                             software_name,
-                                             test_type,
-                                             exp_design,
-                                             num_reps,
-                                        subtitle,
-                                        fdr_threshold,
-                                        actual_ratio,dir_name
-                                        ){
+                                                   file_name,
+                                                   #sheet_name,
+                                                   theo_file_path,
+                                                   theo_file_name,
+                                                   sheet_theo_name,
+                                                   selected_spcies,
+                                                   background_species,
+                                                   acquisiton_type,
+                                                   exp_id,
+                                                   loc_filter_opt,
+                                                   size_variying_pep_size,
+                                                   numerator,
+                                                   loc_filter,
+                                                   software_name,
+                                                   test_type,
+                                                   exp_design,
+                                                   num_reps,
+                                                   subtitle,
+                                                   fdr_threshold,
+                                                   actual_ratio,dir_name
+){
   
   intended_dir <-paste0(file_path,dir_name)
   
@@ -63,7 +63,7 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
     new_path <- list.dirs(intended_dir)
     
   }
- 
+  
   sample_size <- length(exp_design) / num_reps
   sample_names <- paste0("A",1:sample_size)
   comparisons <- NULL
@@ -179,13 +179,13 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   #   filter(grepl("Phospho",Modifications)) %>%
   #   mutate(species="Homo sapiens")
   # 
-    # full_join(pep_list_w_theo_unique,by="Sequence") %>%
-    # mutate_at("Pool_for_seq_merge", ~replace_na(.,"Unexpected")) %>%
-    # mutate(Pool_for_seq_merge= ifelse(is.na(species),"missing",Pool_for_seq_merge)) %>%
-    # filter(!grepl("Unexpected",Pool_for_seq_merge)) %>%
-    # bind_rows(ecoli_seq) %>% 
-    # mutate(Pool_for_seq_merge= ifelse(is.na(Pool_for_seq_merge),background_species,Pool_for_seq_merge)) 
-    # 
+  # full_join(pep_list_w_theo_unique,by="Sequence") %>%
+  # mutate_at("Pool_for_seq_merge", ~replace_na(.,"Unexpected")) %>%
+  # mutate(Pool_for_seq_merge= ifelse(is.na(species),"missing",Pool_for_seq_merge)) %>%
+  # filter(!grepl("Unexpected",Pool_for_seq_merge)) %>%
+  # bind_rows(ecoli_seq) %>% 
+  # mutate(Pool_for_seq_merge= ifelse(is.na(Pool_for_seq_merge),background_species,Pool_for_seq_merge)) 
+  # 
   ########## ########## ########## ########## ########## ########## ########## ##########
   
   # all_corr_seq <-  quant_peptides %>%
@@ -233,8 +233,8 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   # 
   
   abundances_for_impute <- quant_peptides %>% 
-         select(starts_with("Abundances.Normalized")) %>% #### BEFORE RENAME IT BE SURED THAT COLUMNS ARE THE SAME ORDER AS EXP_DESIGN
-         rename_with(~ exp_design, starts_with("Abundances.Normalized"))
+    select(starts_with("Abundances.Normalized")) %>% #### BEFORE RENAME IT BE SURED THAT COLUMNS ARE THE SAME ORDER AS EXP_DESIGN
+    rename_with(~ exp_design, starts_with("Abundances.Normalized"))
   
   # Calculate 5 percent quantile of each sample
   impute_values <- apply(abundances_for_impute, 2 , quantile , probs = 0.05 , na.rm = TRUE )
@@ -263,9 +263,9 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
       mutate(Positions=phospho_pos) %>%
       mutate(pep_with_pos=paste0(Sequence,"_",phospho_pos)) %>%
       filter(!grepl("_NA",pep_with_pos))
-      #filter(as.numeric(phospho_score) >= loc_filter)  #%>%  
-      #### BEFORE RENAME IT BE SURED THAT COLUMNS ARE THE SAME ORDER AS EXP_DESIGN
-      #rename_with(~ exp_design, starts_with("Abundances.Normalized")) 
+    #filter(as.numeric(phospho_score) >= loc_filter)  #%>%  
+    #### BEFORE RENAME IT BE SURED THAT COLUMNS ARE THE SAME ORDER AS EXP_DESIGN
+    #rename_with(~ exp_design, starts_with("Abundances.Normalized")) 
   }else{
     quant_phospho_peptides_tmp <-quant_peptides %>%
       filter(grepl("Homo sapiens",Master.Protein.Descriptions) & 
@@ -280,8 +280,8 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
              Master.Protein.Descriptions,
              Protein.Accessions, #Marked.as
              starts_with("Abundances.Normalized")) %>%
-             #starts_with("Abundance.Ratio.P.Value"),
-             #starts_with("Abundance.Ratio.log2")) %>%
+      #starts_with("Abundance.Ratio.P.Value"),
+      #starts_with("Abundance.Ratio.log2")) %>%
       mutate(species=selected_spcies) %>%
       rowwise() %>%
       mutate(results = list(extract_phospho_numbers(Modifications)),
@@ -291,9 +291,9 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
       mutate(Positions=phospho_pos) %>%
       mutate(pep_with_pos=paste0(Sequence,"_",phospho_pos)) %>%
       filter(!grepl("_NA",pep_with_pos))
-      #filter(as.numeric(phospho_score) >= 75)  %>%  
-      #### BEFORE RENAME IT BE SURED THAT COLUMNS ARE THE SAME ORDER AS EXP_DESIGN
-      #rename_with(~ exp_design, starts_with("Abundances.Normalized"))}
+    #filter(as.numeric(phospho_score) >= 75)  %>%  
+    #### BEFORE RENAME IT BE SURED THAT COLUMNS ARE THE SAME ORDER AS EXP_DESIGN
+    #rename_with(~ exp_design, starts_with("Abundances.Normalized"))}
   } 
   
   
@@ -453,7 +453,7 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   all_seq <- quant_phospho_map_seq %>% 
     bind_rows(barplt_df_ecoli) %>% #ecoli_seq
     mutate(Pool_for_seq_merge= ifelse(is.na(Pool_for_seq_merge),background_species,Pool_for_seq_merge)) %>%
-    mutate(species=is.na(species),selected_spcies,species)
+    mutate(species=ifelse(is.na(species),selected_spcies,species))
   
   #write.table(all_seq_syn, file=paste0(new_path,"/Experiment2",software_name,"_number_of_unique_sequence_for_each_species.txt"),sep = "\t",col.names = T,row.names = F)
   
@@ -542,7 +542,7 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   all_pep_syn <- quant_phospho_aft_inner_map_pep %>%
     #filter(!grepl(background_species,Pool_for_seq_merge)) %>%
     #select(pep_with_pos, Modified.Sequence, map_loc,PTM.Site.Confidence,Experiment,Sample_id,Rep_id) %>%
-   
+    
     #distinct(Sequence, .keep_all = T) %>%
     #bind_rows(ecoli_seq_dist) %>%
     #mutate(Pool_for_seq_merge= ifelse(is.na(Pool_for_seq_merge),background_species,Pool_for_seq_merge)) %>%
@@ -595,13 +595,13 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   #             sep = "\t",row.names = F)
   # 
   # 
-
+  
   ##############################################################################
   ####### GATHERING ALL COLUMNS OF MAIN OUTPUT FROM PD WITH THE CORRECT RESULTS ########
   ### This is necessary only for Proline and PD additionally to compare 
   ## the missing peptides with their scan number.
   
-
+  
   df_merge_all_col <- quant_phospho_aft_inner_map_pep %>%
     select(pep_with_pos,Experiment,Intensity,phospho_score,species,Protein.Accessions) %>% #Marked.as,species
     #rename(Pool_leftjoin=Pool) %>%
@@ -628,7 +628,7 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
     mutate(soft_name=software_name,ion_mobility=acquisiton_type) 
   
   write.table(df_merge_all_col_wide,file = paste0(new_path,"/Count_of_missing_unexpected_correct_phospho-sites_with_all_col_",
-                                             software_name,"_Experiment",exp_id,".txt"),
+                                                  software_name,"_Experiment",exp_id,".txt"),
               sep = "\t",row.names = F)
   #############################################################################
   
@@ -645,7 +645,7 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   
   #filtered_abundances<-quant_phospho_peptides[rowSums(!is.na(select(quant_phospho_peptides,starts_with(exp_design))))>0,]
   #filtered_abundances_ecoli <-quant_peptides_ECOLI[rowSums(!is.na(select(quant_peptides_ECOLI,starts_with(exp_design))))>0,]
- 
+  
   # # Calculate 1 percent quantile of each sample
   # triplicate_indx <- c(1,3,4,6,7,9,10,12,13,15)
   # impute_values_2NA <- NULL
@@ -719,10 +719,10 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   barplt_df_wide <- df_merge_all_col_wide %>% select(colnames(tmp_wide))
   
   barplt_df_ecoli_wide <- barplt_df_ecoli %>% 
-      select(Sequence, species, Experiment,Intensity) %>% #Marked.as
-      pivot_wider(names_from = "Experiment",values_from = "Intensity")
+    select(Sequence, species, Experiment,Intensity) %>% #Marked.as
+    pivot_wider(names_from = "Experiment",values_from = "Intensity")
   
- 
+  
   #library(kableExtra)
   
   barplt_df_wide[,"na_val"] <- apply(X = !is.na(select(barplt_df_wide,contains(exp_design))), MARGIN = 1, FUN = sum)
@@ -766,40 +766,40 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   
   
   
-   ## DENSITY PLOT OF BEFORE IMPUTATION 
-
+  ## DENSITY PLOT OF BEFORE IMPUTATION 
+  
   abundances_rowMeans <- NULL
   abundances_ecoli_rowMeans <- NULL
   for (k in 1:sample_size){
-      # If separate version of row means is not needed, it can be commented later.
-      # Separate row Means can be collected in temp object to merge in "log_10_filtered_abundances_rowMeans"
-      assign(paste0("abundances_A",k),as.data.frame(rowMeans(barplt_df_wide  %>%
-                                                                 select(contains(paste0("A",k)))))) #%>%
-      #select(starts_with("abundance_")))))
-      abundances_rowMeans<- bind_cols(abundances_rowMeans,get(paste0("abundances_A",k)))
-      
-      
-      assign(paste0("ecoli_abundances_A",k),as.data.frame(rowMeans(barplt_df_ecoli_wide  %>%
-                                                                       select(contains(paste0("A",k))))))# %>%
-      #select(starts_with("abundance_")))))  
-      
-      abundances_ecoli_rowMeans<- bind_cols(abundances_ecoli_rowMeans,get(paste0("ecoli_abundances_A",k)))
-      
+    # If separate version of row means is not needed, it can be commented later.
+    # Separate row Means can be collected in temp object to merge in "log_10_filtered_abundances_rowMeans"
+    assign(paste0("abundances_A",k),as.data.frame(rowMeans(barplt_df_wide  %>%
+                                                             select(contains(paste0("A",k)))))) #%>%
+    #select(starts_with("abundance_")))))
+    abundances_rowMeans<- bind_cols(abundances_rowMeans,get(paste0("abundances_A",k)))
+    
+    
+    assign(paste0("ecoli_abundances_A",k),as.data.frame(rowMeans(barplt_df_ecoli_wide  %>%
+                                                                   select(contains(paste0("A",k))))))# %>%
+    #select(starts_with("abundance_")))))  
+    
+    abundances_ecoli_rowMeans<- bind_cols(abundances_ecoli_rowMeans,get(paste0("ecoli_abundances_A",k)))
+    
   }
   
   quant_peptides_ECOLI_density_plt <- barplt_df_ecoli_wide %>%
-      select(!starts_with("E")) %>%
-      bind_cols(abundances_ecoli_rowMeans) %>%
-      tibble() %>%
-      rename_with(~ paste0("mean_abun",1:sample_size), matches("^row")) %>%
-      pivot_longer(cols = starts_with("mean"), 
-                   values_to = "intensity",
-                   names_to = "sample_ids",
-                   values_drop_na = T) %>%
-      mutate(sample_id_seq = paste(Sequence, sample_ids, sep = "_"))
+    select(!starts_with("E")) %>%
+    bind_cols(abundances_ecoli_rowMeans) %>%
+    tibble() %>%
+    rename_with(~ paste0("mean_abun",1:sample_size), matches("^row")) %>%
+    pivot_longer(cols = starts_with("mean"), 
+                 values_to = "intensity",
+                 names_to = "sample_ids",
+                 values_drop_na = T) %>%
+    mutate(sample_id_seq = paste(Sequence, sample_ids, sep = "_"))
   
   ecoli_density_plt<- quant_peptides_ECOLI_density_plt %>%
-      select(contains(c("sample_ids","intensity","species"))) #Marked.as
+    select(contains(c("sample_ids","intensity","species"))) #Marked.as
   
   
   colnames(abundances_rowMeans) <- paste0("mean_abun",1:sample_size)
@@ -807,33 +807,33 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   #### MEAN ABUNDANCE RATIO WITH  DENSITY PLOT ####
   ### BEFORE IMPUTATION ###
   quant_phospho_density_plt <- barplt_df_wide %>%
-      select(!starts_with("E")) %>%
-      bind_cols(abundances_rowMeans) %>% 
-      #rename_with(~ paste0("mean_abun",1:sample_size), matches("^row")) %>%
-      #rename_with(~ paste0("mean_abun",1:5), matches("^row")) %>%
-      tibble() %>% #mutate(pep_with_pos = sequence) %>% ###  At this stage, no need for phospho-position#   
-      pivot_longer(cols = starts_with("mean"),
-                   names_to = "sample_ids",
-                   values_to = "intensity",
-                   values_drop_na = T) %>%
-      mutate(sample_id_seq = paste(pep_with_pos, sample_ids, sep = "_"))
+    select(!starts_with("E")) %>%
+    bind_cols(abundances_rowMeans) %>% 
+    #rename_with(~ paste0("mean_abun",1:sample_size), matches("^row")) %>%
+    #rename_with(~ paste0("mean_abun",1:5), matches("^row")) %>%
+    tibble() %>% #mutate(pep_with_pos = sequence) %>% ###  At this stage, no need for phospho-position#   
+    pivot_longer(cols = starts_with("mean"),
+                 names_to = "sample_ids",
+                 values_to = "intensity",
+                 values_drop_na = T) %>%
+    mutate(sample_id_seq = paste(pep_with_pos, sample_ids, sep = "_"))
   
   density_df <-quant_phospho_density_plt %>%
-      select(c(sample_ids,intensity,species)) %>% #Marked.as
-      bind_rows(ecoli_density_plt) # %>%
+    select(c(sample_ids,intensity,species)) %>% #Marked.as
+    bind_rows(ecoli_density_plt) # %>%
   #separate(accession, into = c("prot_id","species"),remove = F) ### Go back to beginning of inital data creation and continue with "Mark.as" column to use species column here 
   
   
   plot3 <- gg_density(data_set = density_df, 
-                   x_df = density_df$intensity,
-                   fill_df = density_df$species,
-                   color_df = NULL,
-                   header="Distribution of mean abundance of every sample before imputation",
-                   facet_df = "sample_ids",
-                   x_lab = "log10(intensities)",
-                   color_lab= "",
-                   fill_lab = "species",
-                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name, subtitle))
+                      x_df = density_df$intensity,
+                      fill_df = density_df$species,
+                      color_df = NULL,
+                      header="Distribution of mean abundance of every sample before imputation",
+                      facet_df = "sample_ids",
+                      x_lab = "log10(intensities)",
+                      color_lab= "",
+                      fill_lab = "species",
+                      subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name, subtitle))
   
   
   
@@ -920,7 +920,7 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   
   
   #abundances_for_before_impt <- barplt_df_wide %>%
-   #   bind_rows(barplt_df_ecoli_wide) %>% select(exp_design)
+  #   bind_rows(barplt_df_ecoli_wide) %>% select(exp_design)
   
   # # Calculate 1 percent quantile of each sample
   # impute_values <- apply(abundances_for_impute, 2 , quantile , probs = 0.01 , na.rm = TRUE,type=6 ) # Type =6 is to obtain the same result as Excel.
@@ -975,12 +975,11 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
     mutate(is.imputed=ifelse(is.na(Intensity), TRUE,is.imputed))
   
   # # Impute missing values
+  exp_cols <- which(colnames(barplt_df_wide) %in% exp_design)
+  exp_cols_ecoli <- which(colnames(barplt_df_ecoli_wide) %in% exp_design)
   for (j in 1:length(impute_values)){
-    # # Number NA
-    # #num_NA <- length(abundances_for_impute_all[,j+2][is.na(abundances_for_impute_all[,j+2])])
-    # 
-    barplt_df_wide[,j+2][is.na(barplt_df_wide[,j+2])] <- impute_values[j]
-    barplt_df_ecoli_wide[,j+2][is.na(barplt_df_ecoli_wide[,j+2])] <- impute_values[j]
+    barplt_df_wide[,exp_cols[j]][is.na(barplt_df_wide[,exp_cols[j]])] <- impute_values[j]
+    barplt_df_ecoli_wide[,exp_cols_ecoli[j]][is.na(barplt_df_ecoli_wide[,exp_cols_ecoli[j]])] <- impute_values[j]
     # 
     #abundances_for_impute_all[,j+2][is.na(abundances_for_impute_all)[,j+2]] <- impute_values[j]
     # After imputation number of imputed values
@@ -1115,42 +1114,42 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   filtered_abundances_log10_rowMeans <- NULL
   
   for (k in 1:sample_size){
-      # If separate version of row means is not needed, it can be commented later.
-      # Separate row Means can be collected in temp object to merge in "log_10_filtered_abundances_rowMeans"
-      
-      #### COMMENTED CODES ARE CORRESPOND TO IMPUTATION FOR ONLY MOUSE ####
-      
-      # assign(paste0("aft_imp_abundances_A",k),as.data.frame(rowMeans(abundances_for_impute_mouse  %>% select(contains(paste0("A",k))))))
-      # filtered_abundances_rowMeans<- bind_cols(filtered_abundances_rowMeans,get(paste0("aft_imp_abundances_A",k)))
-      # 
-      # assign(paste0("log10_abundances_A",k),as.data.frame(log10(abundances_for_impute_mouse  %>% select(contains(paste0("A",k)))))) 
-      # filtered_abundances_log10 <- bind_cols(filtered_abundances_log10, get(paste0("log10_abundances_A",k)))
-      # 
-      # assign(paste0("rowMean_log10_abundances_A",k),as.data.frame(rowMeans(get(paste0("log10_abundances_A",k)) %>% select(contains(paste0("A",k))))))
-      # filtered_abundances_log10_rowMeans<- bind_cols(filtered_abundances_log10_rowMeans,get(paste0("rowMean_log10_abundances_A",k)))
-      
-      assign(paste0("aft_imp_abundances_A",k),as.data.frame(rowMeans(abundances_all_aft_imputation  %>% select(contains(paste0("A",k))))))
-      filtered_abundances_rowMeans<- bind_cols(filtered_abundances_rowMeans,get(paste0("aft_imp_abundances_A",k)))
-      
-      assign(paste0("log10_abundances_A",k),as.data.frame(log10(abundances_all_aft_imputation  %>% select(contains(paste0("A",k))))))
-      filtered_abundances_log10 <- bind_cols(filtered_abundances_log10, get(paste0("log10_abundances_A",k)))
-      
-      assign(paste0("rowMean_log10_abundances_A",k),as.data.frame(rowMeans(get(paste0("log10_abundances_A",k)) %>% select(contains(paste0("A",k))))))
-      filtered_abundances_log10_rowMeans<- bind_cols(filtered_abundances_log10_rowMeans,get(paste0("rowMean_log10_abundances_A",k)))
-      
+    # If separate version of row means is not needed, it can be commented later.
+    # Separate row Means can be collected in temp object to merge in "log_10_filtered_abundances_rowMeans"
+    
+    #### COMMENTED CODES ARE CORRESPOND TO IMPUTATION FOR ONLY MOUSE ####
+    
+    # assign(paste0("aft_imp_abundances_A",k),as.data.frame(rowMeans(abundances_for_impute_mouse  %>% select(contains(paste0("A",k))))))
+    # filtered_abundances_rowMeans<- bind_cols(filtered_abundances_rowMeans,get(paste0("aft_imp_abundances_A",k)))
+    # 
+    # assign(paste0("log10_abundances_A",k),as.data.frame(log10(abundances_for_impute_mouse  %>% select(contains(paste0("A",k)))))) 
+    # filtered_abundances_log10 <- bind_cols(filtered_abundances_log10, get(paste0("log10_abundances_A",k)))
+    # 
+    # assign(paste0("rowMean_log10_abundances_A",k),as.data.frame(rowMeans(get(paste0("log10_abundances_A",k)) %>% select(contains(paste0("A",k))))))
+    # filtered_abundances_log10_rowMeans<- bind_cols(filtered_abundances_log10_rowMeans,get(paste0("rowMean_log10_abundances_A",k)))
+    
+    assign(paste0("aft_imp_abundances_A",k),as.data.frame(rowMeans(abundances_all_aft_imputation  %>% select(contains(paste0("A",k))))))
+    filtered_abundances_rowMeans<- bind_cols(filtered_abundances_rowMeans,get(paste0("aft_imp_abundances_A",k)))
+    
+    assign(paste0("log10_abundances_A",k),as.data.frame(log10(abundances_all_aft_imputation  %>% select(contains(paste0("A",k))))))
+    filtered_abundances_log10 <- bind_cols(filtered_abundances_log10, get(paste0("log10_abundances_A",k)))
+    
+    assign(paste0("rowMean_log10_abundances_A",k),as.data.frame(rowMeans(get(paste0("log10_abundances_A",k)) %>% select(contains(paste0("A",k))))))
+    filtered_abundances_log10_rowMeans<- bind_cols(filtered_abundances_log10_rowMeans,get(paste0("rowMean_log10_abundances_A",k)))
+    
   }
   
   colnames(filtered_abundances_rowMeans) <- paste0("mean_abundances_aft_imp_A",1:sample_size)
   colnames(filtered_abundances_log10_rowMeans) <- paste0("mean_log10_abundances_A",1:sample_size)
   filtered_abundances_log10 <- filtered_abundances_log10 %>%
-      rename_with(~ paste0("log10_", .x), everything())
+    rename_with(~ paste0("log10_", .x), everything())
   
   
   # Calculate Fold Change by keeping A1 constant (mean(S1)/mean(S2), etc.)
   cols <- ncol(filtered_abundances_rowMeans)
   for(An in 1:cols){
     filtered_abundances_rowMeans[,paste0("exp_FC_A",numerator,"/A",An)] <- filtered_abundances_rowMeans[,numerator]/filtered_abundances_rowMeans[,An]
-      
+    
   }
   rmv_col <- paste0("exp_FC_A",numerator,"/A",numerator)
   filtered_abundances_rowMeans <- filtered_abundances_rowMeans %>% select(!rmv_col)
@@ -1179,21 +1178,21 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   #write.table(final_imputed_data, file = "final_imputed_normalized_data_PAL _T_cell_Exp3_( 5 conc 3reps)_NoFAIMS_DDA_with_cont_230206_2023-02-07_0947.txt",sep = "\t",row.names = F)
   
   df_mean_ab_after_impt <- df_merge %>% 
-      select(contains("aft_imp") | contains("species"),Pool) %>%
-      tibble() %>% 
-      #separate(accession, into = c("uniprot_id", "species"), remove = F) %>%
-      pivot_longer(cols = contains("aft_imp"),
-                   names_to = "Mean_abundance",
-                   values_to = "values")
+    select(contains("aft_imp") | contains("species"),Pool) %>%
+    tibble() %>% 
+    #separate(accession, into = c("uniprot_id", "species"), remove = F) %>%
+    pivot_longer(cols = contains("aft_imp"),
+                 names_to = "Mean_abundance",
+                 values_to = "values")
   
   
   df_FC_ratio_after_impt <- df_merge %>% 
-      select(starts_with("exp_")| contains("species"),Pool) %>%
-      #separate(accession, into = c("uniprot_id", "species"), remove = F) %>%
-      tibble() %>% 
-      pivot_longer(cols = starts_with("exp_"),
-                   names_to = "exp_FC",
-                   values_to = "values") %>%
+    select(starts_with("exp_")| contains("species"),Pool) %>%
+    #separate(accession, into = c("uniprot_id", "species"), remove = F) %>%
+    tibble() %>% 
+    pivot_longer(cols = starts_with("exp_"),
+                 names_to = "exp_FC",
+                 values_to = "values") %>%
     mutate_at("Pool", ~replace_na(.,background_species)) %>%
     filter(!grepl("A6",exp_FC)) %>%
     mutate(actual_ratio_val= case_when(grepl(comparisons[1],exp_FC) ~ actual_ratio[1],
@@ -1224,15 +1223,15 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   ##########################################################
   
   plot4 <- gg_density(data_set = df_mean_ab_after_impt, 
-                   x_df = df_mean_ab_after_impt$values,
-                   fill_df =df_mean_ab_after_impt$species, #df_mean_ab_after_impt$Mean_abundance,
-                   color_df = NULL, #df_mean_ab_after_impt$Pool,
-                   header="Distribution of mean abundance of every sample after imputation",
-                   facet_df = "Mean_abundance",
-                   x_lab = "log10(values)",
-                   color_lab= "",
-                   fill_lab = "Sample Names",
-                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name, subtitle))
+                      x_df = df_mean_ab_after_impt$values,
+                      fill_df =df_mean_ab_after_impt$species, #df_mean_ab_after_impt$Mean_abundance,
+                      color_df = NULL, #df_mean_ab_after_impt$Pool,
+                      header="Distribution of mean abundance of every sample after imputation",
+                      facet_df = "Mean_abundance",
+                      x_lab = "log10(values)",
+                      color_lab= "",
+                      fill_lab = "Sample Names",
+                      subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name, subtitle))
   
   write.table(final_imputed_data, 
               file =paste0(new_path,"/final_imputed_data_PD_",
@@ -1247,8 +1246,8 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
     #separate(accession, into = c("uniprot_id", "species", "position"), remove = T) %>%
     rename(Pool=species) %>%
     rename(pep_with_pos=Sequence) #%>%
-    #select(!c(uniprot_id,position)) %>% 
-    #drop_na()
+  #select(!c(uniprot_id,position)) %>% 
+  #drop_na()
   
   pep_list_w_theo_iso <- pep_list_w_theo %>% select(pep_with_pos,isomericity)
   
@@ -1258,7 +1257,7 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
     #pivot_longer(cols = contains("E2"),
     #names_to = "Experiment",
     #values_to = "Abundances") %>% 
-   # drop_na() %>% 
+    # drop_na() %>% 
     select(!isomericity) %>%
     #pivot_wider(names_from = "Experiment",values_from = "Abundances")%>% drop_na() 
     bind_rows(filtered_abundances_ecoli_bef_impt) %>%
@@ -1300,7 +1299,7 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   write.table(df_aft_impt_CV,file = paste0(new_path,"/CV_calculation_after_imputation",acquisiton_type,software_name,".txt"))
   
   library(ggridges)
-#library(paletteer) # REMOVED: unused 
+  #library(paletteer) # REMOVED: unused 
   
   
   p18<- df_before_impt_CV %>% filter(grepl("Diluted",Pool) | grepl("Fixed",Pool)) %>%
@@ -1557,7 +1556,7 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   #   scale_color_manual(values =  c("#6A51A3","#6A51A3","grey68","#E6550D","#E6550D")) 
   # #scale_y_continuous(limits = c(0,200)) + #breaks = seq(from =0, to=100,by=10)) 
   # 
-
+  
   ratio_supp_FC <-df_merge %>% 
     select(starts_with("exp_") | contains("accession"),pep_with_pos) %>%
     left_join(pep_list_w_theo_sel,by="pep_with_pos") %>%
@@ -1662,15 +1661,15 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   
   
   plot5 <- gg_density(data_set = df_FC_ratio_after_impt,
-                   x_df = df_FC_ratio_after_impt$values,
-                   fill_df = df_FC_ratio_after_impt$exp_FC,
-                   color_df = df_FC_ratio_after_impt$Pool,
-                   header="Distribution of Fold change Ratio of every sample after imputation",
-                   facet_df = "exp_FC",
-                   x_lab = "log10(values)",
-                   color_lab= "",
-                   fill_lab = "Sample Names",
-                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name, subtitle))
+                      x_df = df_FC_ratio_after_impt$values,
+                      fill_df = df_FC_ratio_after_impt$exp_FC,
+                      color_df = df_FC_ratio_after_impt$Pool,
+                      header="Distribution of Fold change Ratio of every sample after imputation",
+                      facet_df = "exp_FC",
+                      x_lab = "log10(values)",
+                      color_lab= "",
+                      fill_lab = "Sample Names",
+                      subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name, subtitle))
   ### BOX-PLOT: Experimental Quantity Ratio of Phospho Peptides  
   df_FC_ratio_plt6 <- df_FC_ratio_after_impt %>%
     separate(Pool,into = c("Pool_id","isomer"),sep = "_",remove = F) %>%
@@ -1684,8 +1683,8 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   write.table(df_FC_ratio_after_impt_final,file = paste0(new_path,"/df_FC_ratio_after_impt",software_name,".txt"),sep = "\t",row.names =F )
   
   #hline_df <- hline_df %>% separate(exp_FC,into = c("tmp","tmp2","FC"),sep = "_",remove = T) %>%
-    #mutate(exp_FC=paste("FC isomeric",FC))
-
+  #mutate(exp_FC=paste("FC isomeric",FC))
+  
   library(ggpattern)
   plot6 <-  ggplot(df_FC_ratio_plt6,aes(x=exp_FC,y=log2_exp_val)) +
     geom_boxplot_pattern(aes(fill=Pool,pattern=isomer),
@@ -1739,14 +1738,14 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   library(gghalves)
   
   plot7 <- gg_half_boxplt_exp_ratio(data_set = df_FC_ratio_after_impt, 
-                                 x_df = df_FC_ratio_after_impt$exp_FC,
-                                 y_df = df_FC_ratio_after_impt$values,
-                                 fill_df = df_FC_ratio_after_impt$Pool,
-                                 header="Experimental Quantity Ratio of Phospho Peptides with Background",
-                                 x_lab="Sample Names",
-                                 y_lab="Abundance Ratios",
-                                 fill_lab = "Sample Names",
-                                 subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name, subtitle)) +
+                                    x_df = df_FC_ratio_after_impt$exp_FC,
+                                    y_df = df_FC_ratio_after_impt$values,
+                                    fill_df = df_FC_ratio_after_impt$Pool,
+                                    header="Experimental Quantity Ratio of Phospho Peptides with Background",
+                                    x_lab="Sample Names",
+                                    y_lab="Abundance Ratios",
+                                    fill_lab = "Sample Names",
+                                    subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name, subtitle)) +
     scale_fill_manual(values = c("#6A51A3","#6A51A3","#E6550D","#E6550D","cyan3",'grey60')) +
     scale_color_manual(values = c("#6A51A3","#6A51A3","#E6550D","#E6550D","cyan3",'grey60')) 
   
@@ -1755,19 +1754,19 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   
   ### TODO: fix y scaling without trimming 
   plot8 <- gg_violin_exp_ratio(data_set = df_FC_ratio_after_impt, 
-                            x_df = df_FC_ratio_after_impt$exp_FC,
-                            y_df = df_FC_ratio_after_impt$values,
-                            fill_df = df_FC_ratio_after_impt$Pool,
-                            header="Experimental Quantity Ratio of Phospho Peptides with Background",
-                            x_lab="Sample Names",
-                            y_lab="Abundance Ratios",
-                            fill_lab = "Sample Names",
-                            trim=TRUE,
-                            subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name, subtitle)) +
+                               x_df = df_FC_ratio_after_impt$exp_FC,
+                               y_df = df_FC_ratio_after_impt$values,
+                               fill_df = df_FC_ratio_after_impt$Pool,
+                               header="Experimental Quantity Ratio of Phospho Peptides with Background",
+                               x_lab="Sample Names",
+                               y_lab="Abundance Ratios",
+                               fill_lab = "Sample Names",
+                               trim=TRUE,
+                               subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name, subtitle)) +
     scale_fill_manual(values = c("#6A51A3","#6A51A3","#E6550D","#E6550D","cyan3",'grey60'))
   
   
- 
+  
   # filter_at(vars(Pool), all_vars(is.na(.)))
   
   #output_path <- "D:/dev/Pinar/PHD/wet_lab_experiments/DDA_data_analysis/comparision_DDA_noFAIMS_mq_proline_pd/"
@@ -1782,32 +1781,32 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   ## T-TEST
   
   ttest_func <- function(x, y) {
-      # if (sum(!is.na(x)) < 2 | sum(!is.na(y)) < 2) {
-      #   return(NA)
-      # }else{
-      #   
-      # }
-      t.test(x, y,alternative = c("two.sided"),var.equal=TRUE)$p.value
+    # if (sum(!is.na(x)) < 2 | sum(!is.na(y)) < 2) {
+    #   return(NA)
+    # }else{
+    #   
+    # }
+    t.test(x, y,alternative = c("two.sided"),var.equal=TRUE)$p.value
   }
   
   wilcox_func <- function(x, y) {
-      # if (sum(!is.na(x)) < 2 | sum(!is.na(y)) < 2) {
-      #   return(NA)
-      # }else{
-      #   
-      # }
-      wilcox.test(as.numeric(x), as.numeric(y),alternative = c("two.sided"))$p.value
+    # if (sum(!is.na(x)) < 2 | sum(!is.na(y)) < 2) {
+    #   return(NA)
+    # }else{
+    #   
+    # }
+    wilcox.test(as.numeric(x), as.numeric(y),alternative = c("two.sided"))$p.value
   }
   
   ## TODO: ADD LIMMA
   stat_analysis <- df_merge %>%
-      select(pep_with_pos,Pool,isomericity,starts_with("log10_") | starts_with("mean_log10_") | starts_with("exp_FC")) %>%
-      filter(!grepl(background_species, Pool))
+    select(pep_with_pos,Pool,isomericity,starts_with("log10_") | starts_with("mean_log10_") | starts_with("exp_FC")) %>%
+    filter(!grepl(background_species, Pool))
   #filter(grepl("HUMAN",accession)) #spectrum_title
   
   rownames(stat_analysis) <- paste0(stat_analysis$pep_with_pos,"@",stat_analysis$Pool,"@",(1:nrow(stat_analysis))) #stat_analysis$spectrum_title,"@"
   
-#library(multtest) # REMOVED: replaced by base R p.adjust()
+  #library(multtest) # REMOVED: replaced by base R p.adjust()
   
   if(test_type== "t.test" | test_type== "wilcoxon"){
     # Pre-allocate memory for results
@@ -1865,10 +1864,8 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
       separate(fold_change_ratios, into = c("tmp","tmp1","ratio"),sep = "_") %>%
       select(!c(tmp,tmp1)) %>%
       #mutate(common_col = paste(pep_with_pos,Pool,1:((sample_size-1)*nrow(stat_analysis)),sep="@")) %>%
-      bind_cols(all_pvalues_common_col$ratio,all_pvalues_common_col$pval) %>%
-      rename_with(.col =6 , ~"fold_change_comp") %>%
-      rename_with(.col=7, ~ "P.Value") %>%
-      #filter(!grepl("ECOLI",Pool))
+      mutate(fold_change_comp = all_pvalues_common_col$ratio,
+             P.Value = all_pvalues_common_col$pval) %>%
       #separate(accession, into = c("prot_id","species"),sep = "_")
       mutate(isomericity = ifelse(is.na(isomericity), "False Positive", isomericity)) %>%
       unite(Pool_new, Pool, isomericity,sep = "_",remove = FALSE) %>%
@@ -1896,7 +1893,7 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
       assign(paste0("df_A",numerator,"vsA",i),stat_analysis %>% 
                select(1:2 | contains(paste0("A",numerator,"-")) & contains("log10_") | contains(paste0("A",i,"-")) & contains("log10_")))
       # First, linear model was built
-      assign(paste0("fit",i) ,lmFit(get(paste0("df_A",numerator,"vsA",i))[,3:8], design_matrix))
+      assign(paste0("fit",i) ,lmFit(get(paste0("df_A",numerator,"vsA",i))[, grep("log10_", colnames(get(paste0("df_A",numerator,"vsA",i)))), drop=FALSE], design_matrix))
       assign(paste0("fit",i), eBayes(get(paste0("fit",i))))
       # Readable dataframe format was generated 
       assign(paste0("alllimma",i), topTable(get(paste0("fit",i)), coef=2,adjust.method="BH",p.value=1,"P"))
@@ -1994,7 +1991,7 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   }
   
   ##TODO: Find more logical way to map these values!!!
-  comparisons <- comparisons[-5]
+  comparisons <- comparisons[!grepl("A6", comparisons)]
   
   if(length(comparisons) == 4){
     actual_ratio_col <- merge_stat_df_final %>%
@@ -2012,7 +2009,7 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
                                          grepl(comparisons[3],fold_change_comp) ~actual_ratio[3],
                                          grepl(comparisons[4],fold_change_comp) ~actual_ratio[4]))#,
     #grepl(comparisons[5],fold_change_comp) ~actual_ratio[5]))
-   
+    
   }else{
     print("Mapping between theoretical ratio and comparison cannot be done. Please make sure that you have either 4 or 5 comparisons overall.")
   }
@@ -2041,11 +2038,11 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
     return(y_pos)
   }
   
-  #comparisons <- comparisons[-5]
+  #comparisons <- comparisons[!grepl("A6", comparisons)]
   
   # # Apply the function to calculate y_pos within each group
   point_count_y_axis$y_pos <- unlist(by(point_count_y_axis$fold_change_comp, 
-                                         point_count_y_axis$fold_change_comp, calculate_y_pos))
+                                        point_count_y_axis$fold_change_comp, calculate_y_pos))
   # 
   # # Apply the function to calculate y_pos within each group
   # point_count_y_axis_filt$y_pos <- unlist(by(point_count_y_axis_filt$fold_change_comp, 
@@ -2085,7 +2082,7 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   # }
   # 
   # actual_ratio_col <- actual_ratio_col %>% bind_cols(col)
-
+  
   # mapped_coloring_dat <- as.data.frame(mapped_coloring)
   # 
   # point_count_y_axis <- mapped_coloring_dat %>% 
@@ -2131,7 +2128,7 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
     rename(colors=1,coloring_comp=2) %>%
     right_join(point_count_y_axis,by="coloring_comp")
   
- 
+  
   plot9 <- ggplot(merge_stat_df_final, aes(x =log2(fold_change_values), y = -log10(P.Value))) +
     geom_point(size = 9, aes(color = coloring_comp,shape=isomericity)) + # Pool_new might be use to 
     
@@ -2149,10 +2146,10 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
     ##scale_color_manual(values =setNames(mapped_coloring, labels)) +
     #scale_y_continuous(limits = c(0, max(-log10(merge_stat_df_final$adj.P.Val))), breaks = seq(0, max(-log10(merge_stat_df_final$adj.P.Val)), by = 0.8)) +
     #scale_x_continuous(limits = c(min(log2(merge_stat_df_final$fold_change_values)),max(log2(merge_stat_df_final$fold_change_values)))) +#facet_wrap(~ratio) +
-  #scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=1)) +
-  ##scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=1)) +
-  #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
-  theme_bw() +
+    #scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=1)) +
+    ##scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=1)) +
+    #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
+    theme_bw() +
     scale_y_continuous(
       limits = c(0,12), 
       breaks = seq(0, 12,2)
@@ -2177,47 +2174,47 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
     geom_label(data =point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos, fill=coloring_comp ,label = n),color="white",size=18,show.legend = FALSE) + #coloring_comp
     scale_fill_manual(values =setNames(cols, sorted_labels))
   
-    # plot9 <- ggplot(merge_stat_df_final,aes(x =log2(merge_stat_df_final$fold_change_values), y = -log10(merge_stat_df_final$P.Value))) +
-    # geom_point(size = 4, aes(color = new_col_coloring,shape=Pool)) + # Pool_new might be use to 
-    # #scale_shape_identity() +                                        # differentiate peptides are found as Unexpected and reference 
-    # # in their associated concentration 
-    # # Pool can be used to show only difference btw pools same as coloring 'less complex visualization)
-    # #geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red") +
-    # #scale_fill_manual(values=setNames(mapped_coloring, labels)) + 
-    # #geom_line(aes(color =setNames(mapped_coloring, labels)), size = 1) +  # Add color aesthetic to geom_line()
-    # scale_color_manual(values =setNames(mapped_coloring, labels)) +
-    # scale_y_continuous(
-    #   limits = c(0,12), 
-    #   breaks = seq(0, 12,2)
-    # ) +
-    # scale_x_continuous(
-    #   limits = c(-9,11), 
-    #   breaks = seq(-9, 11,2)
-    # ) +
-    # 
-    # #scale_y_continuous(limits = c(0, max(-log10(merge_stat_df_final$adj.P.Val))), breaks = seq(0, max(-log10(merge_stat_df_final$adj.P.Val)), by = 0.8)) +
-    # #scale_x_continuous(limits = c(min(log2(merge_stat_df_final$fold_change_values)),max(log2(merge_stat_df_final$fold_change_values)))) +#facet_wrap(~ratio) +
-    # #scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=2)) +
-    # #scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=2)) +
-    # #scale_y_continuous(limits = c(0, 11), breaks = seq(0,11, by = 2)) +
-    # #scale_x_continuous(limits = c(-7,11),breaks = seq(-7,11, by = 2))+
-    # #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
-    # theme_bw() +
-    # theme(legend.text = element_text(size = 45),
-    #       axis.title.x = element_text(size = 45),
-    #       axis.title.y = element_text(size = 45),
-    #       plot.title = element_text(size = 55),
-    #       legend.title = element_text(size = 45),
-    #       axis.text.x = element_text(size = 45),
-    #       axis.title = element_text(size = 45),
-    #       axis.text.y = element_text(size = 45),
-    #       plot.subtitle = element_text(size = 45)) +
-    # labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n", subtitle)) +
-    # geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=col,size=1.5) +
-    # geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=1.5) + 
-    # geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos, fill=new_col_coloring,label = n),color="white",size=14,show.legend = FALSE) +
-    # scale_fill_manual(values =setNames(mapped_coloring, labels))
-    # 
+  # plot9 <- ggplot(merge_stat_df_final,aes(x =log2(merge_stat_df_final$fold_change_values), y = -log10(merge_stat_df_final$P.Value))) +
+  # geom_point(size = 4, aes(color = new_col_coloring,shape=Pool)) + # Pool_new might be use to 
+  # #scale_shape_identity() +                                        # differentiate peptides are found as Unexpected and reference 
+  # # in their associated concentration 
+  # # Pool can be used to show only difference btw pools same as coloring 'less complex visualization)
+  # #geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red") +
+  # #scale_fill_manual(values=setNames(mapped_coloring, labels)) + 
+  # #geom_line(aes(color =setNames(mapped_coloring, labels)), size = 1) +  # Add color aesthetic to geom_line()
+  # scale_color_manual(values =setNames(mapped_coloring, labels)) +
+  # scale_y_continuous(
+  #   limits = c(0,12), 
+  #   breaks = seq(0, 12,2)
+  # ) +
+  # scale_x_continuous(
+  #   limits = c(-9,11), 
+  #   breaks = seq(-9, 11,2)
+  # ) +
+  # 
+  # #scale_y_continuous(limits = c(0, max(-log10(merge_stat_df_final$adj.P.Val))), breaks = seq(0, max(-log10(merge_stat_df_final$adj.P.Val)), by = 0.8)) +
+  # #scale_x_continuous(limits = c(min(log2(merge_stat_df_final$fold_change_values)),max(log2(merge_stat_df_final$fold_change_values)))) +#facet_wrap(~ratio) +
+  # #scale_x_continuous(breaks = seq(from =round(min(log2(merge_stat_df_final$fold_change_values))), to=(round(max(log2(merge_stat_df_final$fold_change_values)))+2),by=2)) +
+  # #scale_y_continuous(breaks = seq(from =round(min(-log10(merge_stat_df_final$P.Value))), to=(round(max(-log10(merge_stat_df_final$P.Value)))+2),by=2)) +
+  # #scale_y_continuous(limits = c(0, 11), breaks = seq(0,11, by = 2)) +
+  # #scale_x_continuous(limits = c(-7,11),breaks = seq(-7,11, by = 2))+
+  # #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
+  # theme_bw() +
+  # theme(legend.text = element_text(size = 45),
+  #       axis.title.x = element_text(size = 45),
+  #       axis.title.y = element_text(size = 45),
+  #       plot.title = element_text(size = 55),
+  #       legend.title = element_text(size = 45),
+  #       axis.text.x = element_text(size = 45),
+  #       axis.title = element_text(size = 45),
+  #       axis.text.y = element_text(size = 45),
+  #       plot.subtitle = element_text(size = 45)) +
+  # labs( y= "-log10(p values)", x="log2(fold change)",title = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), subtitle = paste("Limma was used \n", subtitle)) +
+  # geom_vline(data = actual_ratio_col, aes(xintercept = log2(actual_ratio_val), show.legend = FALSE),color=col,size=1.5) +
+  # geom_hline(yintercept = -log10(fdr_threshold), linetype = "dashed", color = "red",size=1.5) + 
+  # geom_label(data = point_count_y_axis, aes(x = log2(actual_ratio_val), y = y_pos, fill=new_col_coloring,label = n),color="white",size=14,show.legend = FALSE) +
+  # scale_fill_manual(values =setNames(mapped_coloring, labels))
+  # 
   merge_stat_df_final_text <- merge_stat_df_final %>% mutate(soft_name=paste0(software_name)) %>% mutate(acq_type=paste0(acquisiton_type))
   
   write.table(merge_stat_df_final_text,file = paste0(new_path,"/volcano_plot_",software_name,"_",acquisiton_type,".txt"),sep = 
@@ -2225,7 +2222,7 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   
   #filter(!grepl("Unexpected",Pool))
   ### ROC analysis custom func
- 
+  
   df_roc <- merge_stat_df_final %>%
     select(pep_with_pos, Pool,P.Value) %>%
     select(pep_with_pos, Pool,P.Value) %>%
@@ -2259,8 +2256,8 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
          title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), 
          subtitle = paste(subtitle,"including unexpected"), color="Pool Type")
   
-
-
+  
+  
   #### ROC Analysis using pROC 
   
   df_roc$variant <- ifelse(df_roc$Pool == "Diluted", TRUE, FALSE)
@@ -2272,7 +2269,7 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   #tpr_and_fpr_variant  <- cbind(roc_raw_variant$sensitivities,
   #                              roc_raw_variant$specificities,
   #                              "Variant Pool")
-
+  
   fpr <- as.data.frame(1 - roc_raw_variant$specificities)
   tpr_and_fpr_variant  <- cbind(roc_raw_variant$sensitivities,
                                 fpr,#roc_raw_variant$specificities,
@@ -2281,31 +2278,31 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
   
   #roc_raw_non_var <- roc(df_roc$non_var, df_roc$P.Value)
   #tpr_and_fpr_non_var  <- cbind(roc_raw_non_var$sensitivities,
-                                #roc_raw_non_var$specificities,
-                                #"Non-variant Pool")
+  #roc_raw_non_var$specificities,
+  #"Non-variant Pool")
   
   roc_plt_df <- as.data.frame(tpr_and_fpr_variant) %>% 
-      #bind_rows(as.data.frame(tpr_and_fpr_non_var)) 
+    #bind_rows(as.data.frame(tpr_and_fpr_non_var)) 
     bind_cols(software_name)
   
   colnames(roc_plt_df) <- c("sensitivity", "fpr","Pool_type","Software_name")
   
   plot10 <- roc_plt_df %>% #group_by(Pool_type) %>% 
-      ggplot( aes(y=as.numeric(sensitivity), x = as.numeric(fpr), color=Pool_type)) +
-      geom_line(size=1.5) + theme_bw() + # +  scale_x_reverse()
-      theme(legend.text = element_text(size = 20),
-            axis.title.x = element_text(size = 20),
-            axis.title.y = element_text(size = 20),
-            plot.title = element_text(size = 25),
-            legend.title = element_text(size = 20),
-            axis.text.x = element_text(size = 20),
-            axis.title = element_text(size = 20),
-            axis.text.y = element_text(size = 20)) +
-      scale_color_brewer(palette = "Dark2") +
-      labs(y="True Positive Rate \n (Sensitivity)", x="False Positive Rate \n (Specificity)",
-           title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), 
-           subtitle = paste(subtitle), color="Pool Type")
-      
+    ggplot( aes(y=as.numeric(sensitivity), x = as.numeric(fpr), color=Pool_type)) +
+    geom_line(size=1.5) + theme_bw() + # +  scale_x_reverse()
+    theme(legend.text = element_text(size = 20),
+          axis.title.x = element_text(size = 20),
+          axis.title.y = element_text(size = 20),
+          plot.title = element_text(size = 25),
+          legend.title = element_text(size = 20),
+          axis.text.x = element_text(size = 20),
+          axis.title = element_text(size = 20),
+          axis.text.y = element_text(size = 20)) +
+    scale_color_brewer(palette = "Dark2") +
+    labs(y="True Positive Rate \n (Sensitivity)", x="False Positive Rate \n (Specificity)",
+         title =  paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name), 
+         subtitle = paste(subtitle), color="Pool Type")
+  
   write.table(roc_plt_df, file = paste0(new_path,"/pRoc_analysis_",exp_id,"_",software_name,"_",".txt"),sep = "\t",row.names = F)
   
   
@@ -2318,330 +2315,330 @@ final_pd_pep_quant_analysis_redesigned <- function(file_path,
                                               get(plt_obj[x]),
                                               device = "png", #".svg"
   ))
-  }
-  
-  
-  
-  
-  # 
-  # 
-  # 
-  # roc_curve_data_exp2_noFAIMS_MQ <- read.delim("D:/dev/Desktop_copy/PHD/wet_lab_experiments/DDA_data_analysis/experiment_2/MQ_data_analysis/exp2_wo_FAIMS/exp2_wo_FAIMSwith_MBR/roc_curve_data_exp2_noFAIMS_MQ.txt")
-  # roc_proline_mq <- rbind(roc_curve_data_exp2_noFAIMS_MQ,roc_final)
-  # 
-  # 
-  # roc_data_unexpected121 <- cbind(roc_data_unexpected12, "A1 vs A2","unexcepted")
-  # roc_data_unexpected131 <- cbind(roc_data_unexpected13, "A1 vs A3","unexcepted")
-  # roc_data_unexpected141 <- cbind(roc_data_unexpected14, "A1 vs A4","unexcepted")
-  # roc_data_unexpected151 <- cbind(roc_data_unexpected15, "A1 vs A5","unexcepted")
-  # 
-  # colnames(roc_data_unexpected121)[c(4,5)] <- c("Comparison","Pool")
-  # colnames(roc_data_unexpected131)[c(4,5)] <- c("Comparison","Pool")
-  # colnames(roc_data_unexpected141)[c(4,5)] <- c("Comparison","Pool")
-  # colnames(roc_data_unexpected151)[c(4,5)] <- c("Comparison","Pool")
-  # 
-  # 
-  # 
-  # roc_final2 <- rbind(roc_data_unexpected121,roc_data_unexpected131,
-  #                     roc_data_unexpected141,roc_data_unexpected151)
-  # 
-  # 
-  # 
-  # roc_final <- rbind(roc_data121,roc_data131,roc_data141,roc_data151)
-  # write.table(roc_final,file = paste0(file_path,"/","ROC_curve_data_PD_target_decoy_noFAIMS_consider_isoref_false.txt"),sep = "\t",row.names = FALSE)
-  # line_types <- c("12345678","dotted","solid","dashed" )
-  # 
-  # ##TODO: make it more professional
-  # ggplot(roc_final,aes(x=fdp,y=tpr,color=Comparison,linetype=Software)) + 
-  #   geom_line(size=1,values=line_types) +
-  #   scale_color_manual(values = c("#CC79A7", "#E69F00", "#56B4E9", "#009E73"),
-  #                      labels=c('A1 vs A2','A1 vs A3','A1 vs A4','A1 vs A5')) +
-  #   scale_linetype_manual(values = line_types)+
-  #   theme_bw() +
-  #   theme(legend.text = element_text(size=15), 
-  #         axis.title.x = element_text(size = 15),
-  #         axis.title.y = element_text(size = 15),
-  #         plot.title = element_text(size=30),
-  #         legend.title=element_text(size=15),
-  #         axis.text.x=element_text(size=15),
-  #         axis.title=element_text(size=15),
-  #         axis.text.y = element_text(size = 15)) + 
-  #   expand_limits(x = 0, y = 0) +
-  #   expand_limits(x = 0, y = 0) +
-  #   scale_y_continuous(limits = c(0,100)) +
-  #   #facet_wrap(~Ratio_col,scales = "free_x") +
-  #   labs(title = "Experiment 2 - DDA no FAIMS - \n Comparision of Softwares")
-  # 
-  # ##TODO: make it more professional
-  # ggplot(roc_data14,aes(x=fdp,y=tpr)) + geom_line()
-  # 
-  # 
-  # roc_curve_combine_proline_mq_score_0_40 <- read.delim("D:/dev/Desktop_copy/PHD/wet_lab_experiments/DDA_data_analysis/comparision_DDA_noFAIMS_mq_proline_pd/comparison_wrong_localized_pep_MQ_Proline_with_out_FAIMS/final_figures/roc_curve_combine_proline_mq_score_0_40.txt")
-  # 
-  # 
-  # 
-  # 
-  # 
-  # 
-  # merging_all_pvalues <- final_imputed_data %>% 
-  #   select(col_sel_stat_analysis) %>%
-  #   left_join(p_values_12,by="common_col_for_merging") %>%
-  #   left_join(p_values_13,by="common_col_for_merging") %>%
-  #   left_join(p_values_14,by="common_col_for_merging") %>%
-  #   left_join(p_values_15,by="common_col_for_merging")
-  # 
-  # merging_all_pvalues <- merging_all_pvalues %>%
-  #   mutate(Pool=replace_na(Pool,"unexpected"))
-  # 
-  # 
-  # 
-  # 
-  # 
-  #   
-  # # 
-  # # 
-  # # 
-  # # 
-  # # 
-  # # #adjusted_p_values <- as.data.frame(p.adjust(p_values_A1_vs_A5, method = "BH", n = length(p_values_A1_vs_A5)))
-  # # adjusted_p_values <- lapply(stat_analysis, function(x) p.adjust (x, method = "BH", n = length(x)))
-  # # p_values_12[,"adj_pvalue12"] <- p.adjust(p_values_12$p_values_12, method = "BH")
-  # # 
-  # # all_adjusted_p_values <- cbind(unlist(adjusted_p_values[["p_values_12"]]),
-  # #                                unlist(adjusted_p_values[["p_values_13"]]),
-  # #                                unlist(adjusted_p_values[["p_values_14"]]),
-  # #                                unlist(adjusted_p_values[["p_values_15"]]))
-  # # colnames(all_adjusted_p_values) <- c("adj_pvalues_1_2","adj_pvalues_1_3","adj_pvalues_1_4","adj_pvalues_1_5")
-  # # 
-  # # 
-  # 
-  # ##### p_values_for_all_ratio changed it later to adjusted!!!!
-  # df_volcano <- final_imputed_data %>% 
-  #   select(!contains("mean_abundance")) %>%
-  #   mutate(as.data.frame(p_values_for_all_ratio)) %>%
-  #   #mutate(across(everything(), ~replace(., is.infinite(.), NA)))
-  #   rowwise() %>%
-  #   filter(across(where(is.numeric), ~!is.infinite(.)))
-  # 
-  # 
-  # pvalues_df <- merging_all_pvalues %>%
-  #   pivot_longer(cols = starts_with("p_values"), names_to = "pvalues_col", values_to = "pvalues_value") %>%
-  #   select(common_col_for_merging,Pool,isomericity,pvalues_col,pvalues_value)
-  # 
-  # # Pivot the columns containing "Ratio"
-  # ratio_df <- merging_all_pvalues %>%
-  #   pivot_longer(cols = ends_with("_Ratio"), names_to = "Ratio_col", values_to = "Ratio_value") %>%
-  #   select(Ratio_col,Ratio_value)
-  # 
-  # # Pivot the columns containing "exp_FC"
-  # exp_FC_df <- merging_all_pvalues %>%
-  #   pivot_longer(cols = starts_with("exp_FC"), names_to = "exp_FC_col", values_to = "exp_FC_value") %>%
-  #   select(exp_FC_col,exp_FC_value)
-  # 
-  # volcano_final <- bind_cols(pvalues_df,ratio_df,exp_FC_df)
-  # 
-  # actual_ratio <- c(2,10,20,100)
-  # actual_ratio <- data.frame(Ratio_col=unique(volcano_final$Ratio_col),log2(c(2,10,20,100)))
-  # 
-  # log10_p_thresholds <- data.frame(ratio_col=unique(volcano_final$Ratio_col), -log10(p_thresholds))
-  # 
-  # 
-  # #### DETERMINE THRESHOLD OF EACH P VALUE COMPARISON BASED on 
-  # ####    WHERE WE CAN SEE THE CHANGE FROM TRUE to FALSE
-  # 
-  # ## THIS WILL BE ADDED AS AN EXTRA LINE FOR EACH COMPARISION 
-  # ##     WHEN I MERGED ALL VOLCANO PLOTS INTO ONE
-  # 
-  # volcano_final1 <- volcano_final %>% select(-Ratio_value) %>%
-  #   mutate(isomericity = ifelse(is.na(isomericity), "False Positive", isomericity)) %>%
-  #   unite(Pool_new, Pool, isomericity,sep = "_",remove = FALSE) %>%
-  #   unite('new_col_coloring',Pool_new,Ratio_col,sep = "_",remove = FALSE) %>%
-  #   mutate(new_col_coloring = if_else(grepl("ISO-REF", new_col_coloring), "ISO-REF", new_col_coloring)) %>%
-  #   mutate(new_col_coloring = if_else(grepl("unexpected", new_col_coloring), "unexpected", new_col_coloring))
-  # 
-  # write.table(volcano_final1,file = "D:/dev/Desktop_copy/PHD/wet_lab_experiments/DDA_data_analysis/experiment_2/PD_data_analysis/target_decoy_no_FAIMS/new/volcano_plot_output_PD.tsv",
-  #             sep = "\t",row.names = F,col.names = T)
-  # 
-  # ggplot(volcano_final1, aes(x = log2(exp_FC_value), y = -log10(pvalues_value))) +
-  #   geom_point(aes(shape = Pool_new, color = new_col_coloring), size = 2.5) +
-  #   #geom_line(aes(color = new_col_coloring), size = 1) +  # Add color aesthetic to geom_line()
-  #   scale_color_manual(values = c("ISO-REF" = "#000000", "unexpected" = "#999999",
-  #                                 "Others_multi_A1-A2_Ratio" = "#CC79A7",
-  #                                 "Others_mono_A1-A2_Ratio" = "#CC79A7",
-  #                                 "Others_multi_A1-A3_Ratio" = "#E69F00",
-  #                                 "Others_mono_A1-A3_Ratio" = "#E69F00",
-  #                                 "Others_multi_A1-A4_Ratio" = "#56B4E9",
-  #                                 "Others_mono_A1-A4_Ratio" = "#56B4E9",
-  #                                 "Others_multi_A1-A5_Ratio" = "#009E73",
-  #                                 "Others_mono_A1-A5_Ratio" = "#009E73"),
-  #                      labels = c('Non-variant', 'Variant non-isomeric A1 vs A2',
-  #                                 'Variant non-isomeric A1 vs A3',
-  #                                 'Variant non-isomeric A1 vs A4',
-  #                                 'Variant non-isomeric A1 vs A5',
-  #                                 'Variant isomeric A1 vs A2',
-  #                                 'Variant isomeric A1 vs A3',
-  #                                 'Variant isomeric A1 vs A4',
-  #                                 'Variant isomeric A1 vs A5',
-  #                                 'Unexpected')) +
-  #   scale_shape_manual(values = c(16, 15, 12, 17),
-  #                      labels = c('Non-variant', 'Variant isomeric', 'Variant non-isomeric', 'Unexpected')) +
-  #   scale_y_continuous(limits = c(0, 7.2), breaks = seq(0, 7.2, by = 0.8)) +
-  #   scale_x_continuous(limits = c(-7,7)) +
-  #   #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
-  #   theme_bw() +
-  #   theme(legend.text = element_text(size = 15),
-  #         axis.title.x = element_text(size = 15),
-  #         axis.title.y = element_text(size = 15),
-  #         plot.title = element_text(size = 30),
-  #         legend.title = element_text(size = 15),
-  #         axis.text.x = element_text(size = 15),
-  #         axis.title = element_text(size = 15),
-  #         axis.text.y = element_text(size = 15)) +
-  #   expand_limits(x = 0, y = 0) +
-  #   geom_vline(data = actual_ratio, aes(xintercept = actual_ratio$log2.c.2..10..20..100..),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"), size = 1, show.legend = FALSE) +
-  #   geom_hline(data = log10_p_thresholds, aes(yintercept = log10_p_thresholds$X.log10.p_thresholds.),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"), size = 1, linetype = 2, show.legend = FALSE)+ 
-  #   labs(title = "Experiment 2 - DDA no FAIMS processed by Proteome Discoverer", color = "Classes", shape="Type")
-  # 
-  #   #coord_fixed()
-  # 
-  # final_imputed_data %>% 
-  #   pivot_longer(cols = starts_with("mean_"),
-  #                names_to = "Abundance_col",
-  #                values_to = "Abundance_value") %>%
-  # ggplot(aes(x = Abundance_col, y = common_col_for_merging, fill = Abundance_value)) +
-  #   geom_tile(color = "white") +
-  #   scale_fill_viridis() +
-  #   labs(x = "Condition", y = "Peptide", fill = "Abundance") +
-  #   ggtitle("Heatmap")
-  # 
-  # 
-  # 
-  # ggplot(df_volcano, aes(x=df_volcano$`exp_FC_A1/A4`, y=-log10(pvalues_1_4),color=Pool)) + 
-  #   geom_point(aes(Pool)) + geom_hline(yintercept = pvalue_threshold, size=1) + 
-  #   geom_vline(xintercept = actual_ratio[3], size=1)
-  # #### Distribution of experimental quantitative ratios with two different pools
-  # 
-  # 
-  # 
-  # library(ggplot2)
-  # 
-  # ## This can be used as an object name
-  # df_for_figure <- final_imputed_data %>% 
-  #   select(contains(col_sel_stat_analysis)) %>%
-  #   pivot_longer(cols = col_sel_stat_analysis[3:11], names_to = "Theo_Exp", values_to = "Ratios",values_drop_na = T) %>%
-  #   #select(!contains(c("common_col_for_merging"))) %>%
-  #   filter(grepl("exp_FC",Theo_Exp)) %>%
-  #   filter_at(vars(Pool), all_vars(!is.na(.))) %>%
-  #   filter_at(vars(Ratios), all_vars(!is.infinite(.)))
-  # 
-  # p1 <- gg_density(data_set = df_for_figure, 
-  #                  x_df = df_for_figure$Ratios,
-  #                  fill_df = df_for_figure$Theo_Exp,
-  #                  color_df = df_for_figure$Pool,
-  #                  header="Distribution of experimental quantitative ratios with two different pools",
-  #                  facet_df = "Theo_Exp",
-  #                  x_lab = "log10(Ratios)",
-  #                  color_lab= "Pool",
-  #                  fill_lab = "Ratios")
-  # 
-  # 
-  # #### Distribution of mean abundance of every sample with two different pools
-  # 
-  # figure_with_mean_abundance <- final_imputed_data %>%
-  #   select(starts_with("mean_") | contains(c("Pool", "common_col_for_merging"))) %>%
-  #   pivot_longer(cols = starts_with("mean"),
-  #                names_to = "Theo_Exp",
-  #                values_to = "Mean_abundance",
-  #                values_drop_na = T) %>%
-  #   filter_at(vars(Pool), all_vars(!is.na(.)))
-  # 
-  # 
-  # p2 <- gg_density(data_set = figure_with_mean_abundance, 
-  #                  x_df = figure_with_mean_abundance$Mean_abundance,
-  #                  fill_df = figure_with_mean_abundance$Theo_Exp,
-  #                  color_df = figure_with_mean_abundance$Pool,
-  #                  header="Distribution of mean abundance of every sample with two different pools",
-  #                  facet_df = "Theo_Exp",
-  #                  x_lab = "log10(Ratios)",
-  #                  color_lab= "Pool",
-  #                  fill_lab = "Ratios")
-  # 
-  # # final_imputed_normalized_data %>%
-  # #   select(starts_with("mean_") | contains(c("Pool", "common_col_for_merging"))) %>%  
-  # #   filter_at(vars(Pool), all_vars(!is.na(.))) %>%
-  # 
-  # #### MANUAL PLOTTING   
-  # #
-  # #   ggplot(aes(x =log10(mean_abundances_A1) , y = log10(mean_abundances_A5), color=Pool)) +
-  # #   geom_point()+
-  # #   #facet_wrap(vars(df_for_figure$common_col_for_merging))  + 
-  # #   geom_smooth(formula = y ~ x,method = "loess", colour = "green", fill = "green") +
-  # #   theme_minimal() +
-  # #   theme(legend.text = element_text(size=15), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
-  # #         axis.title.x = element_text(size = 15),axis.title.y = element_text(size = 15),
-  # #         plot.title = element_text(size=20),
-  # #         legend.title=element_text(size=15),
-  # #         axis.text=element_text(size=15),
-  # #         axis.title=element_text(size=15)
-  # #   )
-  # #### PLOTTING WITH FUNCTION
-  # #
-  # # gg_density_mean_abun <- function(data_set = final_imputed_normalized_data,
-  # #                                  x_df = final_imputed_normalized_data$mean_abundances_A1,
-  # #                                  y_df = final_imputed_normalized_data$mean_abundances_A5,
-  # #                                  color_df =final_imputed_normalized_data$Pool,
-  # #                                  #header,
-  # #                                  facet_df= "common_col_for_merging")
-  # 
-  # ### BOX-PLOT: Experimental Quantity Ratio of Synthetic Peptides  
-  # 
-  # p3 <- gg_boxplt_exp_ratio(data_set = df_for_figure, 
-  #                           x_df = df_for_figure$Theo_Exp,
-  #                           y_df = df_for_figure$Ratios,
-  #                           fill_df = df_for_figure$Pool,
-  #                           header="Experimental Quantity Ratio of Synthetic Peptides",
-  #                           x_lab="Sample Names",
-  #                           y_lab="Abundance Ratios",
-  #                           fill_lab = "Pool")
-  # 
-  # ### HALF-BOX-PLOT & HALF-SCATTER-PLOT: Experimental Quantity Ratio of Synthetic Peptides  
-  # library(gghalves)
-  # 
-  # p4 <- gg_half_boxplt_exp_ratio(data_set = df_for_figure, 
-  #                                x_df = df_for_figure$Theo_Exp,
-  #                                y_df = df_for_figure$Ratios,
-  #                                fill_df = df_for_figure$Pool,
-  #                                header="Experimental Quantity Ratio of Synthetic Peptides",
-  #                                x_lab="Sample Names",
-  #                                y_lab="Abundance Ratios",
-  #                                fill_lab = "Pool")
-  # 
-  # 
-  # 
-  # ### VIOLIN-PLOT: Experimental Quantity Ratio of Synthetic Peptides   
-  # 
-  # ### TODO: fix y scaling without trimming 
-  # p5 <- gg_violin_exp_ratio(data_set = df_for_figure, 
-  #                           x_df = df_for_figure$Theo_Exp,
-  #                           y_df = df_for_figure$Ratios,
-  #                           fill_df = df_for_figure$Pool,
-  #                           header="Experimental Quantity Ratio of Synthetic Peptides",
-  #                           x_lab="Sample Names",
-  #                           y_lab="Abundance Ratios",
-  #                           fill_lab = "Pool",
-  #                           trim=TRUE)
-  # 
-  # ### SAVE ALL PLOT AUTOMATICALLY (without giving a custom file name)
-  # sapply(1:5,function(x) ggsave(filename = paste0("p",x,".tiff"),
-  #                               width = 50, height = 40, 
-  #                               path = file_path,
-  #                               units = "cm",
-  #                               get(paste0("p",x)),
-  #                               device = "tiff", #".svg"
-  # ))
-  # 
-  # 
-  # 
-  
+}
+
+
+
+
+# 
+# 
+# 
+# roc_curve_data_exp2_noFAIMS_MQ <- read.delim("D:/dev/Desktop_copy/PHD/wet_lab_experiments/DDA_data_analysis/experiment_2/MQ_data_analysis/exp2_wo_FAIMS/exp2_wo_FAIMSwith_MBR/roc_curve_data_exp2_noFAIMS_MQ.txt")
+# roc_proline_mq <- rbind(roc_curve_data_exp2_noFAIMS_MQ,roc_final)
+# 
+# 
+# roc_data_unexpected121 <- cbind(roc_data_unexpected12, "A1 vs A2","unexcepted")
+# roc_data_unexpected131 <- cbind(roc_data_unexpected13, "A1 vs A3","unexcepted")
+# roc_data_unexpected141 <- cbind(roc_data_unexpected14, "A1 vs A4","unexcepted")
+# roc_data_unexpected151 <- cbind(roc_data_unexpected15, "A1 vs A5","unexcepted")
+# 
+# colnames(roc_data_unexpected121)[c(4,5)] <- c("Comparison","Pool")
+# colnames(roc_data_unexpected131)[c(4,5)] <- c("Comparison","Pool")
+# colnames(roc_data_unexpected141)[c(4,5)] <- c("Comparison","Pool")
+# colnames(roc_data_unexpected151)[c(4,5)] <- c("Comparison","Pool")
+# 
+# 
+# 
+# roc_final2 <- rbind(roc_data_unexpected121,roc_data_unexpected131,
+#                     roc_data_unexpected141,roc_data_unexpected151)
+# 
+# 
+# 
+# roc_final <- rbind(roc_data121,roc_data131,roc_data141,roc_data151)
+# write.table(roc_final,file = paste0(file_path,"/","ROC_curve_data_PD_target_decoy_noFAIMS_consider_isoref_false.txt"),sep = "\t",row.names = FALSE)
+# line_types <- c("12345678","dotted","solid","dashed" )
+# 
+# ##TODO: make it more professional
+# ggplot(roc_final,aes(x=fdp,y=tpr,color=Comparison,linetype=Software)) + 
+#   geom_line(size=1,values=line_types) +
+#   scale_color_manual(values = c("#CC79A7", "#E69F00", "#56B4E9", "#009E73"),
+#                      labels=c('A1 vs A2','A1 vs A3','A1 vs A4','A1 vs A5')) +
+#   scale_linetype_manual(values = line_types)+
+#   theme_bw() +
+#   theme(legend.text = element_text(size=15), 
+#         axis.title.x = element_text(size = 15),
+#         axis.title.y = element_text(size = 15),
+#         plot.title = element_text(size=30),
+#         legend.title=element_text(size=15),
+#         axis.text.x=element_text(size=15),
+#         axis.title=element_text(size=15),
+#         axis.text.y = element_text(size = 15)) + 
+#   expand_limits(x = 0, y = 0) +
+#   expand_limits(x = 0, y = 0) +
+#   scale_y_continuous(limits = c(0,100)) +
+#   #facet_wrap(~Ratio_col,scales = "free_x") +
+#   labs(title = "Experiment 2 - DDA no FAIMS - \n Comparision of Softwares")
+# 
+# ##TODO: make it more professional
+# ggplot(roc_data14,aes(x=fdp,y=tpr)) + geom_line()
+# 
+# 
+# roc_curve_combine_proline_mq_score_0_40 <- read.delim("D:/dev/Desktop_copy/PHD/wet_lab_experiments/DDA_data_analysis/comparision_DDA_noFAIMS_mq_proline_pd/comparison_wrong_localized_pep_MQ_Proline_with_out_FAIMS/final_figures/roc_curve_combine_proline_mq_score_0_40.txt")
+# 
+# 
+# 
+# 
+# 
+# 
+# merging_all_pvalues <- final_imputed_data %>% 
+#   select(col_sel_stat_analysis) %>%
+#   left_join(p_values_12,by="common_col_for_merging") %>%
+#   left_join(p_values_13,by="common_col_for_merging") %>%
+#   left_join(p_values_14,by="common_col_for_merging") %>%
+#   left_join(p_values_15,by="common_col_for_merging")
+# 
+# merging_all_pvalues <- merging_all_pvalues %>%
+#   mutate(Pool=replace_na(Pool,"unexpected"))
+# 
+# 
+# 
+# 
+# 
+#   
+# # 
+# # 
+# # 
+# # 
+# # 
+# # #adjusted_p_values <- as.data.frame(p.adjust(p_values_A1_vs_A5, method = "BH", n = length(p_values_A1_vs_A5)))
+# # adjusted_p_values <- lapply(stat_analysis, function(x) p.adjust (x, method = "BH", n = length(x)))
+# # p_values_12[,"adj_pvalue12"] <- p.adjust(p_values_12$p_values_12, method = "BH")
+# # 
+# # all_adjusted_p_values <- cbind(unlist(adjusted_p_values[["p_values_12"]]),
+# #                                unlist(adjusted_p_values[["p_values_13"]]),
+# #                                unlist(adjusted_p_values[["p_values_14"]]),
+# #                                unlist(adjusted_p_values[["p_values_15"]]))
+# # colnames(all_adjusted_p_values) <- c("adj_pvalues_1_2","adj_pvalues_1_3","adj_pvalues_1_4","adj_pvalues_1_5")
+# # 
+# # 
+# 
+# ##### p_values_for_all_ratio changed it later to adjusted!!!!
+# df_volcano <- final_imputed_data %>% 
+#   select(!contains("mean_abundance")) %>%
+#   mutate(as.data.frame(p_values_for_all_ratio)) %>%
+#   #mutate(across(everything(), ~replace(., is.infinite(.), NA)))
+#   rowwise() %>%
+#   filter(across(where(is.numeric), ~!is.infinite(.)))
+# 
+# 
+# pvalues_df <- merging_all_pvalues %>%
+#   pivot_longer(cols = starts_with("p_values"), names_to = "pvalues_col", values_to = "pvalues_value") %>%
+#   select(common_col_for_merging,Pool,isomericity,pvalues_col,pvalues_value)
+# 
+# # Pivot the columns containing "Ratio"
+# ratio_df <- merging_all_pvalues %>%
+#   pivot_longer(cols = ends_with("_Ratio"), names_to = "Ratio_col", values_to = "Ratio_value") %>%
+#   select(Ratio_col,Ratio_value)
+# 
+# # Pivot the columns containing "exp_FC"
+# exp_FC_df <- merging_all_pvalues %>%
+#   pivot_longer(cols = starts_with("exp_FC"), names_to = "exp_FC_col", values_to = "exp_FC_value") %>%
+#   select(exp_FC_col,exp_FC_value)
+# 
+# volcano_final <- bind_cols(pvalues_df,ratio_df,exp_FC_df)
+# 
+# actual_ratio <- c(2,10,20,100)
+# actual_ratio <- data.frame(Ratio_col=unique(volcano_final$Ratio_col),log2(c(2,10,20,100)))
+# 
+# log10_p_thresholds <- data.frame(ratio_col=unique(volcano_final$Ratio_col), -log10(p_thresholds))
+# 
+# 
+# #### DETERMINE THRESHOLD OF EACH P VALUE COMPARISON BASED on 
+# ####    WHERE WE CAN SEE THE CHANGE FROM TRUE to FALSE
+# 
+# ## THIS WILL BE ADDED AS AN EXTRA LINE FOR EACH COMPARISION 
+# ##     WHEN I MERGED ALL VOLCANO PLOTS INTO ONE
+# 
+# volcano_final1 <- volcano_final %>% select(-Ratio_value) %>%
+#   mutate(isomericity = ifelse(is.na(isomericity), "False Positive", isomericity)) %>%
+#   unite(Pool_new, Pool, isomericity,sep = "_",remove = FALSE) %>%
+#   unite('new_col_coloring',Pool_new,Ratio_col,sep = "_",remove = FALSE) %>%
+#   mutate(new_col_coloring = if_else(grepl("ISO-REF", new_col_coloring), "ISO-REF", new_col_coloring)) %>%
+#   mutate(new_col_coloring = if_else(grepl("unexpected", new_col_coloring), "unexpected", new_col_coloring))
+# 
+# write.table(volcano_final1,file = "D:/dev/Desktop_copy/PHD/wet_lab_experiments/DDA_data_analysis/experiment_2/PD_data_analysis/target_decoy_no_FAIMS/new/volcano_plot_output_PD.tsv",
+#             sep = "\t",row.names = F,col.names = T)
+# 
+# ggplot(volcano_final1, aes(x = log2(exp_FC_value), y = -log10(pvalues_value))) +
+#   geom_point(aes(shape = Pool_new, color = new_col_coloring), size = 2.5) +
+#   #geom_line(aes(color = new_col_coloring), size = 1) +  # Add color aesthetic to geom_line()
+#   scale_color_manual(values = c("ISO-REF" = "#000000", "unexpected" = "#999999",
+#                                 "Others_multi_A1-A2_Ratio" = "#CC79A7",
+#                                 "Others_mono_A1-A2_Ratio" = "#CC79A7",
+#                                 "Others_multi_A1-A3_Ratio" = "#E69F00",
+#                                 "Others_mono_A1-A3_Ratio" = "#E69F00",
+#                                 "Others_multi_A1-A4_Ratio" = "#56B4E9",
+#                                 "Others_mono_A1-A4_Ratio" = "#56B4E9",
+#                                 "Others_multi_A1-A5_Ratio" = "#009E73",
+#                                 "Others_mono_A1-A5_Ratio" = "#009E73"),
+#                      labels = c('Non-variant', 'Variant non-isomeric A1 vs A2',
+#                                 'Variant non-isomeric A1 vs A3',
+#                                 'Variant non-isomeric A1 vs A4',
+#                                 'Variant non-isomeric A1 vs A5',
+#                                 'Variant isomeric A1 vs A2',
+#                                 'Variant isomeric A1 vs A3',
+#                                 'Variant isomeric A1 vs A4',
+#                                 'Variant isomeric A1 vs A5',
+#                                 'Unexpected')) +
+#   scale_shape_manual(values = c(16, 15, 12, 17),
+#                      labels = c('Non-variant', 'Variant isomeric', 'Variant non-isomeric', 'Unexpected')) +
+#   scale_y_continuous(limits = c(0, 7.2), breaks = seq(0, 7.2, by = 0.8)) +
+#   scale_x_continuous(limits = c(-7,7)) +
+#   #scale_y_continuous(breaks = seq(0, max(-log10(volcano_final1$pvalues_value)), length.out = 21)) +
+#   theme_bw() +
+#   theme(legend.text = element_text(size = 15),
+#         axis.title.x = element_text(size = 15),
+#         axis.title.y = element_text(size = 15),
+#         plot.title = element_text(size = 30),
+#         legend.title = element_text(size = 15),
+#         axis.text.x = element_text(size = 15),
+#         axis.title = element_text(size = 15),
+#         axis.text.y = element_text(size = 15)) +
+#   expand_limits(x = 0, y = 0) +
+#   geom_vline(data = actual_ratio, aes(xintercept = actual_ratio$log2.c.2..10..20..100..),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"), size = 1, show.legend = FALSE) +
+#   geom_hline(data = log10_p_thresholds, aes(yintercept = log10_p_thresholds$X.log10.p_thresholds.),color=c("#CC79A7","#E69F00","#56B4E9","#009E73"), size = 1, linetype = 2, show.legend = FALSE)+ 
+#   labs(title = "Experiment 2 - DDA no FAIMS processed by Proteome Discoverer", color = "Classes", shape="Type")
+# 
+#   #coord_fixed()
+# 
+# final_imputed_data %>% 
+#   pivot_longer(cols = starts_with("mean_"),
+#                names_to = "Abundance_col",
+#                values_to = "Abundance_value") %>%
+# ggplot(aes(x = Abundance_col, y = common_col_for_merging, fill = Abundance_value)) +
+#   geom_tile(color = "white") +
+#   scale_fill_viridis() +
+#   labs(x = "Condition", y = "Peptide", fill = "Abundance") +
+#   ggtitle("Heatmap")
+# 
+# 
+# 
+# ggplot(df_volcano, aes(x=df_volcano$`exp_FC_A1/A4`, y=-log10(pvalues_1_4),color=Pool)) + 
+#   geom_point(aes(Pool)) + geom_hline(yintercept = pvalue_threshold, size=1) + 
+#   geom_vline(xintercept = actual_ratio[3], size=1)
+# #### Distribution of experimental quantitative ratios with two different pools
+# 
+# 
+# 
+# library(ggplot2)
+# 
+# ## This can be used as an object name
+# df_for_figure <- final_imputed_data %>% 
+#   select(contains(col_sel_stat_analysis)) %>%
+#   pivot_longer(cols = col_sel_stat_analysis[3:11], names_to = "Theo_Exp", values_to = "Ratios",values_drop_na = T) %>%
+#   #select(!contains(c("common_col_for_merging"))) %>%
+#   filter(grepl("exp_FC",Theo_Exp)) %>%
+#   filter_at(vars(Pool), all_vars(!is.na(.))) %>%
+#   filter_at(vars(Ratios), all_vars(!is.infinite(.)))
+# 
+# p1 <- gg_density(data_set = df_for_figure, 
+#                  x_df = df_for_figure$Ratios,
+#                  fill_df = df_for_figure$Theo_Exp,
+#                  color_df = df_for_figure$Pool,
+#                  header="Distribution of experimental quantitative ratios with two different pools",
+#                  facet_df = "Theo_Exp",
+#                  x_lab = "log10(Ratios)",
+#                  color_lab= "Pool",
+#                  fill_lab = "Ratios")
+# 
+# 
+# #### Distribution of mean abundance of every sample with two different pools
+# 
+# figure_with_mean_abundance <- final_imputed_data %>%
+#   select(starts_with("mean_") | contains(c("Pool", "common_col_for_merging"))) %>%
+#   pivot_longer(cols = starts_with("mean"),
+#                names_to = "Theo_Exp",
+#                values_to = "Mean_abundance",
+#                values_drop_na = T) %>%
+#   filter_at(vars(Pool), all_vars(!is.na(.)))
+# 
+# 
+# p2 <- gg_density(data_set = figure_with_mean_abundance, 
+#                  x_df = figure_with_mean_abundance$Mean_abundance,
+#                  fill_df = figure_with_mean_abundance$Theo_Exp,
+#                  color_df = figure_with_mean_abundance$Pool,
+#                  header="Distribution of mean abundance of every sample with two different pools",
+#                  facet_df = "Theo_Exp",
+#                  x_lab = "log10(Ratios)",
+#                  color_lab= "Pool",
+#                  fill_lab = "Ratios")
+# 
+# # final_imputed_normalized_data %>%
+# #   select(starts_with("mean_") | contains(c("Pool", "common_col_for_merging"))) %>%  
+# #   filter_at(vars(Pool), all_vars(!is.na(.))) %>%
+# 
+# #### MANUAL PLOTTING   
+# #
+# #   ggplot(aes(x =log10(mean_abundances_A1) , y = log10(mean_abundances_A5), color=Pool)) +
+# #   geom_point()+
+# #   #facet_wrap(vars(df_for_figure$common_col_for_merging))  + 
+# #   geom_smooth(formula = y ~ x,method = "loess", colour = "green", fill = "green") +
+# #   theme_minimal() +
+# #   theme(legend.text = element_text(size=15), #plot.margin=unit(c(-0.5,1,1,1), "cm"),
+# #         axis.title.x = element_text(size = 15),axis.title.y = element_text(size = 15),
+# #         plot.title = element_text(size=20),
+# #         legend.title=element_text(size=15),
+# #         axis.text=element_text(size=15),
+# #         axis.title=element_text(size=15)
+# #   )
+# #### PLOTTING WITH FUNCTION
+# #
+# # gg_density_mean_abun <- function(data_set = final_imputed_normalized_data,
+# #                                  x_df = final_imputed_normalized_data$mean_abundances_A1,
+# #                                  y_df = final_imputed_normalized_data$mean_abundances_A5,
+# #                                  color_df =final_imputed_normalized_data$Pool,
+# #                                  #header,
+# #                                  facet_df= "common_col_for_merging")
+# 
+# ### BOX-PLOT: Experimental Quantity Ratio of Synthetic Peptides  
+# 
+# p3 <- gg_boxplt_exp_ratio(data_set = df_for_figure, 
+#                           x_df = df_for_figure$Theo_Exp,
+#                           y_df = df_for_figure$Ratios,
+#                           fill_df = df_for_figure$Pool,
+#                           header="Experimental Quantity Ratio of Synthetic Peptides",
+#                           x_lab="Sample Names",
+#                           y_lab="Abundance Ratios",
+#                           fill_lab = "Pool")
+# 
+# ### HALF-BOX-PLOT & HALF-SCATTER-PLOT: Experimental Quantity Ratio of Synthetic Peptides  
+# library(gghalves)
+# 
+# p4 <- gg_half_boxplt_exp_ratio(data_set = df_for_figure, 
+#                                x_df = df_for_figure$Theo_Exp,
+#                                y_df = df_for_figure$Ratios,
+#                                fill_df = df_for_figure$Pool,
+#                                header="Experimental Quantity Ratio of Synthetic Peptides",
+#                                x_lab="Sample Names",
+#                                y_lab="Abundance Ratios",
+#                                fill_lab = "Pool")
+# 
+# 
+# 
+# ### VIOLIN-PLOT: Experimental Quantity Ratio of Synthetic Peptides   
+# 
+# ### TODO: fix y scaling without trimming 
+# p5 <- gg_violin_exp_ratio(data_set = df_for_figure, 
+#                           x_df = df_for_figure$Theo_Exp,
+#                           y_df = df_for_figure$Ratios,
+#                           fill_df = df_for_figure$Pool,
+#                           header="Experimental Quantity Ratio of Synthetic Peptides",
+#                           x_lab="Sample Names",
+#                           y_lab="Abundance Ratios",
+#                           fill_lab = "Pool",
+#                           trim=TRUE)
+# 
+# ### SAVE ALL PLOT AUTOMATICALLY (without giving a custom file name)
+# sapply(1:5,function(x) ggsave(filename = paste0("p",x,".tiff"),
+#                               width = 50, height = 40, 
+#                               path = file_path,
+#                               units = "cm",
+#                               get(paste0("p",x)),
+#                               device = "tiff", #".svg"
+# ))
+# 
+# 
+# 
+
 #}
 
