@@ -30,8 +30,8 @@ compute_roc_curve = function(df, flag, expected) {
       #print(fp)
     }
     
-    fdp = fp#(fp/(fp+tp))*100
-    tpr = tp#(tp/expected)*100 
+    fdp = (fp/(fp+tp))*100
+    tpr = (tp/expected)*100 
     
     result$fdp[nrow(data) - (k-1)] = fdp
     result$tpr[nrow(data) - (k-1)] = tpr
