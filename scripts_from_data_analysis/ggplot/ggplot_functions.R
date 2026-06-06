@@ -301,157 +301,245 @@ conditional_imputation <- function(df,impute_val,samp_names,num_NA_imputed){
 ############## ############## ############## ##############
 ## FUNCTION FOR CV CALCULATION ##### SECOND VERSION ##############
 ############## ############## ############## ##############
-CV_calculator <- function(abundance_col,
-                          data,
-                          replicate,
-                          iter,
-                          exp_id,
-                          acquisiton_type,software_name
-                          
+# CV_calculator_buggy <- function(abundance_col,
+#                                 data,
+#                                 replicate,
+#                                 iter,
+#                                 exp_id,
+#                                 acquisiton_type,software_name
+#                                 
+# ){
+#   
+#   
+#   
+#   if(exp_id ==3){
+#     
+#     for(i in 2:iter){
+#       
+#       old_mean_name <- paste0(abundance_col,i)
+#       new_name <- paste0("CV",i)
+#       
+#       dftmp_mean <- data %>%
+#         select(pep_with_pos,species,contains(paste0(abundance_col,i))) %>% 
+#         rename_with(~"row_mean", contains(abundance_col)) %>%
+#         #bind_cols(1:nrow(data)) %>%
+#         drop_na() 
+#       #rename(index = (replicate+1)) 
+#       
+#       if (i==2){
+#         
+#         assign(paste0('A_CV',i), data %>%
+#                  select(contains(paste0("E3-A",i))) %>%
+#                  drop_na() %>%
+#                  #rowwise() %>%
+#                  mutate(
+#                    row_sd = apply(select(., where(is.numeric)), 1, sd, na.rm = TRUE),
+#                    # Add other transformations here
+#                  ) %>%
+#                  #mutate(row_sd = sd(c_across(where(is.numeric)), na.rm = TRUE)) %>%
+#                  bind_cols(dftmp_mean) %>%
+#                  mutate(CV=(row_sd/row_mean)*100) %>%
+#                  bind_cols(1:nrow(dftmp_mean)) %>%
+#                  rename(index = ((replicate)+(2*(replicate)))) %>%
+#                  #rename_with(~paste0(new_name,.x,recycle0 = FALSE),starts_with("CV")) %>%
+#                  rename_with(~new_name, contains("CV")) %>%
+#                  select(!contains("E3-A")))
+#       }else{
+#         
+#         assign(paste0('A_CV',i), data %>%
+#                  select(contains(paste0("E3-A",i))) %>%
+#                  drop_na() %>%
+#                  #rowwise() %>%
+#                  mutate(
+#                    row_sd = apply(select(., where(is.numeric)), 1, sd, na.rm = TRUE),
+#                    # Add other transformations here
+#                  ) %>%
+#                  #mutate(row_sd = sd(c_across(where(is.numeric)), na.rm = TRUE)) %>%
+#                  bind_cols(dftmp_mean) %>%
+#                  mutate(CV=(row_sd/row_mean)*100) %>%
+#                  bind_cols(1:nrow(dftmp_mean)) %>%
+#                  rename(index = (replicate+6)) %>%
+#                  select(CV,index) %>%
+#                  rename_with(~new_name, contains("CV")))
+#       }
+#       print(i)
+#     }
+#     
+#     df_CV <- A_CV2 %>% #A_CV1 %>%
+#       select(!row_sd) %>%
+#       #left_join(A_CV2,by="index") %>%
+#       left_join(A_CV3,by="index") %>%
+#       left_join(A_CV4,by="index") %>%
+#       left_join(A_CV5,by="index") %>%
+#       pivot_longer(cols = contains("CV"),
+#                    names_to = "CV_samples",
+#                    values_to = "CV_values") %>%
+#       #filter(!grepl("Unexpected",Pool)) %>%
+#       #mutate(CV_values=(CV_values*100)) %>%
+#       mutate(acq_type=acquisiton_type) %>%
+#       mutate(soft_name=software_name) %>%
+#       drop_na()
+#     
+#     
+#   }else if (exp_id==2){
+#     
+#     for (i in 1:iter){
+#       
+#       old_mean_name <- paste0(abundance_col,i)
+#       new_name <- paste0("CV",i)
+#       
+#       dftmp_mean <- data %>%
+#         select(pep_with_pos,Pool,contains(paste0(abundance_col,i))) %>% 
+#         rename_with(~"row_mean", contains(abundance_col)) %>%
+#         #bind_cols(1:nrow(data)) %>%
+#         drop_na() 
+#       #rename(index = (replicate+1)) 
+#       
+#       if (i==1){
+#         
+#         assign(paste0('A_CV',i), data %>%
+#                  select(contains(paste0("E2-A",i))) %>%
+#                  drop_na() %>%
+#                  #rowwise() %>%
+#                  mutate(
+#                    row_sd = apply(select(., where(is.numeric)), 1, sd, na.rm = TRUE),
+#                    # Add other transformations here
+#                  ) %>%
+#                  #mutate(row_sd = sd(c_across(where(is.numeric)), na.rm = TRUE)) %>%
+#                  bind_cols(dftmp_mean) %>%
+#                  mutate(CV=(row_sd/row_mean)*100) %>%
+#                  bind_cols(1:nrow(dftmp_mean)) %>%
+#                  rename(index = (replicate+(2*(replicate)))) %>%
+#                  #rename_with(~paste0(new_name,.x,recycle0 = FALSE),starts_with("CV")) %>%
+#                  rename_with(~new_name, contains("CV")) %>%
+#                  select(!contains("E2-A")))
+#       }else{
+#         
+#         assign(paste0('A_CV',i), data %>%
+#                  select(contains(paste0("E2-A",i))) %>%
+#                  drop_na() %>%
+#                  #rowwise() %>%
+#                  mutate(
+#                    row_sd = apply(select(., where(is.numeric)), 1, sd, na.rm = TRUE),
+#                    # Add other transformations here
+#                  ) %>%
+#                  #mutate(row_sd = sd(c_across(where(is.numeric)), na.rm = TRUE)) %>%
+#                  bind_cols(dftmp_mean) %>%
+#                  mutate(CV=(row_sd/row_mean)*100) %>%
+#                  bind_cols(1:nrow(dftmp_mean)) %>%
+#                  rename(index = (replicate+6)) %>%
+#                  select(CV,index) %>%
+#                  rename_with(~new_name, contains("CV")))
+#       }
+#       print(i)
+#       
+#     }
+#     
+#     df_CV <- A_CV1 %>% 
+#       select(!row_sd) %>%
+#       left_join(A_CV2,by="index") %>%
+#       left_join(A_CV3,by="index") %>%
+#       left_join(A_CV4,by="index") %>%
+#       left_join(A_CV5,by="index") %>%
+#       pivot_longer(cols = contains("CV"),
+#                    names_to = "CV_samples",
+#                    values_to = "CV_values") %>%
+#       #filter(!grepl("Unexpected",Pool)) %>%
+#       #mutate(CV_values=(CV_values*100)) %>%
+#       mutate(acq_type=acquisiton_type) %>%
+#       mutate(soft_name=software_name) %>%
+#       drop_na()
+#     
+#   }
+#   
+#   
+#   return(df_CV)
+# }
+
+
+## CV_calculator_fixed: Issue 11 root-cause fix
+## Replaces bind_cols (positional join between independently drop_na'd dataframes)
+## with keyed left_join by pep_with_pos, ensuring rows are correctly matched even when
+## drop_na removes different rows from the replicate and mean dataframes.
+CV_calculator_fixed <- function(abundance_col,
+                                data,
+                                replicate,
+                                iter,
+                                exp_id,
+                                acquisiton_type,software_name
 ){
   
-  
-  
-  if(exp_id ==3){
-    
-    for(i in 2:iter){
-      
-      old_mean_name <- paste0(abundance_col,i)
-      new_name <- paste0("CV",i)
-      
-      dftmp_mean <- data %>%
-        select(pep_with_pos,species,contains(paste0(abundance_col,i))) %>% 
-        rename_with(~"row_mean", contains(abundance_col)) %>%
-        #bind_cols(1:nrow(data)) %>%
-        drop_na() 
-      #rename(index = (replicate+1)) 
-      
-      if (i==2){
-        
-        assign(paste0('A_CV',i), data %>%
-                 select(contains(paste0("E3-A",i))) %>%
-                 drop_na() %>%
-                 #rowwise() %>%
-                 mutate(
-                   row_sd = apply(select(., where(is.numeric)), 1, sd, na.rm = TRUE),
-                   # Add other transformations here
-                 ) %>%
-                 #mutate(row_sd = sd(c_across(where(is.numeric)), na.rm = TRUE)) %>%
-                 bind_cols(dftmp_mean) %>%
-                 mutate(CV=(row_sd/row_mean)*100) %>%
-                 bind_cols(1:nrow(dftmp_mean)) %>%
-                 rename(index = ((replicate)+(2*(replicate)))) %>%
-                 #rename_with(~paste0(new_name,.x,recycle0 = FALSE),starts_with("CV")) %>%
-                 rename_with(~new_name, contains("CV")) %>%
-                 select(!contains("E3-A")))
-      }else{
-        
-        assign(paste0('A_CV',i), data %>%
-                 select(contains(paste0("E3-A",i))) %>%
-                 drop_na() %>%
-                 #rowwise() %>%
-                 mutate(
-                   row_sd = apply(select(., where(is.numeric)), 1, sd, na.rm = TRUE),
-                   # Add other transformations here
-                 ) %>%
-                 #mutate(row_sd = sd(c_across(where(is.numeric)), na.rm = TRUE)) %>%
-                 bind_cols(dftmp_mean) %>%
-                 mutate(CV=(row_sd/row_mean)*100) %>%
-                 bind_cols(1:nrow(dftmp_mean)) %>%
-                 rename(index = (replicate+6)) %>%
-                 select(CV,index) %>%
-                 rename_with(~new_name, contains("CV")))
-      }
-      print(i)
-    }
-    
-    df_CV <- A_CV2 %>% #A_CV1 %>%
-      select(!row_sd) %>%
-      #left_join(A_CV2,by="index") %>%
-      left_join(A_CV3,by="index") %>%
-      left_join(A_CV4,by="index") %>%
-      left_join(A_CV5,by="index") %>%
-      pivot_longer(cols = contains("CV"),
-                   names_to = "CV_samples",
-                   values_to = "CV_values") %>%
-      #filter(!grepl("Unexpected",Pool)) %>%
-      #mutate(CV_values=(CV_values*100)) %>%
-      mutate(acq_type=acquisiton_type) %>%
-      mutate(soft_name=software_name) %>%
-      drop_na()
-    
-    
-  }else if (exp_id==2){
-    
-    for (i in 1:iter){
-      
-      old_mean_name <- paste0(abundance_col,i)
-      new_name <- paste0("CV",i)
-      
-      dftmp_mean <- data %>%
-        select(pep_with_pos,Pool,contains(paste0(abundance_col,i))) %>% 
-        rename_with(~"row_mean", contains(abundance_col)) %>%
-        #bind_cols(1:nrow(data)) %>%
-        drop_na() 
-      #rename(index = (replicate+1)) 
-      
-      if (i==1){
-        
-        assign(paste0('A_CV',i), data %>%
-                 select(contains(paste0("E2-A",i))) %>%
-                 drop_na() %>%
-                 #rowwise() %>%
-                 mutate(
-                   row_sd = apply(select(., where(is.numeric)), 1, sd, na.rm = TRUE),
-                   # Add other transformations here
-                 ) %>%
-                 #mutate(row_sd = sd(c_across(where(is.numeric)), na.rm = TRUE)) %>%
-                 bind_cols(dftmp_mean) %>%
-                 mutate(CV=(row_sd/row_mean)*100) %>%
-                 bind_cols(1:nrow(dftmp_mean)) %>%
-                 rename(index = (replicate+(2*(replicate)))) %>%
-                 #rename_with(~paste0(new_name,.x,recycle0 = FALSE),starts_with("CV")) %>%
-                 rename_with(~new_name, contains("CV")) %>%
-                 select(!contains("E2-A")))
-      }else{
-        
-        assign(paste0('A_CV',i), data %>%
-                 select(contains(paste0("E2-A",i))) %>%
-                 drop_na() %>%
-                 #rowwise() %>%
-                 mutate(
-                   row_sd = apply(select(., where(is.numeric)), 1, sd, na.rm = TRUE),
-                   # Add other transformations here
-                 ) %>%
-                 #mutate(row_sd = sd(c_across(where(is.numeric)), na.rm = TRUE)) %>%
-                 bind_cols(dftmp_mean) %>%
-                 mutate(CV=(row_sd/row_mean)*100) %>%
-                 bind_cols(1:nrow(dftmp_mean)) %>%
-                 rename(index = (replicate+6)) %>%
-                 select(CV,index) %>%
-                 rename_with(~new_name, contains("CV")))
-      }
-      print(i)
-      
-    }
-    
-    df_CV <- A_CV1 %>% 
-      select(!row_sd) %>%
-      left_join(A_CV2,by="index") %>%
-      left_join(A_CV3,by="index") %>%
-      left_join(A_CV4,by="index") %>%
-      left_join(A_CV5,by="index") %>%
-      pivot_longer(cols = contains("CV"),
-                   names_to = "CV_samples",
-                   values_to = "CV_values") %>%
-      #filter(!grepl("Unexpected",Pool)) %>%
-      #mutate(CV_values=(CV_values*100)) %>%
-      mutate(acq_type=acquisiton_type) %>%
-      mutate(soft_name=software_name) %>%
-      drop_na()
-    
+  # Detect the experiment column naming pattern from the data.
+  # DIA-NN uses "A1-R1", "A2-R1" etc. (no experiment prefix)
+  # Spectronaut uses "E2-A1-R1", "E2-A2-R1" etc.
+  # We find the pattern by looking for columns matching "A1-R" with or without prefix.
+  all_cols <- colnames(data)
+  if (any(grepl(paste0("E", exp_id, "-A1"), all_cols))) {
+    exp_prefix <- paste0("E", exp_id, "-A")
+  } else if (any(grepl("^A1-R", all_cols))) {
+    exp_prefix <- "A"
+  } else {
+    warning("CV_calculator_fixed: cannot detect experiment column prefix")
+    return(data.frame())
   }
   
+  # Determine the key column for joining (species for Exp3, Pool for Exp2)
+  key_col <- if(exp_id == 3) "species" else "Pool"
+  # Starting iteration index
+  start_i <- if(exp_id == 3) 2 else 1
+  
+  for (i in start_i:iter){
+    
+    new_name <- paste0("CV", i)
+    
+    # Mean values per peptide for sample i — keyed by pep_with_pos
+    dftmp_mean <- data %>%
+      select(pep_with_pos, all_of(key_col), contains(paste0(abundance_col, i))) %>% 
+      rename_with(~"row_mean", contains(abundance_col)) %>%
+      drop_na()
+    
+    # SD across replicates for sample i — keyed by pep_with_pos
+    rep_cols <- grep(paste0(exp_prefix, i), colnames(data), value = TRUE)
+    dftmp_sd <- data %>%
+      select(pep_with_pos, all_of(rep_cols)) %>%
+      drop_na() %>%
+      mutate(row_sd = apply(select(., all_of(rep_cols)), 1, sd, na.rm = TRUE))
+    
+    # Keyed join instead of bind_cols — only keeps peptides present in both
+    joined <- dftmp_sd %>%
+      inner_join(dftmp_mean, by = "pep_with_pos") %>%
+      mutate(CV = (row_sd / row_mean) * 100) %>%
+      mutate(index = row_number())
+    
+    if (i == start_i){
+      assign(paste0('A_CV', i), joined %>%
+               rename_with(~new_name, matches("^CV$")) %>%
+               select(!all_of(rep_cols)))
+    } else {
+      assign(paste0('A_CV', i), joined %>%
+               select(CV, index, pep_with_pos) %>%
+               rename_with(~new_name, matches("^CV$")))
+    }
+    print(i)
+  }
+  
+  # Assemble CV columns — join by pep_with_pos for correctness
+  first_cv <- get(paste0('A_CV', start_i))
+  if ("row_sd" %in% colnames(first_cv)) {
+    first_cv <- first_cv %>% select(!row_sd)
+  }
+  df_CV <- first_cv
+  for (j in (start_i + 1):iter) {
+    df_CV <- df_CV %>% left_join(get(paste0('A_CV', j)), by = c("pep_with_pos", "index"))
+  }
+  
+  df_CV <- df_CV %>%
+    pivot_longer(cols = contains("CV"),
+                 names_to = "CV_samples",
+                 values_to = "CV_values") %>%
+    mutate(acq_type = acquisiton_type) %>%
+    mutate(soft_name = software_name) %>%
+    drop_na()
   
   return(df_CV)
 }
@@ -495,12 +583,12 @@ calculate_sum <- function(Sequence, Positions, mapping_df) {
   
   # Check if the positions column contains "&" or only numeric values
   if (grepl("&", Positions)) {
-       # Count the number of "&" symbols in the positions string
-       count_ampersand <- nchar(gsub("[^&]", "", Positions))
-       additional_value <-(count_ampersand+1) * 80
+    # Count the number of "&" symbols in the positions string
+    count_ampersand <- nchar(gsub("[^&]", "", Positions))
+    additional_value <-(count_ampersand+1) * 80
   }else {
-       additional_value <- 80
-       }
+    additional_value <- 80
+  }
   # Add the additional value to the base sum
   final_sum <- base_sum + additional_value
   
@@ -521,11 +609,11 @@ gg_quant_ratio_acc <- function(data_set,
                                y_lab,
                                color_lab,
                                subtitle_txt
-                               ){
+){
   
   ggplot(data_set,aes(x=x_df,y=y_df,color=color_df,xmin)) + 
     geom_point(size=12) + stat_summary(fun.y=median, geom="point", shape=18,
-                              size=15, color=median_col) + 
+                                       size=15, color=median_col) + 
     geom_smooth(method = "lm",col = "black",size=1.9) +
     theme_minimal() +
     
@@ -543,25 +631,25 @@ gg_quant_ratio_acc <- function(data_set,
     ggtitle(header) +
     labs(x=x_lab, y=y_lab,color= color_lab,subtitle = subtitle_txt) +
     scale_color_brewer(palette = 1,direction=-1) #+
-    # scale_y_continuous(
-    #   limits = c(-5,9), 
-    #   breaks = seq(-5, 9,1)
-    # ) +
-    # scale_x_continuous(
-    #   limits = c(xmin,7), 
-    #   breaks = seq(xmin, 7,0.5)
-    # ) 
+  # scale_y_continuous(
+  #   limits = c(-5,9), 
+  #   breaks = seq(-5, 9,1)
+  # ) +
+  # scale_x_continuous(
+  #   limits = c(xmin,7), 
+  #   breaks = seq(xmin, 7,0.5)
+  # ) 
 }
 
 gg_density <- function(data_set,
-                                 x_df,
-                                 fill_df,
-                                 color_df,
-                                 header,
-                                 facet_df,
-                                 x_lab,
-                                 fill_lab,
-                                 color_lab,
+                       x_df,
+                       fill_df,
+                       color_df,
+                       header,
+                       facet_df,
+                       x_lab,
+                       fill_lab,
+                       color_lab,
                        subtitle_txt){
   data_set$facet <- data_set[[facet_df]]
   ggplot(data_set,aes(x=log10(x_df), fill=fill_df )) +
@@ -582,16 +670,16 @@ gg_density <- function(data_set,
           strip.text.x = element_text(
             size = 15
           )
-          ) +
+    ) +
     ggtitle(header) +
     facet_wrap(~facet, nrow = 2,scales = "free_x") +
     labs(x=x_lab,fill = fill_lab, color= color_lab,subtitle = subtitle_txt)
-    
+  
   
 } 
 
-            
-    
+
+
 
 
 #### THIS IS NOT TESTED ####
@@ -621,13 +709,13 @@ gg_density <- function(data_set,
 ### BOX-PLOT: Experimental Quantity Ratio of Synthetic Peptides  
 
 gg_boxplt_exp_ratio <- function(data_set,
-                                 x_df,
-                                 y_df,
-                                 fill_df,
-                                 header,
-                                 x_lab,
-                                 y_lab,
-                                 fill_lab,
+                                x_df,
+                                y_df,
+                                fill_df,
+                                header,
+                                x_lab,
+                                y_lab,
+                                fill_lab,
                                 subtitle_txt){
   ggplot(data_set,aes(x =x_df , y =log2(y_df),fill = fill_df)) +
     geom_boxplot() +
@@ -651,17 +739,17 @@ gg_boxplt_exp_ratio <- function(data_set,
 library(gghalves)
 
 ### HALF-BOX-PLOT & HALF-SCATTER-PLOT: Experimental Quantity Ratio of Synthetic Peptides  
- 
+
 gg_half_boxplt_exp_ratio <- function(data_set,
-                                x_df,
-                                y_df,
-                                fill_df,
-                                header,
-                                x_lab,
-                                y_lab,
-                                fill_lab,
-                                subtitle_txt
-                                ){
+                                     x_df,
+                                     y_df,
+                                     fill_df,
+                                     header,
+                                     x_lab,
+                                     y_lab,
+                                     fill_lab,
+                                     subtitle_txt
+){
   ggplot(data_set,aes(x =x_df , y =log2(y_df),fill = fill_df)) +
     geom_half_boxplot(outlier.shape = NA) +
     geom_half_point(alpha = 1, show.legend = FALSE, aes(color=fill_df))+
@@ -676,7 +764,7 @@ gg_half_boxplt_exp_ratio <- function(data_set,
           axis.text=element_text(size=30),
           axis.title=element_text(size=30)
     ) + scale_fill_brewer(palette = "Dark2") +
-        scale_color_brewer(palette = "Dark2")+ 
+    scale_color_brewer(palette = "Dark2")+ 
     labs(x=x_lab,y=y_lab,fill=fill_lab,subtitle = subtitle_txt) +
     ggtitle(header)
 }
@@ -686,14 +774,14 @@ gg_half_boxplt_exp_ratio <- function(data_set,
 ### HALF-BOX-PLOT & HALF-SCATTER-PLOT: Experimental Quantity Ratio of Synthetic Peptides  
 
 gg_half_boxplt_exp_ratio_nolog <- function(data_set,
-                                     x_df,
-                                     y_df,
-                                     fill_df,
-                                     header,
-                                     x_lab,
-                                     y_lab,
-                                     fill_lab,
-                                     subtitle_txt
+                                           x_df,
+                                           y_df,
+                                           fill_df,
+                                           header,
+                                           x_lab,
+                                           y_lab,
+                                           fill_lab,
+                                           subtitle_txt
 ){
   ggplot(data_set,aes(x =x_df , y =y_df,fill = fill_df)) +
     geom_half_boxplot(outlier.shape = NA) +
@@ -722,14 +810,14 @@ gg_half_boxplt_exp_ratio_nolog <- function(data_set,
 ### VIOLIN-PLOT: Experimental Quantity Ratio of Synthetic Peptides   
 
 gg_violin_exp_ratio <- function(data_set,
-                                     x_df,
-                                     y_df,
-                                     fill_df,
-                                     header,
-                                     x_lab,
-                                     y_lab,
-                                     fill_lab,
-                                     trim,
+                                x_df,
+                                y_df,
+                                fill_df,
+                                header,
+                                x_lab,
+                                y_lab,
+                                fill_lab,
+                                trim,
                                 subtitle_txt){
   
   ggplot(data_set,aes(x =x_df , y =log2(y_df),fill = fill_df)) +
@@ -750,15 +838,15 @@ gg_violin_exp_ratio <- function(data_set,
 }
 
 gg_violin_exp_ratio_nolog <- function(data_set,
-                                x_df,
-                                y_df,
-                                fill_df,
-                                header,
-                                x_lab,
-                                y_lab,
-                                fill_lab,
-                                trim,
-                                subtitle_txt){
+                                      x_df,
+                                      y_df,
+                                      fill_df,
+                                      header,
+                                      x_lab,
+                                      y_lab,
+                                      fill_lab,
+                                      trim,
+                                      subtitle_txt){
   
   ggplot(data_set,aes(x =x_df , y =y_df,fill = fill_df)) +
     geom_violin(trim = trim) +
@@ -781,37 +869,6 @@ gg_violin_exp_ratio_nolog <- function(data_set,
 #################################
 
 gg_barplt_id_pep_count <- function(data_set,
-                                x_df,
-                                fill_df,
-                                header,
-                                ymax,
-                                x_lab,
-                                y_lab,
-                                fill_lab,
-                                caption_lab, # "NA values are removed.",
-                                subtitle_txt,
-                                size_num){
-
-
-ggplot(data_set, aes(x=x_df, fill=fill_df)) +  geom_bar(position = position_dodge2(preserve = "single")) +
-  scale_fill_brewer(palette = 1,direction=-1) +
-  theme_minimal() +
-  theme(legend.text = element_text(size=30), 
-        axis.title.x = element_text(size=30),
-        axis.title.y = element_text(size=30),
-        plot.title = element_text(size=35),
-        plot.subtitle = element_text(size = 25),
-        plot.caption = element_text(size = 25),
-        legend.title=element_text(size=30),
-        axis.text=element_text(size=30),
-        axis.title=element_text(size=30)) +
-  ggtitle(header) + 
-  scale_y_continuous(breaks = seq(from=0, to=ymax,by=1000)) + #,expand = expansion(mult = c(0, 0.05))
-  geom_text(aes(label=after_stat(count)),stat = "count", position=position_dodge(width=0.9), vjust=-0.5,size=size_num) +
-  labs(x=x_lab,y=y_lab, fill= fill_lab, caption = caption_lab,subtitle = subtitle_txt)
-}
-  
-gg_barplt_id_pep_count_stack <- function(data_set,
                                    x_df,
                                    fill_df,
                                    header,
@@ -822,6 +879,37 @@ gg_barplt_id_pep_count_stack <- function(data_set,
                                    caption_lab, # "NA values are removed.",
                                    subtitle_txt,
                                    size_num){
+  
+  
+  ggplot(data_set, aes(x=x_df, fill=fill_df)) +  geom_bar(position = position_dodge2(preserve = "single")) +
+    scale_fill_brewer(palette = 1,direction=-1) +
+    theme_minimal() +
+    theme(legend.text = element_text(size=30), 
+          axis.title.x = element_text(size=30),
+          axis.title.y = element_text(size=30),
+          plot.title = element_text(size=35),
+          plot.subtitle = element_text(size = 25),
+          plot.caption = element_text(size = 25),
+          legend.title=element_text(size=30),
+          axis.text=element_text(size=30),
+          axis.title=element_text(size=30)) +
+    ggtitle(header) + 
+    scale_y_continuous(breaks = seq(from=0, to=ymax,by=1000)) + #,expand = expansion(mult = c(0, 0.05))
+    geom_text(aes(label=after_stat(count)),stat = "count", position=position_dodge(width=0.9), vjust=-0.5,size=size_num) +
+    labs(x=x_lab,y=y_lab, fill= fill_lab, caption = caption_lab,subtitle = subtitle_txt)
+}
+
+gg_barplt_id_pep_count_stack <- function(data_set,
+                                         x_df,
+                                         fill_df,
+                                         header,
+                                         ymax,
+                                         x_lab,
+                                         y_lab,
+                                         fill_lab,
+                                         caption_lab, # "NA values are removed.",
+                                         subtitle_txt,
+                                         size_num){
   
   
   ggplot(data_set, aes(x=x_df, fill=fill_df)) + geom_bar(position = "stack") +
@@ -857,18 +945,18 @@ gg_raincloud <- function(data_set,
                          caption_lab,
                          subtitle_txt){
   ggplot(data_set, aes(x= factor(x_df),
-                                         y = log2(y_df),
-                                         fill=factor(fill_df)
-                       )) +
+                       y = log2(y_df),
+                       fill=factor(fill_df)
+  )) +
     ggdist::stat_halfeye(side="right", adjust = 0.5,
-                          justification = -0.15,
-                          .width = 0,
-                          point_colour=NA,
-                          alpha=0.75) +
+                         justification = -0.15,
+                         .width = 0,
+                         point_colour=NA,
+                         alpha=0.75) +
     geom_boxplot(
-                 width = .24, 
-                 outlier.colour = NA,
-                 alpha=1) +
+      width = .24, 
+      outlier.colour = NA,
+      alpha=1) +
     # ggdist::stat_dots(side="left",
     #                   justification= 1.1,
     #                   binwidth =.025) + 
@@ -885,10 +973,10 @@ gg_raincloud <- function(data_set,
     labs(x=x_lab,y=y_lab, fill= fill_lab, caption = caption_lab,subtitle = subtitle_txt) +
     #+ #,"cyan3"
     scale_fill_brewer(palette="Dark2")
-
+  
   
 }
-  
+
 
 gg_volcano <- function(data_set,
                        x_df,
@@ -928,8 +1016,7 @@ gg_volcano <- function(data_set,
     guides(color = guide_legend(override.aes = list(size = 10))) 
 }
 
-  
-  
-  
-  
-  
+
+
+
+
