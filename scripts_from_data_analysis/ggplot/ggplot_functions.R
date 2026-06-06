@@ -169,8 +169,138 @@ conditional_imputation <- function(df,impute_val,samp_names,num_NA_imputed){
   }
   return(all_complete_df)
 }
+############## ############## ############## ##############
+## FUNCTION FOR CV CALCULATION ##### FIRST VERSION ##############
+############## ############## ############## ##############
+# CV_calculator <- function(abundance_col,
+#                           data,
+#                           replicate,
+#                           iter,
+#                           exp_id,
+#                           acquisiton_type,software_name
+#                           
+# ){
+#   for (i in 1:iter){ ## it has to be started from 2 for experiment 3
+#     
+#     old_mean_name <- paste0(abundance_col,i)
+#     new_name <- paste0("CV",i)
+#     
+#     if(exp_id ==3){
+#       dftmp_mean <- data %>%
+#         select(pep_with_pos,species,contains(paste0(abundance_col,i))) %>% 
+#         rename_with(~"row_mean", contains(abundance_col)) %>%
+#         #bind_cols(1:nrow(data)) %>%
+#         drop_na() 
+#       #rename(index = (replicate+1)) 
+#       
+#       if (i==2){
+#         
+#         assign(paste0('A_CV',i), data %>%
+#                  select(contains(paste0("E3-A",i))) %>%
+#                  drop_na() %>%
+#                  #rowwise() %>%
+#                  mutate(
+#                    row_sd = apply(select(., where(is.numeric)), 1, sd, na.rm = TRUE),
+#                    # Add other transformations here
+#                  ) %>%
+#                  #mutate(row_sd = sd(c_across(where(is.numeric)), na.rm = TRUE)) %>%
+#                  bind_cols(dftmp_mean) %>%
+#                  mutate(CV=(row_sd/row_mean)*100) %>%
+#                  bind_cols(1:nrow(dftmp_mean)) %>%
+#                  rename(index = ((replicate)+(2*(replicate)))) %>%
+#                  #rename_with(~paste0(new_name,.x,recycle0 = FALSE),starts_with("CV")) %>%
+#                  rename_with(~new_name, contains("CV")) %>%
+#                  select(!contains("E3-A")))
+#       }else{
+#         
+#         assign(paste0('A_CV',i), data %>%
+#                  select(contains(paste0("E3-A",i))) %>%
+#                  drop_na() %>%
+#                  #rowwise() %>%
+#                  mutate(
+#                    row_sd = apply(select(., where(is.numeric)), 1, sd, na.rm = TRUE),
+#                    # Add other transformations here
+#                  ) %>%
+#                  #mutate(row_sd = sd(c_across(where(is.numeric)), na.rm = TRUE)) %>%
+#                  bind_cols(dftmp_mean) %>%
+#                  mutate(CV=(row_sd/row_mean)*100) %>%
+#                  bind_cols(1:nrow(dftmp_mean)) %>%
+#                  rename(index = (replicate+6)) %>%
+#                  select(CV,index) %>%
+#                  rename_with(~new_name, contains("CV")))
+#       }
+#       print(i)
+#       
+#     }else if (exp_id==2){
+#       dftmp_mean <- data %>%
+#         select(pep_with_pos,Pool,contains(paste0(abundance_col,i))) %>% 
+#         rename_with(~"row_mean", contains(abundance_col)) %>%
+#         #bind_cols(1:nrow(data)) %>%
+#         drop_na() 
+#       #rename(index = (replicate+1)) 
+#       
+#       if (i==1){
+#         
+#         assign(paste0('A_CV',i), data %>%
+#                  select(contains(paste0("E2-A",i))) %>%
+#                  drop_na() %>%
+#                  #rowwise() %>%
+#                  mutate(
+#                    row_sd = apply(select(., where(is.numeric)), 1, sd, na.rm = TRUE),
+#                    # Add other transformations here
+#                  ) %>%
+#                  #mutate(row_sd = sd(c_across(where(is.numeric)), na.rm = TRUE)) %>%
+#                  bind_cols(dftmp_mean) %>%
+#                  mutate(CV=(row_sd/row_mean)*100) %>%
+#                  bind_cols(1:nrow(dftmp_mean)) %>%
+#                  rename(index = (replicate+(2*(replicate)))) %>%
+#                  #rename_with(~paste0(new_name,.x,recycle0 = FALSE),starts_with("CV")) %>%
+#                  rename_with(~new_name, contains("CV")) %>%
+#                  select(!contains("E2-A")))
+#       }else{
+#         
+#         assign(paste0('A_CV',i), data %>%
+#                  select(contains(paste0("E2-A",i))) %>%
+#                  drop_na() %>%
+#                  #rowwise() %>%
+#                  mutate(
+#                    row_sd = apply(select(., where(is.numeric)), 1, sd, na.rm = TRUE),
+#                    # Add other transformations here
+#                  ) %>%
+#                  #mutate(row_sd = sd(c_across(where(is.numeric)), na.rm = TRUE)) %>%
+#                  bind_cols(dftmp_mean) %>%
+#                  mutate(CV=(row_sd/row_mean)*100) %>%
+#                  bind_cols(1:nrow(dftmp_mean)) %>%
+#                  rename(index = (replicate+6)) %>%
+#                  select(CV,index) %>%
+#                  rename_with(~new_name, contains("CV")))
+#       }
+#       print(i)
+#     }
+#   
+#   }
+#   
+#   df_CV <- A_CV2 %>% #A_CV1 %>%
+#     select(!row_sd) %>%
+#     #left_join(A_CV2,by="index") %>%
+#     left_join(A_CV3,by="index") %>%
+#     left_join(A_CV4,by="index") %>%
+#     left_join(A_CV5,by="index") %>%
+#     pivot_longer(cols = contains("CV"),
+#                  names_to = "CV_samples",
+#                  values_to = "CV_values") %>%
+#     #filter(!grepl("Unexpected",Pool)) %>%
+#     #mutate(CV_values=(CV_values*100)) %>%
+#     mutate(acq_type=acquisiton_type) %>%
+#     mutate(soft_name=software_name) %>%
+#     drop_na()
+#   
+#   return(df_CV)
+# }
 
-## FUNCTION FOR CV CALCULATION 
+############## ############## ############## ##############
+## FUNCTION FOR CV CALCULATION ##### SECOND VERSION ##############
+############## ############## ############## ##############
 CV_calculator <- function(abundance_col,
                           data,
                           replicate,
@@ -179,12 +309,16 @@ CV_calculator <- function(abundance_col,
                           acquisiton_type,software_name
                           
 ){
-  for (i in 1:iter){ ## it has to be started from 2 for experiment 3
+  
+  
+  
+  if(exp_id ==3){
     
-    old_mean_name <- paste0(abundance_col,i)
-    new_name <- paste0("CV",i)
-    
-    if(exp_id ==3){
+    for(i in 2:iter){
+      
+      old_mean_name <- paste0(abundance_col,i)
+      new_name <- paste0("CV",i)
+      
       dftmp_mean <- data %>%
         select(pep_with_pos,species,contains(paste0(abundance_col,i))) %>% 
         rename_with(~"row_mean", contains(abundance_col)) %>%
@@ -229,8 +363,31 @@ CV_calculator <- function(abundance_col,
                  rename_with(~new_name, contains("CV")))
       }
       print(i)
+    }
+    
+    df_CV <- A_CV2 %>% #A_CV1 %>%
+      select(!row_sd) %>%
+      #left_join(A_CV2,by="index") %>%
+      left_join(A_CV3,by="index") %>%
+      left_join(A_CV4,by="index") %>%
+      left_join(A_CV5,by="index") %>%
+      pivot_longer(cols = contains("CV"),
+                   names_to = "CV_samples",
+                   values_to = "CV_values") %>%
+      #filter(!grepl("Unexpected",Pool)) %>%
+      #mutate(CV_values=(CV_values*100)) %>%
+      mutate(acq_type=acquisiton_type) %>%
+      mutate(soft_name=software_name) %>%
+      drop_na()
+    
+    
+  }else if (exp_id==2){
+    
+    for (i in 1:iter){
       
-    }else if (exp_id==2){
+      old_mean_name <- paste0(abundance_col,i)
+      new_name <- paste0("CV",i)
+      
       dftmp_mean <- data %>%
         select(pep_with_pos,Pool,contains(paste0(abundance_col,i))) %>% 
         rename_with(~"row_mean", contains(abundance_col)) %>%
@@ -275,27 +432,31 @@ CV_calculator <- function(abundance_col,
                  rename_with(~new_name, contains("CV")))
       }
       print(i)
+      
     }
-  
+    
+    df_CV <- A_CV1 %>% 
+      select(!row_sd) %>%
+      left_join(A_CV2,by="index") %>%
+      left_join(A_CV3,by="index") %>%
+      left_join(A_CV4,by="index") %>%
+      left_join(A_CV5,by="index") %>%
+      pivot_longer(cols = contains("CV"),
+                   names_to = "CV_samples",
+                   values_to = "CV_values") %>%
+      #filter(!grepl("Unexpected",Pool)) %>%
+      #mutate(CV_values=(CV_values*100)) %>%
+      mutate(acq_type=acquisiton_type) %>%
+      mutate(soft_name=software_name) %>%
+      drop_na()
+    
   }
   
-  df_CV <- A_CV2 %>% #A_CV1 %>%
-    select(!row_sd) %>%
-    #left_join(A_CV2,by="index") %>%
-    left_join(A_CV3,by="index") %>%
-    left_join(A_CV4,by="index") %>%
-    left_join(A_CV5,by="index") %>%
-    pivot_longer(cols = contains("CV"),
-                 names_to = "CV_samples",
-                 values_to = "CV_values") %>%
-    #filter(!grepl("Unexpected",Pool)) %>%
-    #mutate(CV_values=(CV_values*100)) %>%
-    mutate(acq_type=acquisiton_type) %>%
-    mutate(soft_name=software_name) %>%
-    drop_na()
   
   return(df_CV)
 }
+
+
 ##################################
 ### ADDING NEUTRAL MASS FOR PEPTIDE TO MO MAPPING ###
 
