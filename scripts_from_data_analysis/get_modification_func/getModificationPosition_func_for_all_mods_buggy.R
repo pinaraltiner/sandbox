@@ -23,8 +23,11 @@ getModificationPosition_ <- function( mod_seq, character_index=F ){
       ## Remove other modifications from the sequence that are not being accessed to get a more accurate position index
       mods_to_remove_from_sequence <- modification_labels[ !(modification_labels %in%  mod) ]
       if ( length(mods_to_remove_from_sequence)>0 ){
-        ## Remove the other modifications not being assessed.
-        current_mod_sequence <- gsub( gsub("\\)", "\\\\)", gsub("\\(", "\\\\(", mods_to_remove_from_sequence )), "", mod_seq )
+        ## Remove the other modifications not being assessed — iterate to handle vectors correctly
+        current_mod_sequence <- mod_seq
+        for ( mod_to_remove in mods_to_remove_from_sequence ) {
+          current_mod_sequence <- gsub( gsub("\\)", "\\\\)", gsub("\\(", "\\\\(", mod_to_remove )), "", current_mod_sequence )
+        }
       } else {
         current_mod_sequence <- mod_seq
       }
