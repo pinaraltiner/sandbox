@@ -1,7 +1,7 @@
 #library(PhosR)
 library(stringr)
 library(dplyr)
-library(data.table)
+#library(data.table) # REMOVED: unused
 library(openxlsx)
 library(tidyr)
 library(ggplot2)
@@ -13,17 +13,17 @@ source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis
 #source("D:/dev/Pinar/PHD/sandbox/benchmarking_scripts/scripts_from_data_analysis/roc_curve/new_roc_curve_generation_with_custom_threshold.R")
 
 final_pd_pep_quant_analysis_exp1 <- function(file_path,
-                                                 #file_name,
-                                                 theo_file_path,
-                                                 theo_file_name,
-                                                 sheet_theo_name,
-                                                 selected_species,
-                                                 exp_id,
-                                                 #exp_design,
-                                                 background_species,
-                                                 mapping_file,
-                                                 acquisiton_type,
-                                                 software_name){
+                                             #file_name,
+                                             theo_file_path,
+                                             theo_file_name,
+                                             sheet_theo_name,
+                                             selected_species,
+                                             exp_id,
+                                             #exp_design,
+                                             background_species,
+                                             mapping_file,
+                                             acquisiton_type,
+                                             software_name){
   
   intended_dir <-paste0(file_path,"/output_final_aft_mapp_func_mod_col_sel")#output_final")
   
@@ -100,7 +100,7 @@ final_pd_pep_quant_analysis_exp1 <- function(file_path,
     return(list(extracted_letters, extracted_values))
   }
   
-
+  
   # 
   # # Define the improved extraction function that handles decimal phospho scores
   # extract_phospho_info <- function(input_string) {
@@ -171,13 +171,13 @@ final_pd_pep_quant_analysis_exp1 <- function(file_path,
                phospho_pos = results[[1]],
                phospho_score =results[[2]]) %>%
         select(!results) %>%
-      
+        
         ungroup() %>% # After rowwise, return to normal dataframe operations
         mutate(pep_with_pos = paste(Sequence,phospho_pos,sep = "_")) %>%
         drop_na(phospho_score)
       
-      }else{
-    
+    }else{
+      
       phospho_tmp <- tmp %>% 
         filter(grepl("Phospho",Modifications) & grepl(selected_species,Master.Protein.Descriptions)) %>%
         mutate(raw_files=all_dirs[i]) %>%
@@ -187,29 +187,29 @@ final_pd_pep_quant_analysis_exp1 <- function(file_path,
         mutate(phospho_pos = proline_phospho_pos_extraction(Modifications)) %>%
         mutate(pep_with_pos = paste(Sequence,phospho_pos,sep = "_")) #%>%
       #distinct(pep_with_pos,.keep_all = TRUE)
-      }
-      
-      assign(paste0(all_dirs[i]), phospho_tmp)
-      assign(paste0("comb_result"),bind_rows(comb_result, phospho_tmp))
-      
+    }
+    
+    assign(paste0(all_dirs[i]), phospho_tmp)
+    assign(paste0("comb_result"),bind_rows(comb_result, phospho_tmp))
+    
     if(background_species == "Escherichia coli"){
-        ecoli_tmp <- tmp %>% 
-          filter(grepl(background_species,Master.Protein.Descriptions)) %>%
-          mutate(raw_files=all_dirs[i]) %>%
-          separate(raw_files,into = c(paste0("tmp",1:3)),sep = "-") %>%
-          rename(raw_file=tmp1) %>%
-          mutate(acq_type=acquisiton_type) %>%
-          mutate(soft_name=software_name) %>%
-          distinct(Sequence,.keep_all = TRUE)
-        
-        assign(paste0("comb_ecoli"), bind_rows(comb_ecoli,ecoli_tmp))
-      }else{
-        
-      }
+      ecoli_tmp <- tmp %>% 
+        filter(grepl(background_species,Master.Protein.Descriptions)) %>%
+        mutate(raw_files=all_dirs[i]) %>%
+        separate(raw_files,into = c(paste0("tmp",1:3)),sep = "-") %>%
+        rename(raw_file=tmp1) %>%
+        mutate(acq_type=acquisiton_type) %>%
+        mutate(soft_name=software_name) %>%
+        distinct(Sequence,.keep_all = TRUE)
       
-      rm(tmp,phospho_tmp,ecoli_tmp)
+      assign(paste0("comb_ecoli"), bind_rows(comb_ecoli,ecoli_tmp))
+    }else{
       
     }
+    
+    rm(tmp,phospho_tmp,ecoli_tmp)
+    
+  }
   
   
   if(background_species == "Escherichia coli"){
@@ -227,22 +227,22 @@ final_pd_pep_quant_analysis_exp1 <- function(file_path,
       ungroup() 
     
     plot1 <- gg_barplt_id_pep_count(data_set = comb_ecoli_dist,
-                           x_df = comb_ecoli_dist$raw_file,
-                           fill_df = comb_ecoli_dist$pool_id,
-                           ymax = 20000,
-                           size_num = 8,
-                           header = paste("Total number of identified synthetic phospho-sequences across each pool",sep=" "),
-                           caption_lab = "Wrong Sequences were removed for the futher analysis.",
-                           x_lab = "Sample id",
-                           fill_lab =  "Sample id",
-                           y_lab = "Number of identified Sequence",
-                           subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) + 
+                                    x_df = comb_ecoli_dist$raw_file,
+                                    fill_df = comb_ecoli_dist$pool_id,
+                                    ymax = 20000,
+                                    size_num = 8,
+                                    header = paste("Total number of identified synthetic phospho-sequences across each pool",sep=" "),
+                                    caption_lab = "Wrong Sequences were removed for the futher analysis.",
+                                    x_lab = "Sample id",
+                                    fill_lab =  "Sample id",
+                                    y_lab = "Number of identified Sequence",
+                                    subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) + 
       scale_fill_brewer(palette = "Dark2") + theme(axis.text.x = element_text(angle = 90))
     
     write.table(comb_ecoli_dist,file=paste0(new_path, "/",software_name, ##file_path
-                                           "experiment",
-                                           exp_id,
-                                           "merge_id_ecoli_seq.tsv"),
+                                            "experiment",
+                                            exp_id,
+                                            "merge_id_ecoli_seq.tsv"),
                 sep = "\t",col.names = T,row.names = F)
     
     
@@ -299,7 +299,7 @@ final_pd_pep_quant_analysis_exp1 <- function(file_path,
       #mutate(raw_file=str_remove_all(Spectrum.File,".raw")) %>%
       full_join(map_df,by="raw_file") %>%
       rename(Experiment=sample_name) %>%
-    #separate(pool_id,into = c("expid","sample_id","Ecoli","inj"),sep = "_") %>%
+      #separate(pool_id,into = c("expid","sample_id","Ecoli","inj"),sep = "_") %>%
       mutate(pool_id_map_df=pool_id)
   }else{
     # Extracted values
@@ -312,7 +312,7 @@ final_pd_pep_quant_analysis_exp1 <- function(file_path,
       #mutate(raw_file=str_remove_all(Spectrum.File,".raw")) %>%
       full_join(map_df,by="raw_file") %>%
       rename(Experiment=sample_name) %>%
-    #separate(pool_id,into = c("expid","sample_id","Ecoli","inj"),sep = "_") %>%
+      #separate(pool_id,into = c("expid","sample_id","Ecoli","inj"),sep = "_") %>%
       mutate(pool_id_map_df=pool_id)
   }
   
@@ -340,10 +340,10 @@ final_pd_pep_quant_analysis_exp1 <- function(file_path,
     mutate(map_seq = ifelse(!is.na(Neutral_mass_res) & !is.na(Neutral_mass_theo) & Neutral_mass_res == Neutral_mass_theo , # pool_id_map_df==pool_id_theo_list_seq
                             "Correct seq. & Correct mz",map_seq)) %>%
     select(!c(Positions,Sum)) #%>%
-####### THESE LAST THREE ROWS ARE COMMENTED BECAUSE THERE IS NO INTENSITY INFO
-    #group_by(pep_with_pos,Experiment) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
-    #slice(which.max(Intensity)) %>%
-   # ungroup() 
+  ####### THESE LAST THREE ROWS ARE COMMENTED BECAUSE THERE IS NO INTENSITY INFO
+  #group_by(pep_with_pos,Experiment) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
+  #slice(which.max(Intensity)) %>%
+  # ungroup() 
   
   
   comb_result_seq_pool <- comb_result_mz_seq_map %>% 
@@ -373,19 +373,19 @@ final_pd_pep_quant_analysis_exp1 <- function(file_path,
   # 
   #### WRITE THE OBJECT AS TSV ####
   #### WRITE THE OBJECT AS TSV ####
- 
   
-    ### Duplicate sequences were removed.
-    comb_result_dist <- comb_result_seq_pool %>%
-      #relocate(pool_id_map_df,pool_id_theo_list,Pool_for_seq_merge,.after = Sequence) %>% #
-      group_by(raw_file,Sequence,Neutral_mass_res) %>%
-      distinct(Sequence,.keep_all = T) %>%
-      ungroup() 
+  
+  ### Duplicate sequences were removed.
+  comb_result_dist <- comb_result_seq_pool %>%
+    #relocate(pool_id_map_df,pool_id_theo_list,Pool_for_seq_merge,.after = Sequence) %>% #
+    group_by(raw_file,Sequence,Neutral_mass_res) %>%
+    distinct(Sequence,.keep_all = T) %>%
+    ungroup() 
   
   write.table(comb_result_seq_pool,file=paste0(new_path,"/", #file_path,curr_dir
-                                          "exp",
-                                          exp_id,#acquisiton_type,
-                                          "merge_theo_list_with_identified_phospho_seq.tsv"),
+                                               "exp",
+                                               exp_id,#acquisiton_type,
+                                               "merge_theo_list_with_identified_phospho_seq.tsv"),
               sep = "\t",col.names = T,row.names = F)
   
   write.table(comb_result_dist,file=paste0(new_path,"/", software_name, #file_path,curr_dir
@@ -393,46 +393,46 @@ final_pd_pep_quant_analysis_exp1 <- function(file_path,
                                            exp_id,#acquisiton_type,
                                            "merge_theo_list_with_identified_phospho_seq_unique_ones.tsv"),
               sep = "\t",col.names = T,row.names = F)
-    
-    #### VISUALIZATION OF TOTAL NUM. OF PHOSPHO-SEQ ####
-    plot2 <-   gg_barplt_id_pep_count_stack(data_set =comb_result_dist,#comb_result_seq_dist,
-                                      x_df =comb_result_dist$Experiment,#comb_result_seq_dist$raw_file,
-                                      fill_df = comb_result_dist$map_seq_pool,#comb_result_seq_dist$Pool_for_seq_merge ,
-                                      ymax = 250,
-                                      size_num = 10,
-                                      header = paste("Total number of identified synthetic phospho-sequences across each pool",sep=" "),
-                                      caption_lab = "Duplicates were removed for the futher analysis.",
-                                      x_lab = "Sample id",
-                                      fill_lab =  "Sample id",
-                                      y_lab = "Number of identified Sequence",
-                                      subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +
-      scale_fill_brewer(palette = "Paired") + theme(axis.text.x = element_text(angle = 90))
-    
-    #### EXTRACTION OF CORRECT SEQ. ####
-    comb_result_seq_dist_cor <- comb_result_dist %>%
-      #filter(!grepl("Wrong",Pool_for_seq_merge) & !grepl("Missing",Pool_for_seq_merge))
+  
+  #### VISUALIZATION OF TOTAL NUM. OF PHOSPHO-SEQ ####
+  plot2 <-   gg_barplt_id_pep_count_stack(data_set =comb_result_dist,#comb_result_seq_dist,
+                                          x_df =comb_result_dist$Experiment,#comb_result_seq_dist$raw_file,
+                                          fill_df = comb_result_dist$map_seq_pool,#comb_result_seq_dist$Pool_for_seq_merge ,
+                                          ymax = 250,
+                                          size_num = 10,
+                                          header = paste("Total number of identified synthetic phospho-sequences across each pool",sep=" "),
+                                          caption_lab = "Duplicates were removed for the futher analysis.",
+                                          x_lab = "Sample id",
+                                          fill_lab =  "Sample id",
+                                          y_lab = "Number of identified Sequence",
+                                          subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +
+    scale_fill_brewer(palette = "Paired") + theme(axis.text.x = element_text(angle = 90))
+  
+  #### EXTRACTION OF CORRECT SEQ. ####
+  comb_result_seq_dist_cor <- comb_result_dist %>%
+    #filter(!grepl("Wrong",Pool_for_seq_merge) & !grepl("Missing",Pool_for_seq_merge))
     filter(!grepl("Subset or different mz",map_seq) & !grepl("Missing",map_seq))
+  
+  #### VISUALIZATION OF TOTAL NUM. OF CORRECTLY IDENTIFIED PHOSPHO-SEQ ####
+  plot3 <- gg_barplt_id_pep_count_stack(data_set = comb_result_seq_dist_cor,
+                                        x_df = comb_result_seq_dist_cor$Experiment,
+                                        fill_df = comb_result_seq_dist_cor$map_seq_pool,
+                                        ymax = 250,
+                                        size_num=10,
+                                        header = paste("Total number of identified synthetic phospho-sequences across each pool",sep=" "),
+                                        caption_lab = "Wrong Sequences were removed for the futher analysis.",
+                                        x_lab = "Sample id",
+                                        fill_lab =  "Sample id",
+                                        y_lab = "Number of identified Sequence",
+                                        subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +
     
-    #### VISUALIZATION OF TOTAL NUM. OF CORRECTLY IDENTIFIED PHOSPHO-SEQ ####
-    plot3 <- gg_barplt_id_pep_count_stack(data_set = comb_result_seq_dist_cor,
-                                   x_df = comb_result_seq_dist_cor$Experiment,
-                                   fill_df = comb_result_seq_dist_cor$map_seq_pool,
-                                   ymax = 250,
-                                   size_num=10,
-                                   header = paste("Total number of identified synthetic phospho-sequences across each pool",sep=" "),
-                                   caption_lab = "Wrong Sequences were removed for the futher analysis.",
-                                   x_lab = "Sample id",
-                                   fill_lab =  "Sample id",
-                                   y_lab = "Number of identified Sequence",
-                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +
-      
-      scale_fill_brewer(palette = "Dark2") + theme(axis.text.x = element_text(angle = 90))
-    
-    
-    #### TOTAL NUM. OF PHOSPHO-PEPTIDES ####
-    ### Only correct sequences were kept.
-    ### Correct mapping was done using "pool_id_map_df" and "pep_with_pos".
-    ### Duplicate peptides were removed.
+    scale_fill_brewer(palette = "Dark2") + theme(axis.text.x = element_text(angle = 90))
+  
+  
+  #### TOTAL NUM. OF PHOSPHO-PEPTIDES ####
+  ### Only correct sequences were kept.
+  ### Correct mapping was done using "pool_id_map_df" and "pep_with_pos".
+  ### Duplicate peptides were removed.
   if(grepl("PeptideIsoforms", all_dirs[i]) |grepl("PeptideGroups", all_dirs[i]) ){
     
     
@@ -449,14 +449,14 @@ final_pd_pep_quant_analysis_exp1 <- function(file_path,
       group_by(pep_with_pos,raw_file) %>%
       distinct(pep_with_pos,.keep_all = TRUE)%>%
       ungroup()
-      
-      #mutate(map_pep=ifelse(is.na(pool_id_theo_list_pep),"Correct Seq. & Wrong Loc.",map_seq_pool)) %>%
-      #select(!c(Positions,Sum)) %>%
-      
-      ####### THESE LAST THREE ROWS ARE COMMENTED BECAUSE THERE IS NO INTENSITY INFO
-     # group_by(pep_with_pos,Experiment) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
-     # #slice(which.max(Intensity)) %>%
-      #ungroup() 
+    
+    #mutate(map_pep=ifelse(is.na(pool_id_theo_list_pep),"Correct Seq. & Wrong Loc.",map_seq_pool)) %>%
+    #select(!c(Positions,Sum)) %>%
+    
+    ####### THESE LAST THREE ROWS ARE COMMENTED BECAUSE THERE IS NO INTENSITY INFO
+    # group_by(pep_with_pos,Experiment) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
+    # #slice(which.max(Intensity)) %>%
+    #ungroup() 
     
     # comb_result_pep <- comb_result_seq %>% 
     #   rename(max_phospho=phospho_score) %>%
@@ -495,122 +495,122 @@ final_pd_pep_quant_analysis_exp1 <- function(file_path,
       # relocate(pool_id_map_df,pool_id_theo_list,map_pep,.after = Sequence) %>% 
       # mutate(acq_type=acquisiton_type) %>%
       # mutate(soft_name=software_name)
-    filter(!grepl("Subset or different mz",map_seq) & !grepl("Missing",map_seq))%>%
-    filter(!grepl('Correct Seq. & mz but wrong pool',map_seq_pool)) %>%
+      filter(!grepl("Subset or different mz",map_seq) & !grepl("Missing",map_seq))%>%
+      filter(!grepl('Correct Seq. & mz but wrong pool',map_seq_pool)) %>%
       #filter(!grepl("Wrong",Pool_for_seq_merge) & !grepl("Missing",Pool_for_seq_merge)) %>%
-    left_join(pep_list_w_theo_pep_map_pool ,by=c("pep_with_pos","pool_id")) %>%
-    mutate(map_pep=ifelse(pool_id_map_df==pool_id_theo_list_pep,"Correct Seq. & Correct Loc.",NA)) %>%
-    mutate(map_pep=ifelse(map_seq_pool=="Correct Seq. & mz & pool"& is.na(pool_id_theo_list_pep),"Correct Seq. & Wrong Loc.",map_pep)) %>%
-    mutate(map_pep=ifelse(map_seq_pool=="missing","missing",map_pep)) %>%
-    group_by(pep_with_pos,raw_file) %>%
-    distinct(pep_with_pos,.keep_all = TRUE)%>%
-    ungroup()
+      left_join(pep_list_w_theo_pep_map_pool ,by=c("pep_with_pos","pool_id")) %>%
+      mutate(map_pep=ifelse(pool_id_map_df==pool_id_theo_list_pep,"Correct Seq. & Correct Loc.",NA)) %>%
+      mutate(map_pep=ifelse(map_seq_pool=="Correct Seq. & mz & pool"& is.na(pool_id_theo_list_pep),"Correct Seq. & Wrong Loc.",map_pep)) %>%
+      mutate(map_pep=ifelse(map_seq_pool=="missing","missing",map_pep)) %>%
+      group_by(pep_with_pos,raw_file) %>%
+      distinct(pep_with_pos,.keep_all = TRUE)%>%
+      ungroup()
   }
-    
-    
-      
-      # filter(!grepl("Unexpected Seq.",Pool_for_seq_merge) & !grepl("Missing Seq.",Pool_for_seq_merge)) %>%
-      # select(!c(Pool_for_seq_merge, pool_id_theo_list)) %>%
-      # full_join(pep_list_w_theo_quant_new,by="pep_with_pos") %>% ## IF FULL_JOIN IS USED,
-     
-      # mutate(map_pep=ifelse(pool_id_theo_list==pool_id_map_df,"Correct","Wrong Loc.within theo list")) %>%
-      # mutate(map_pep= ifelse(is.na(pool_id_map_df),"Missing",map_pep)) %>%
-      # mutate(map_pep=ifelse(is.na(pool_id_theo_list),"Wrong Loc. out of theo. list",map_pep)) %>%
-      # mutate(acq_type=acquisiton_type) %>%
-      # mutate(soft_name=software_name) 
-      # 
+  
+  
+  
+  # filter(!grepl("Unexpected Seq.",Pool_for_seq_merge) & !grepl("Missing Seq.",Pool_for_seq_merge)) %>%
+  # select(!c(Pool_for_seq_merge, pool_id_theo_list)) %>%
+  # full_join(pep_list_w_theo_quant_new,by="pep_with_pos") %>% ## IF FULL_JOIN IS USED,
+  
+  # mutate(map_pep=ifelse(pool_id_theo_list==pool_id_map_df,"Correct","Wrong Loc.within theo list")) %>%
+  # mutate(map_pep= ifelse(is.na(pool_id_map_df),"Missing",map_pep)) %>%
+  # mutate(map_pep=ifelse(is.na(pool_id_theo_list),"Wrong Loc. out of theo. list",map_pep)) %>%
+  # mutate(acq_type=acquisiton_type) %>%
+  # mutate(soft_name=software_name) 
+  # 
   write.table(comb_result_pep_poolwise ,file=paste0(new_path,"/merge_theo_list_id_phospho_sites_only_unique_ones.tsv"), #file_path,curr_dir
               sep = "\t",col.names = T,row.names = F)
+  
+  #### VISUALIZATION OF TOTAL NUM. OF IDENTIFIED & LOCALIZED PHOSPHO-PEP ####
+  plot4 <- gg_barplt_id_pep_count_stack(data_set =comb_result_pep_poolwise,
+                                        x_df =comb_result_pep_poolwise$Experiment,
+                                        fill_df = comb_result_pep_poolwise$map_pep,
+                                        ymax = 250,
+                                        size_num=10,
+                                        header = paste("Number of Identified phospho-sites for each pool \n","Experiment",
+                                                       exp_id, acquisiton_type),
+                                        caption_lab = "Duplicates were removed for the futher analysis. \n Assessment was done by selecting only correct sequences",
+                                        x_lab = "Sample id",
+                                        fill_lab =  "Localization Accuracy",
+                                        y_lab = "Number of Localized Phospho-peptides",
+                                        subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +
+    scale_fill_brewer(palette = "Dark2") + theme(axis.text.x = element_text(angle = 90))
+  
+  #### EXTRACTION OF CORRECT PEP. ####
+  comb_result_pep_cor <- comb_result_pep_poolwise %>%
+    #filter(grepl("Correct",map_pep))
+    filter(grepl("Correct Seq. & mz & pool",map_seq_pool))
+  
+  #### VISUALIZATION OF TOTAL NUM. OF CORRECTLY IDENTIFIED & LOCALIZED PHOSPHO-PEP ####
+  plot5 <- gg_barplt_id_pep_count_stack(data_set =comb_result_pep_cor,
+                                        x_df =comb_result_pep_cor$Experiment,
+                                        fill_df = comb_result_pep_cor$map_pep,
+                                        ymax = 250,
+                                        size_num=10,
+                                        header = paste("Distribution of Correctly Identified phospho-sites for each pool \n","Experiment",
+                                                       exp_id, acquisiton_type),
+                                        caption_lab = "Duplicates were removed for the futher analysis. \n Assessment was done by selecting only correct sequences",
+                                        x_lab = "Sample id",
+                                        fill_lab =  "Localization Accuracy",
+                                        y_lab = "Number of Localized Phospho-peptides",
+                                        subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +
+    scale_fill_brewer(palette = "Dark2") + theme(axis.text.x = element_text(angle = 90))
+  
+  
+  if(background_species == "Escherichia coli"){
     
-    #### VISUALIZATION OF TOTAL NUM. OF IDENTIFIED & LOCALIZED PHOSPHO-PEP ####
-    plot4 <- gg_barplt_id_pep_count_stack(data_set =comb_result_pep_poolwise,
-                                   x_df =comb_result_pep_poolwise$Experiment,
-                                   fill_df = comb_result_pep_poolwise$map_pep,
-                                   ymax = 250,
-                                   size_num=10,
-                                   header = paste("Number of Identified phospho-sites for each pool \n","Experiment",
-                                                  exp_id, acquisiton_type),
-                                   caption_lab = "Duplicates were removed for the futher analysis. \n Assessment was done by selecting only correct sequences",
-                                   x_lab = "Sample id",
-                                   fill_lab =  "Localization Accuracy",
-                                   y_lab = "Number of Localized Phospho-peptides",
-                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +
-      scale_fill_brewer(palette = "Dark2") + theme(axis.text.x = element_text(angle = 90))
+    comb_result_pep_filtered <- comb_result_pep_poolwise %>% 
+      filter(!grepl("missing",map_pep)) %>%
+      separate(Experiment,into = c("exp","samp","coli","inj"),sep = "_",remove = F) %>%
+      mutate(samp_name_wo_inj=paste(exp,samp,coli,sep = "-")) %>%
+      group_by(samp_name_wo_inj,pep_with_pos) %>%
+      slice(which.max(max_phospho)) %>%
+      ungroup()
     
-    #### EXTRACTION OF CORRECT PEP. ####
-    comb_result_pep_cor <- comb_result_pep_poolwise %>%
-      #filter(grepl("Correct",map_pep))
-      filter(grepl("Correct Seq. & mz & pool",map_seq_pool))
+  }else if (background_species ==""){
     
-    #### VISUALIZATION OF TOTAL NUM. OF CORRECTLY IDENTIFIED & LOCALIZED PHOSPHO-PEP ####
-    plot5 <- gg_barplt_id_pep_count_stack(data_set =comb_result_pep_cor,
-                                   x_df =comb_result_pep_cor$Experiment,
-                                   fill_df = comb_result_pep_cor$map_pep,
-                                   ymax = 250,
-                                   size_num=10,
-                                   header = paste("Distribution of Correctly Identified phospho-sites for each pool \n","Experiment",
-                                                  exp_id, acquisiton_type),
-                                   caption_lab = "Duplicates were removed for the futher analysis. \n Assessment was done by selecting only correct sequences",
-                                   x_lab = "Sample id",
-                                   fill_lab =  "Localization Accuracy",
-                                   y_lab = "Number of Localized Phospho-peptides",
-                                   subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +
-      scale_fill_brewer(palette = "Dark2") + theme(axis.text.x = element_text(angle = 90))
+    comb_result_pep_filtered <- comb_result_pep_poolwise %>% 
+      filter(!grepl("missing",map_pep)) %>%
+      separate(Experiment,into = c("exp","samp","inj"),sep = "_",remove = F) %>%
+      mutate(samp_name_wo_inj=paste(exp,samp,sep = "-")) %>%
+      group_by(samp_name_wo_inj,pep_with_pos) %>%
+      slice(which.max(max_phospho)) %>%
+      ungroup()
     
-    
-    if(background_species == "Escherichia coli"){
-      
-      comb_result_pep_filtered <- comb_result_pep_poolwise %>% 
-        filter(!grepl("missing",map_pep)) %>%
-        separate(Experiment,into = c("exp","samp","coli","inj"),sep = "_",remove = F) %>%
-        mutate(samp_name_wo_inj=paste(exp,samp,coli,sep = "-")) %>%
-        group_by(samp_name_wo_inj,pep_with_pos) %>%
-        slice(which.max(max_phospho)) %>%
-        ungroup()
-      
-    }else if (background_species ==""){
-      
-      comb_result_pep_filtered <- comb_result_pep_poolwise %>% 
-        filter(!grepl("missing",map_pep)) %>%
-        separate(Experiment,into = c("exp","samp","inj"),sep = "_",remove = F) %>%
-        mutate(samp_name_wo_inj=paste(exp,samp,sep = "-")) %>%
-        group_by(samp_name_wo_inj,pep_with_pos) %>%
-        slice(which.max(max_phospho)) %>%
-        ungroup()
-      
-    }else{}
+  }else{}
   
   write.table(comb_result_pep_filtered ,file=paste0(new_path,"/merge_theo_list_id_phospho_sites_max_ptm_score.tsv"), #file_path,curr_dir
               sep = "\t",col.names = T,row.names = F)
-
-    #### LOCALIZATION ACCURACY ASSESSMENT (ROC LIKE PLOT GENERATION) #### 
-    ### Column selection
-    comb_result_pep_rmv_miss <- comb_result_pep_filtered %>% 
-      select(pep_with_pos,map_pep,max_phospho,pool_id_map_df)
+  
+  #### LOCALIZATION ACCURACY ASSESSMENT (ROC LIKE PLOT GENERATION) #### 
+  ### Column selection
+  comb_result_pep_rmv_miss <- comb_result_pep_filtered %>% 
+    select(pep_with_pos,map_pep,max_phospho,pool_id_map_df)
+  
+  
+  ### Custom localization threshold determination and
+  ### Counting total number of correct and wrong localization at a given threshold
+  threshold <- 1:100
+  final_df <- NULL
+  
+  for (i in 1:length(threshold)){
     
+    df <- comb_result_pep_rmv_miss %>% subset(max_phospho > threshold[i]) %>% 
+      count(map_pep) %>% 
+      mutate(threshold_val = threshold[i])
     
-    ### Custom localization threshold determination and
-    ### Counting total number of correct and wrong localization at a given threshold
-    threshold <- 1:100
-    final_df <- NULL
-    
-    for (i in 1:length(threshold)){
-      
-      df <- comb_result_pep_rmv_miss %>% subset(max_phospho > threshold[i]) %>% 
-        count(map_pep) %>% 
-        mutate(threshold_val = threshold[i])
-      
-      final_df <-bind_rows(final_df,df)
-      rm(df)
-    }
-    
-    write.table(final_df, file=paste0(new_path,"/","Experiment",exp_id,software_name,"_num_sites_with_scores.tsv"),sep = "\t",col.names = T,row.names = F) #file_path,curr_dir
-    
-    
+    final_df <-bind_rows(final_df,df)
+    rm(df)
+  }
+  
+  write.table(final_df, file=paste0(new_path,"/","Experiment",exp_id,software_name,"_num_sites_with_scores.tsv"),sep = "\t",col.names = T,row.names = F) #file_path,curr_dir
+  
+  
   #wrong_df <- final_df %>% filter(!grepl("Correct",map_pep))
   ## Threshold values were divided by 100 to make all thresholds the same range
-    correct_df <- final_df %>% filter(grepl("Correct Seq. & Correct Loc",map_pep)) %>% #filter(grepl("Correct",map_pep)) %>% 
-      mutate(new_threshold_val=threshold_val/100)
+  correct_df <- final_df %>% filter(grepl("Correct Seq. & Correct Loc",map_pep)) %>% #filter(grepl("Correct",map_pep)) %>% 
+    mutate(new_threshold_val=threshold_val/100)
   
   ### Visualization
   plot6 <- ggplot(correct_df,aes(y=n, x=new_threshold_val)) + geom_line(size=2) +
@@ -876,8 +876,8 @@ final_pd_pep_quant_analysis_exp1 <- function(file_path,
     
     ggplot( aes(x= max_phospho,fill=interaction(is_adj))) +
     geom_bar(stat = "count") + labs(x = "Count of STY amino acids", y = "Total count",
-                                   title = "Comparison of having an adjacent a.a effect of localization accuracy",
-                                   caption = paste(software_name,"Experiment",exp_id,acquisiton_type,sep = " "),fill="Is peptide adjacent?") +
+                                    title = "Comparison of having an adjacent a.a effect of localization accuracy",
+                                    caption = paste(software_name,"Experiment",exp_id,acquisiton_type,sep = " "),fill="Is peptide adjacent?") +
     facet_wrap(~pep_class) +
     theme_minimal() +
     #scale_fill_brewer(palette = "Paired")+
@@ -898,11 +898,11 @@ final_pd_pep_quant_analysis_exp1 <- function(file_path,
   plt_obj <- ls(pattern="plot")
   plt_obj <- plt_obj[!is.na(plt_obj)]
   sapply(1:length(plt_obj),function(x) ggsave(filename = paste0("p",x,".png"),
-                                               width = 60, height = 45, 
-                                               path = paste0(file_path,"/output_final_aft_mapp_func_mod_col_sel/"),#output_final #outputs_after_mapping_change
-                                               units = "cm",
-                                               get(plt_obj[x]),
-                                               device = "png", #".svg"
+                                              width = 60, height = 45, 
+                                              path = paste0(file_path,"/output_final_aft_mapp_func_mod_col_sel/"),#output_final #outputs_after_mapping_change
+                                              units = "cm",
+                                              get(plt_obj[x]),
+                                              device = "png", #".svg"
   ))
   
   
