@@ -34,7 +34,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
                                                      #actual_ratio,
                                                      subtitle){
   
-  intended_dir <-paste0(file_path,"/output_final")
+  intended_dir <-paste0(file_path,"/output_final_aft_mapp_func")#output_final")
   
   if(dir.exists(intended_dir)){
     new_path <- intended_dir
@@ -121,10 +121,14 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   # https://stackoverflow.com/questions/26923862/why-are-my-dplyr-group-by-summarize-not-working-properly-name-collision-with
   quant_peptides_with_cond <- quant_peptides %>% 
     mutate(Experiment=paste0(R.Condition,"-R",R.Replicate)) %>%
-    rename("Intensity"= "EG.TotalQuantity..Settings.") %>%
+    rename("Intensity"= `EG.TotalQuantity (Settings)`) %>% #"EG.TotalQuantity..Settings.") %>%
     rename(Sequence=PEP.GroupingKey) %>%
     rename(raw_file=R.FileName) %>%
-    full_join(map_df,by="raw_file") #%>%
+    full_join(map_df,by="raw_file") %>%
+    separate(EG.PrecursorId,into = c("Precursor_pep","Charge"),sep = "\\.", remove = F) %>%
+    mutate(pool_id_map_df=pool_id) %>%
+    mutate(Charge=as.numeric(Charge)) %>%
+    filter(Charge < 5)
     #rename(pool_id_map_df=pool_id)
   
   
@@ -136,8 +140,8 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   
   # Apply the function to each row
   max_prob_and_pos <- apply(comb_result, 1, function(row) {
-    find_max_value_and_pos(ptm_prob = row["EG.PTMProbabilities..Phospho..STY.."], #"EG.PTMProbabilities [Phospho (STY)]"
-                           ptm_pos = row["EG.PTMPositions..Phospho..STY.." ], #EG.PTMPositions [Phospho (STY)]
+    find_max_value_and_pos(ptm_prob = row["EG.PTMProbabilities [Phospho (STY)]"], # "EG.PTMProbabilities..Phospho..STY.."
+                           ptm_pos = row["EG.PTMPositions [Phospho (STY)]" ], # EG.PTMPositions..Phospho..STY..
                            ptm_count = row["EG.PrecursorId"])
   })
   
@@ -159,20 +163,23 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   # Extracted values
   comb_result_pos <- comb_result %>% 
     bind_cols(df) %>% 
+    filter(!grepl("non-distinguishable",ptm_type)) %>%
     mutate(pep_with_pos=paste(Sequence,ptm_position,sep = "_")) %>%
+    separate(pep_with_pos,into = c("seq","Positions"),sep = "_",remove = F) %>%
     select(pep_with_pos,
            Sequence,
            Intensity,
            Experiment,
            raw_file,
-           sample_name,
+           #sample_name,
            pool_id,
-           #pool_id_map_df,
+           pool_id_map_df,
            ptm_score,
-           ptm_position,
+           Positions,
+           #ptm_position,
            ptm_type,
-           EG.PTMLocalizationProbabilities,
-           EG.PTMProbabilities..Phospho..STY..,
+           `EG.PTMPositions [Phospho (STY)]`,#EG.PTMLocalizationProbabilities,
+           `EG.PTMProbabilities [Phospho (STY)]`, #EG.PTMProbabilities..Phospho..STY..,
            PG.ProteinLabel)
   
   ## READ THEO LIST
@@ -184,17 +191,33 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   ## ADD COMMON COLUMN TO MERGE WITH EXP. DATA
   #colnames(common_col_theo_quant) <- "pep_with_pos"
   #pep_list_w_theo_quant_new <- cbind(common_col_theo_quant,pep_list_w_theo_quant)
+  # 
+  # pep_list_w_theo_pep_comp <- pep_list_w_theo %>% 
+  #   select(!c(Sequence,Phosphopeptide.sequence)) %>%
+  #   #rename(Sequence = Phosphopeptide.sequence) %>% 
+  #   rename(pool_id_theo_list=pool_id) 
+  # 
+  # pep_list_w_theo_seq_comp <- pep_list_w_theo %>% 
+  #   select(Sequence,pool_id) %>%
+  #   #select(!pep_with_pos) %>%
+  #   #rename(sequence = Sequence) %>% 
+  #   mutate(pool_id_theo_list=pool_id) 
   
-  pep_list_w_theo_pep_comp <- pep_list_w_theo %>% 
-    select(!c(Sequence,Phosphopeptide.sequence)) %>%
-    #rename(Sequence = Phosphopeptide.sequence) %>% 
-    rename(pool_id_theo_list=pool_id) 
+  pep_list_w_theo_seq_map <- pep_list_w_theo %>%
+    select(Sequence,Neutral.mass.SH.Cys) %>%
+    rename(Neutral_mass=Neutral.mass.SH.Cys) %>%
+    mutate(Neutral_mass = round(Neutral_mass, 0)) %>%
+    mutate(Neutral_mass_theo=Neutral_mass) #%>%
+  #mutate(pool_id_theo_list_seq=pool_id) 
   
-  pep_list_w_theo_seq_comp <- pep_list_w_theo %>% 
+  
+  pep_list_w_theo_seq_map_pool <-  pep_list_w_theo %>%
     select(Sequence,pool_id) %>%
-    #select(!pep_with_pos) %>%
-    #rename(sequence = Sequence) %>% 
-    mutate(pool_id_theo_list=pool_id) 
+    mutate(pool_id_theo_list_seq=pool_id) 
+  
+  pep_list_w_theo_pep_map_pool <-  pep_list_w_theo %>%
+    select(pep_with_pos,pool_id) %>%
+    mutate(pool_id_theo_list_pep=pool_id) 
   
   # Extracted values
   # comb_result_pos <- final_results_with_common_col %>% 
@@ -208,33 +231,73 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   #   #rename(ptm_score=extracted_values) %>%
   #   full_join(map_df,by="raw_file") #%>%
   #rename(pool_id_map_df=pool_id) 
-
+  
+  ##################################################################################################################
+  ##################################################################################################################
+  ### Mapping by precursor mass + phospho  and sequence ####
+  
+  amino_acid_table <- read.delim("D:/dev/Pinar/PHD/wet_lab_experiments/Eyers_syn_peptides_experiment/amino_acid_table.txt")
+  mapping_df <- as.data.frame(cbind(amino_acid_table$X1.letter.code,amino_acid_table$Monoisotopic.Mass))
+  colnames(mapping_df) <- c("letters","mono_isotopic")
+  
+  mapping_df$mono_isotopic <- as.numeric(mapping_df$mono_isotopic)
+  # Apply the function to each sequence in the sequences data frame
+  
+  comb_result_pos$Sum <- mapply(calculate_sum,
+                                comb_result_pos$Sequence,
+                                comb_result_pos$Positions, MoreArgs = list(mapping_df = mapping_df))
+  
+  comb_result_mz_seq_map <- comb_result_pos %>%
+    mutate(Neutral_mass = round(Sum, 0)) %>%
+    mutate(Neutral_mass_res=Neutral_mass) %>%
+    full_join(pep_list_w_theo_seq_map,by=c("Neutral_mass","Sequence"),relationship="many-to-many") %>% # #pep_with_pos
+    mutate(map_seq = ifelse(is.na(Neutral_mass_res), "missing", NA)) %>%
+    mutate(map_seq = ifelse(is.na(Neutral_mass_theo), "Subset or different mz", map_seq)) %>%
+    mutate(map_seq = ifelse(!is.na(Neutral_mass_res) & !is.na(Neutral_mass_theo) & Neutral_mass_res == Neutral_mass_theo , # pool_id_map_df==pool_id_theo_list_seq
+                            "Correct seq. & Correct mz",map_seq)) %>%
+    select(!c(Positions,Sum)) %>%
+    group_by(pep_with_pos,Experiment) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
+    slice(which.max(Intensity)) %>%
+    ungroup() 
+  
+  
+  comb_result_seq_pool <- comb_result_mz_seq_map %>% 
+    full_join(pep_list_w_theo_seq_map_pool,by=c("Sequence","pool_id")) %>% # #pep_with_pos
+    mutate(map_seq_pool=ifelse(map_seq!='Subset or different mz' & pool_id_theo_list_seq==pool_id_map_df, "Correct Seq. & mz & pool",NA)) %>%
+    mutate(map_seq_pool=ifelse(map_seq!='Subset or different mz' & is.na(pool_id_theo_list_seq), "Correct Seq. & mz but wrong pool",map_seq_pool)) %>%
+    
+    mutate(map_seq_pool=ifelse(map_seq== "Subset or different mz",map_seq,map_seq_pool)) %>%
+    mutate(map_seq_pool = ifelse(is.na(Experiment), "missing", map_seq_pool))
+  
+  
+  
+  
   
   #### TOTAL NUM. OF PHOSPHO-SEQUENCES ####
   ### Correct mapping was done using "map_df".
-  comb_result_seq <- comb_result_pos %>% 
-    full_join(pep_list_w_theo_seq_comp,by=c("Sequence","pool_id")) %>%
-    select(!c(pool_id,sample_name)) %>%
-    ## RE-JOINING TO COUNT CORRECT, INCORRECT and MISSING SEQ. 
-    full_join(map_df,by="raw_file") %>%
-    rename(pool_id_map_df=pool_id) %>%
-    mutate(Pool_for_seq_merge=ifelse(pool_id_theo_list==pool_id_map_df,"Correct Seq.","Wrong Seq.")) %>% #within theo list
-    #mutate_at("Pool_for_seq_merge", ~replace_na(.,"Unexpected Seq.")) %>%
-    mutate(Pool_for_seq_merge= ifelse(is.na(pool_id_map_df),"Missing",Pool_for_seq_merge)) %>%
-    mutate(Pool_for_seq_merge=ifelse(is.na(pool_id_theo_list),"Wrong Seq.",Pool_for_seq_merge)) %>% # out of theo. list
-    mutate(acq_type=acquisiton_type) %>%
-    mutate(soft_name=software_name)
-  
+  # comb_result_seq <- comb_result_pos %>% 
+  #   full_join(pep_list_w_theo_seq_comp,by=c("Sequence","pool_id")) %>%
+  #   select(!c(pool_id,sample_name)) %>%
+  #   ## RE-JOINING TO COUNT CORRECT, INCORRECT and MISSING SEQ. 
+  #   full_join(map_df,by="raw_file") %>%
+  #   rename(pool_id_map_df=pool_id) %>%
+  #   mutate(Pool_for_seq_merge=ifelse(pool_id_theo_list==pool_id_map_df,"Correct Seq.","Wrong Seq.")) %>% #within theo list
+  #   #mutate_at("Pool_for_seq_merge", ~replace_na(.,"Unexpected Seq.")) %>%
+  #   mutate(Pool_for_seq_merge= ifelse(is.na(pool_id_map_df),"Missing",Pool_for_seq_merge)) %>%
+  #   mutate(Pool_for_seq_merge=ifelse(is.na(pool_id_theo_list),"Wrong Seq.",Pool_for_seq_merge)) %>% # out of theo. list
+  #   mutate(acq_type=acquisiton_type) %>%
+  #   mutate(soft_name=software_name)
+  # 
  
   ### Duplicate sequences were removed.
-  comb_result_dist <- comb_result_seq %>%
-    relocate(pool_id_map_df,pool_id_theo_list,Pool_for_seq_merge,.after = Sequence) %>% #
-    group_by(raw_file,Sequence) %>%
+  comb_result_dist <- comb_result_seq_pool %>%
+    #relocate(pool_id_map_df,pool_id_theo_list,Pool_for_seq_merge,.after = Sequence) %>% #
+    group_by(raw_file,Sequence,Neutral_mass_res) %>%
     distinct(Sequence,.keep_all = T) %>%
     ungroup() 
  
   #### WRITE THE OBJECT AS TSV ####
-  write.table(comb_result_seq,file=paste0(new_path,"/", #file_path
+  write.table(comb_result_seq_pool,file=paste0(new_path,"/", #file_path
                                           "exp",
                                           exp_id,#acquisiton_type,
                                           "merge_theo_list_with_identified_phospho_seq.tsv"),
@@ -247,8 +310,8 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
               sep = "\t",col.names = T,row.names = F)
   #### VISUALIZATION OF TOTAL NUM. OF PHOSPHO-SEQ ####
   plot3 <- gg_barplt_id_pep_count_stack(data_set = comb_result_dist,
-                                 x_df = comb_result_dist$sample_name,
-                                 fill_df = comb_result_dist$Pool_for_seq_merge,
+                                 x_df = comb_result_dist$Experiment,
+                                 fill_df = comb_result_dist$map_seq_pool,
                                  ymax = 250,
                                  size_num=10,
                                  header = paste("Total number of identified synthetic phospho-sequences across each pool",sep=" "),
@@ -262,13 +325,14 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   
   #### EXTRACTION OF CORRECT SEQ. ####
   comb_result_seq_dist_cor <- comb_result_dist %>%
-    filter(!grepl("Wrong",Pool_for_seq_merge) & !grepl("Missing",Pool_for_seq_merge))
+    filter(!grepl("Subset or different mz",map_seq) & !grepl("Missing",map_seq))
+           #!grepl("Wrong",Pool_for_seq_merge) & !grepl("Missing",Pool_for_seq_merge))
   
   #### VISUALIZATION OF TOTAL NUM. OF CORRECTLY IDENTIFIED PHOSPHO-SEQ ####
   
   plot2 <- gg_barplt_id_pep_count_stack(data_set =comb_result_seq_dist_cor,
-                                 x_df =comb_result_seq_dist_cor$sample_name,
-                                 fill_df = comb_result_seq_dist_cor$Pool_for_seq_merge,
+                                 x_df =comb_result_seq_dist_cor$Experiment,
+                                 fill_df = comb_result_seq_dist_cor$map_seq_pool,
                                  ymax = 250,
                                  size_num=10,
                                  header = paste("Total number of identified synthetic phospho-sequences across each pool",sep=" "),
@@ -284,31 +348,43 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   ### Correct mapping was done using "pool_id_map_df" and "pep_with_pos".
   ### Duplicate peptides were removed.
   
-  comb_result_pep <- comb_result_seq %>% 
-    filter(!grepl("Wrong",Pool_for_seq_merge) & !grepl("Missing",Pool_for_seq_merge)) %>%
+  comb_result_pep_poolwise <- comb_result_seq_pool %>% 
+    filter(!grepl("Subset or different mz",map_seq) & !grepl("Missing",map_seq))%>%
+    filter(!grepl('Correct Seq. & mz but wrong pool',map_seq_pool)) %>%
+    #filter(!grepl("Wrong",Pool_for_seq_merge) & !grepl("Missing",Pool_for_seq_merge)) %>%
+    left_join(pep_list_w_theo_pep_map_pool ,by=c("pep_with_pos","pool_id")) %>%
     
-    select(!c(Pool_for_seq_merge,pool_id_theo_list,pool_id_map_df,sample_name)) %>%
-    full_join(map_df,by="raw_file") %>%
-    rename(pool_id_map_df=pool_id) %>%
-    full_join(pep_list_w_theo_pep_comp,by="pep_with_pos") %>% ## IF FULL_JOIN IS USED,
-    group_by(pep_with_pos,raw_file) %>%
-    distinct(pep_with_pos,.keep_all = TRUE)%>%
-    ungroup() %>%
-    mutate(Pool_for_pep_merge=ifelse(pool_id_theo_list==pool_id_map_df,"Correct","Wrong Loc.within theo list")) %>%
-    mutate(Pool_for_pep_merge= ifelse(is.na(pool_id_map_df),"Missing",Pool_for_pep_merge)) %>%
-    mutate(Pool_for_pep_merge=ifelse(is.na(pool_id_theo_list),"Wrong Loc. out of theo. list",Pool_for_pep_merge)) %>%
-    relocate(pool_id_map_df,pool_id_theo_list,Pool_for_pep_merge,.after = Sequence) %>% 
-    mutate(acq_type=acquisiton_type) %>%
-    mutate(soft_name=software_name) 
+    mutate(map_pep=ifelse(pool_id_map_df==pool_id_theo_list_pep,"Correct Seq. & Correct Loc.",NA)) %>%
+    mutate(map_pep=ifelse(map_seq_pool=="Correct Seq. & mz & pool"& is.na(pool_id_theo_list_pep),"Correct Seq. & Wrong Loc.",map_pep)) %>%
+    mutate(map_pep=ifelse(map_seq_pool=="missing","missing",map_pep)) %>%
+    
+    #mutate(map_pep=ifelse(is.na(pool_id_theo_list_pep),"Correct Seq. & Wrong Loc.",map_seq_pool)) %>%
+    #select(!c(Positions,Sum)) %>%
+    group_by(pep_with_pos,Experiment) %>% ## sample_rep_id_seq allowed us to keep one sequence for each sample
+    slice(which.max(Intensity)) %>%
+    ungroup() 
+    # select(!c(Pool_for_seq_merge,pool_id_theo_list,pool_id_map_df,sample_name)) %>%
+    # full_join(map_df,by="raw_file") %>%
+    # rename(pool_id_map_df=pool_id) %>%
+    # full_join(pep_list_w_theo_pep_comp,by="pep_with_pos") %>% ## IF FULL_JOIN IS USED,
+    # group_by(pep_with_pos,raw_file) %>%
+    # distinct(pep_with_pos,.keep_all = TRUE)%>%
+    # ungroup() %>%
+    # mutate(map_pep=ifelse(pool_id_theo_list==pool_id_map_df,"Correct","Wrong Loc.within theo list")) %>%
+    # mutate(map_pep= ifelse(is.na(pool_id_map_df),"Missing",map_pep)) %>%
+    # mutate(map_pep=ifelse(is.na(pool_id_theo_list),"Wrong Loc. out of theo. list",map_pep)) %>%
+    # relocate(pool_id_map_df,pool_id_theo_list,map_pep,.after = Sequence) %>% 
+    # mutate(acq_type=acquisiton_type) %>%
+    # mutate(soft_name=software_name) 
   
   
-  write.table(comb_result_pep ,file=paste0(new_path,"/merge_theo_list_id_phospho_sites_only_unique_ones.tsv"), #file_path
+  write.table(comb_result_pep_poolwise,file=paste0(new_path,"/merge_theo_list_id_phospho_sites_only_unique_ones.tsv"), #file_path
               sep = "\t",col.names = T,row.names = F)
   
   #### VISUALIZATION OF TOTAL NUM. OF IDENTIFIED & LOCALIZED PHOSPHO-PEP ####
-  plot4 <- gg_barplt_id_pep_count_stack(data_set =comb_result_pep,
-                                 x_df =comb_result_pep$sample_name,
-                                 fill_df = comb_result_pep$Pool_for_pep_merge,
+  plot4 <- gg_barplt_id_pep_count_stack(data_set =comb_result_pep_poolwise,
+                                 x_df =comb_result_pep_poolwise$Experiment,
+                                 fill_df = comb_result_pep_poolwise$map_pep,
                                  ymax = 250,
                                  size_num=10,
                                  header = paste("Number of Identified phospho-sites for each pool \n","Experiment",
@@ -322,13 +398,14 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   
   
   #### EXTRACTION OF CORRECT PEP. ####
-  comb_result_pep_cor <- comb_result_pep %>%
-    filter(grepl("Correct",Pool_for_pep_merge))
+  comb_result_pep_cor <- comb_result_pep_poolwise %>%
+    #filter(grepl("Correct",Pool_for_pep_merge))
+    filter(grepl("Correct Seq. & mz & pool",map_seq_pool))
   
   #### VISUALIZATION OF TOTAL NUM. OF CORRECTLY IDENTIFIED & LOCALIZED PHOSPHO-PEP ####
   plot5 <- gg_barplt_id_pep_count_stack(data_set =comb_result_pep_cor,
-                                 x_df =comb_result_pep_cor$sample_name,
-                                 fill_df = comb_result_pep_cor$Pool_for_pep_merge,
+                                 x_df =comb_result_pep_cor$Experiment,
+                                 fill_df = comb_result_pep_cor$map_pep,
                                  ymax = 250,
                                  size_num=10,
                                  header = paste("Distribution of Correctly Identified phospho-sites for each pool \n","Experiment",
@@ -340,9 +417,9 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
                                  subtitle_txt = paste("Experiment - ", exp_id, acquisiton_type, " data processed by ", software_name)) +
     scale_fill_brewer(palette = "Dark2") + theme(axis.text.x = element_text(angle = 90))
   
-  comb_result_pep_filtered <- comb_result_pep %>% 
-    filter(!grepl("Missing",Pool_for_pep_merge)) %>%
-      separate(sample_name,into = c("exp","samp","inj"),sep = "_",remove = F) %>%
+  comb_result_pep_filtered <- comb_result_pep_cor %>% 
+    #filter(!grepl("Missing",Pool_for_pep_merge)) %>%
+      separate(Experiment,into = c("exp","samp","inj"),sep = "_",remove = F) %>%
       mutate(samp_name_wo_inj=paste(exp,samp,sep = "-")) %>%
       group_by(samp_name_wo_inj,pep_with_pos) %>%
       slice(which.max(ptm_score)) %>%
@@ -354,7 +431,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   #### LOCALIZATION ACCURACY ASSESSMENT (ROC LIKE PLOT GENERATION) #### 
   ### Column selection
   comb_result_pep_rmv_miss <- comb_result_pep_filtered %>% 
-    select(pep_with_pos,Pool_for_pep_merge,ptm_score,pool_id_map_df)
+    select(pep_with_pos,map_pep,ptm_score,pool_id_map_df)
   
   ### Custom localization threshold determination and
   ### Counting total number of correct and wrong localization at a given threshold
@@ -364,7 +441,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   for (i in 1:length(threshold)){
     
     df <- comb_result_pep_rmv_miss %>% subset(ptm_score > threshold[i]) %>% 
-      count(Pool_for_pep_merge) %>% 
+      count(map_pep) %>% 
       mutate(threshold_val = threshold[i])
     
     final_df <-bind_rows(final_df,df)
@@ -373,10 +450,10 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   
   write.table(final_df, file=paste0(new_path,"/","Experiment",exp_id,software_name,"_num_sites_with_scores.tsv"),sep = "\t",col.names = T,row.names = F) #file_path
   
-  #wrong_df <- final_df %>% filter(grepl("Wrong",Pool_for_pep_merge))
+  #wrong_df <- final_df %>% filter(grepl("Wrong",map_pep))
   
   ### Filtering only the correct ones
-  correct_df <- final_df %>% filter(grepl("Correct",Pool_for_pep_merge))
+  correct_df <- final_df %>% filter(grepl("Correct Seq. & Correct Loc",map_pep)) #Correct
   ### Visualization
   plot6 <- ggplot(correct_df,aes(y=n, x=threshold_val)) + geom_line(size=2) +
     scale_fill_brewer(palette = "Dark2") +
@@ -434,7 +511,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     return(result)
   }
   
-  # comb_pep_adj_dist_df_neg <- comb_result_pep %>%
+  # comb_pep_adj_dist_df_neg <- comb_result_pep_poolwise%>%
   #   select(Sequence) %>%
   #   mutate(
   #     Contains_STY = ifelse(sapply(Sequence, function(x) str_count(x, pattern = "(S(?=(S|T|Y)(S|T|Y))|T(?=(S|T|Y)(S|T|Y))|Y(?=(S|T|Y)(S|T|Y)))")) == 2,
@@ -488,7 +565,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     mutate(is_adj= "non_adjacent")
   
   comb_result_pep_non_adj$STY_adj_new <- sapply(comb_result_pep_non_adj$STY_adj, paste, collapse = "")
-  
+  pep_list_w_theo_adj_map <- pep_list_w_theo %>% select(pep_with_pos,S_count,T_count,Y_count,row_sum)
   ### COMBINATION OF ALL ADJACENT ONES
   comb_result_pep_adj_all <- comb_result_pep_non_adj %>%
     select(!c(STY_adj)) %>%
@@ -497,6 +574,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
               comb_result_pep_adj_4,
               comb_result_pep_adj_3,
               comb_result_pep_adj_2) %>%
+    left_join(pep_list_w_theo_adj_map,by = "pep_with_pos") %>%
     select(Sequence,
            S_count,
            T_count,
@@ -504,18 +582,19 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
            row_sum,
            STY_adj,
            STY_len,
-           Pool_for_pep_merge,
+           map_seq_pool,
+           map_pep,
            ptm_score,
            pep_with_pos,
            pool_id_map_df,
-           sample_name,
+           #sample_name,
            raw_file,is_adj) 
   
   write.table(comb_result_pep_adj_all,file = paste0(new_path,"/all_adj&nonadj_corr_wrong_loc_nolocthreshold.txt"),sep = "\t",col.names = T,row.names = F)
   ### TOTAL COUNT OF ALL SEQUENCES WITHOUT CONSIDERING ADJ_COUNT
   ### TOTAL COUNT OF ALL SEQUENCES WITHOUT CONSIDERING ADJ_COUNT
   plot7 <- comb_result_pep_adj_all %>% tibble() %>%
-    filter(grepl("Correct",Pool_for_pep_merge)) %>%
+    filter(grepl("Correct Seq. & Correct Loc",map_pep)) %>%#grepl("Correct",map_pep)) %>%
     count(is_adj) %>%
     #mutate(n_new = ifelse(Pool_for_seq_merge!="Correct",(-1*n),n)) %>%
     ggplot(aes(x=n,y=n, fill=is_adj)) +
@@ -544,19 +623,19 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   
   ### TOTAL COUNT OF ALL SEQUENCES WITH CONSIDERING ADJ_COUNT AND ACCURACY
   plot8 <- comb_result_pep_adj_all %>%
-    mutate(pep_class=Pool_for_pep_merge) %>%
-    mutate(pep_class=ifelse(Pool_for_pep_merge!= "Correct","Wrong",pep_class)) %>%
-    #filter(grepl("Correct",Pool_for_pep_merge)) %>%
+    mutate(pep_class=map_pep) %>%
+    #mutate(pep_class=ifelse(map_pep!= "Correct Seq. & Correct Loc","Wrong","Correct")) %>%
+    #filter(grepl("Correct",map_pep)) %>%
     rowwise() %>%
     #distinct(Sequence,.keep_all = TRUE) %>%
     #group_by(pep_with_pos,new_col) %>%
     #count(pep_with_pos)
-    #mutate(ptm_score = ifelse(Pool_for_pep_merge == "Wrong Localization",(ptm_score*-1),ptm_score)) %>%
+    #mutate(ptm_score = ifelse(map_pep == "Wrong Localization",(ptm_score*-1),ptm_score)) %>%
     group_by(is_adj,pep_class) %>%
-    count(STY_len) %>% #Pool_for_pep_merge
+    count(STY_len) %>% #map_pep
     ungroup() %>%
     mutate(n_label=n) %>%
-    #mutate(n=ifelse(Pool_for_pep_merge =="Wrong Localization", (n* (-1)),n)) %>%
+    #mutate(n=ifelse(map_pep =="Wrong Localization", (n* (-1)),n)) %>%
     mutate(n=ifelse(is_adj =="non_adjacent", (n* (-1)),n)) %>%
     mutate(STY_len= ifelse(STY_len < 0, (-1*STY_len),STY_len)) %>%
     #mutate(abs_n=c("141","79","82","26\n")) %>%
@@ -581,13 +660,15 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     geom_text(aes(label =n_label), position = position_stack(vjust = 0.5),size=15)
   
   
-  plot11 <- comb_result_pep_adj_all %>% mutate(Pool_for_pep_merge=ifelse(Pool_for_pep_merge!="Correct","Wrong",Pool_for_pep_merge)) %>%
-    #filter(!grepl("Wrong Loc. out of theo. list",Pool_for_pep_merge)) %>%
+  plot11 <- comb_result_pep_adj_all %>% 
+    mutate(pep_class=map_pep) %>%
+    #mutate(map_pep=ifelse(map_pep!="Correct","Wrong",map_pep)) %>%
+    #filter(!grepl("Wrong Loc. out of theo. list",map_pep)) %>%
     #filter(ptm_score > 0.75) %>%
-    count(row_sum,is_adj,Pool_for_pep_merge) %>% mutate(n_label=n) %>%
+    count(row_sum,is_adj,map_pep) %>% mutate(n_label=n) %>%
     mutate(n=ifelse(is_adj =="non_adjacent", (n* (-1)),n)) %>%
     mutate(STY_len= ifelse(row_sum < 0, (-1*row_sum),row_sum)) %>%
-    ggplot(aes(x=STY_len,y=n,fill=Pool_for_pep_merge,pattern=is_adj)) +
+    ggplot(aes(x=STY_len,y=n,fill=map_pep,pattern=is_adj)) +
     geom_col_pattern(alpha=0.8,
                      color = "white", 
                      pattern_fill = "white",
@@ -614,13 +695,14 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
     labs(subtitle = "No Localization filter was applied.",x="Length of STY a.a in the sequence",y="Count",fill="Is correctly localized?")
   
   plot12 <- comb_result_pep_adj_all %>% filter(!grepl("non_adjacent",is_adj)) %>%
-    mutate(Pool_for_pep_merge=ifelse(Pool_for_pep_merge!="Correct","Wrong",Pool_for_pep_merge)) %>%
-    #filter(!grepl("Wrong Loc. out of theo. list",Pool_for_pep_merge)) %>%
+    mutate(pep_class=map_pep) %>%
+    #mutate(map_pep=ifelse(map_pep!="Correct","Wrong",map_pep)) %>%
+    #filter(!grepl("Wrong Loc. out of theo. list",map_pep)) %>%
     #filter(ptm_score > 0.75) %>%
-    count(STY_len,is_adj,Pool_for_pep_merge) %>% mutate(n_label=n) %>%
-    mutate(n=ifelse(Pool_for_pep_merge =="Wrong", (n* (-1)),n)) %>%
+    count(STY_len,is_adj,map_pep) %>% mutate(n_label=n) %>%
+    mutate(n=ifelse(map_pep =="Wrong", (n* (-1)),n)) %>%
     mutate(STY_len= ifelse(STY_len < 0, (-1*STY_len),STY_len)) %>%
-    ggplot(aes(x=STY_len,y=n,fill=Pool_for_pep_merge)) +
+    ggplot(aes(x=STY_len,y=n,fill=map_pep)) +
     geom_col() +
     geom_text(aes(label =n_label), position = position_stack(vjust = 0.5),size=5) +
     scale_fill_manual(values = c("#a1d76a", "#e9a3c9")) + 
@@ -641,9 +723,9 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   
   ### DISTRIBUTION OF ALL SEQUENCES WITH CONSIDERING ADJ_COUNT AND ACCURACY 
   plot9 <- comb_result_pep_adj_all %>%
-    mutate(pep_class=Pool_for_pep_merge) %>%
-    mutate(pep_class=ifelse(Pool_for_pep_merge!= "Correct","Wrong",pep_class)) %>%
-    select(!Pool_for_pep_merge) %>%
+    mutate(pep_class=map_pep) %>%
+    #mutate(pep_class=ifelse(map_pep!= "Correct","Wrong",pep_class)) %>%
+    select(!map_pep) %>%
     subset(!(STY_len == 1 & is_adj == "non_adjacent")) %>%
     
     ggplot(aes(x= ptm_score,fill=is_adj)) +
@@ -671,7 +753,7 @@ final_spectronaut_pep_quant_analysis_syn <- function(file_path,
   plt_obj <- plt_obj[!is.na(plt_obj)]
   sapply(1:length(plt_obj),function(x) ggsave(filename = paste0("p",x,".png"),
                                                width = 60, height = 45, 
-                                               path = paste0(file_path,"output_final/"),
+                                               path = paste0(file_path,"output_final_aft_mapp_func/"), #output_final
                                                units = "cm",
                                                get(plt_obj[x]),
                                                device = "png", #".svg"
